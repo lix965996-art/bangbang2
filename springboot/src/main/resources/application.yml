@@ -1,0 +1,84 @@
+server:
+  port: 9090
+  servlet:
+    context-path: /
+  tomcat:
+    max-threads: 200
+    min-spare-threads: 10
+
+spring:
+  application:
+    name: smart-agriculture
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/smart-agriculture?characterEncoding=utf8&useSSL=false&serverTimezone=UTC&rewriteBatchedStatements=true&allowPublicKeyRetrieval=true
+    username: root
+    password: 123456
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
+      enabled: true
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: GMT+8
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.farmland.intel.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    cache-enabled: true
+    lazy-loading-enabled: true
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+# 日志配置
+logging:
+  level:
+    com.farmland.intel: info
+    org.springframework.web: warn
+    org.mybatis: warn
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/smart-agriculture.log
+    max-size: 10MB
+    max-history: 30
+
+# 文件上传配置
+files:
+  upload:
+    path: D:\test\smart-agriculture\springboot
+    allowed-types: jpg,jpeg,png,gif,pdf,doc,docx,xls,xlsx
+    max-size: 100MB
+
+# 高德地图API配置
+amap:
+  js-key: a0dc4534ab26be714e94cef345e480aa  # JavaScript API Key（前端地图使用）
+  web-key: ad1347855b35e84080018cf5c811d3e7  # Web服务API Key（后端REST API使用）
+  city: 430800  # 张家界市的adcode
+
+# OneNET物联网平台配置（STM32硬件）
+onenet:
+  api-url: https://iot-api.heclouds.com
+  author-key: 2eb8177d8aef4736a03d004ac8538238  # 使用与index(1).vue相同的密钥
+  user-id: 470386
+  version: 2022-05-01
+  product-id: CzL61ga8FI
+  device-name: d1
+  enabled: true

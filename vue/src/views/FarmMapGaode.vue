@@ -1,0 +1,1140 @@
+<template>
+  <div class="modern-map-page">
+    <div class="left-sidebar-panel">
+      <div class="sidebar-header">
+        <h3 class="sidebar-title">农场列表</h3>
+      </div>
+      
+      <div class="search-wrapper">
+        <el-input
+          v-model="searchKeyword"
+          placeholder="搜索农场名称"
+          prefix-icon="el-icon-search"
+          clearable
+          class="search-input"
+        ></el-input>
+      </div>
+
+      <div class="region-list">
+        <!-- 按区域分组显示 -->
+        <div v-for="(group, region) in groupedFarms" :key="region" class="region-section">
+          <div class="region-header" @click="toggleRegion(region)">
+            <i :class="expandedRegions[region] ? 'el-icon-arrow-down' : 'el-icon-arrow-right'" class="expand-icon"></i>
+            <i class="el-icon-location-outline region-icon"></i>
+            <span class="region-name">{{ region }}</span>
+            <span class="region-count">({{ group.length }})</span>
+          </div>
+          
+          <div v-show="expandedRegions[region]" class="farm-list">
+            <div 
+              v-for="(farm, index) in group" 
+              :key="farm.id || index" 
+              class="farm-item"
+              :class="{ 'active': currentFarm && currentFarm.id === farm.id }"
+              @click="focusFarm(farm)"
+            >
+              <div class="farm-icon">
+                <span class="crop-initial">{{ farm.crop ? farm.crop[0] : '农' }}</span>
+              </div>
+              <div class="farm-info">
+                <div class="farm-name">{{ farm.farm }}</div>
+                <div class="farm-details">
+                  <span class="area">{{ farm.area || 0 }}亩</span>
+                  <span class="crop">{{ farm.crop || '未知' }}</span>
+                  <span :class="'status-' + getFarmStatus(farm).type" class="status">{{ getFarmStatus(farm).label }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <el-empty v-if="Object.keys(groupedFarms).length === 0" description="未找到地块" :image-size="60"></el-empty>
+      </div>
+    </div>
+
+    <div class="map-wrapper">
+      <div class="top-glass-bar">
+        <div class="brand">
+          <i class="el-icon-location-information" style="color: #4CAF50; font-size: 20px;"></i>
+          <span class="title">智慧农田 GIS 驾驶舱</span>
+        </div>
+        
+        <div class="data-pills">
+          <div class="pill">
+            <span class="label">监测地块</span>
+            <span class="val">{{ allFarms.length }}</span>
+          </div>
+        </div>
+
+        <div class="view-control">
+          <span class="control-label">3D 视角</span>
+          <el-slider 
+            v-model="mapPitch" 
+            :min="0" 
+            :max="80" 
+            :format-tooltip="val => val + '°'"
+            @input="handlePitchChange"
+            class="pitch-slider"
+          ></el-slider>
+        </div>
+      </div>
+      <div id="gaode-container" class="map-container"></div>
+    </div>
+
+    <div v-if="mapError" class="map-error-overlay">
+      <div class="error-content">
+        <i class="el-icon-warning-outline"></i>
+        <p>地图资源加载失败</p>
+        <el-button type="primary" size="medium" @click="retryLoadMap" icon="el-icon-refresh">重新加载</el-button>
+      </div>
+    </div>
+
+    <transition name="el-zoom-in-top">
+      <div class="right-detail-card" v-if="currentFarm">
+        <div class="detail-header">
+          <div class="header-left">
+            <div class="dh-title">{{ currentFarm.farm }}</div>
+            <div class="dh-address">
+              <i class="el-icon-location" style="margin-right: 4px;"></i>
+              {{ currentFarm.address || '位置信息未录入' }}
+            </div>
+          </div>
+          <el-button circle icon="el-icon-close" size="mini" @click="currentFarm = null"></el-button>
+        </div>
+        
+        <div class="detail-body">
+          <div class="kpi-row">
+            <div class="kpi-box">
+              <div class="k-val">{{ currentFarm.area || 0 }}<small>亩</small></div>
+              <div class="k-label">种植面积</div>
+            </div>
+            <div class="kpi-box">
+              <div class="k-val">{{ currentFarm.crop || '-' }}</div>
+              <div class="k-label">作物类型</div>
+            </div>
+            <div class="kpi-box">
+              <div class="k-val" :style="{color: currentFarmStatus.color}">{{ currentFarmStatus.label }}</div>
+              <div class="k-label">当前状态</div>
+            </div>
+          </div>
+
+          <el-divider></el-divider>
+
+          <div class="env-list">
+            <div class="env-item">
+              <div class="env-icon"><i class="el-icon-sunny"></i></div>
+              <div class="env-info">
+                <div class="env-name">光照强度</div>
+                <el-progress :percentage="80" :stroke-width="6" color="#F7BA2A"></el-progress>
+              </div>
+              <div class="env-val">High</div>
+            </div>
+            <div class="env-item">
+              <div class="env-icon"><i class="el-icon-heavy-rain"></i></div>
+              <div class="env-info">
+                <div class="env-name">土壤水分</div>
+                <el-progress :percentage="35" :stroke-width="6" status="exception"></el-progress>
+              </div>
+              <div class="env-val warning">Low</div>
+            </div>
+          </div>
+
+          <div class="action-group">
+            <el-button type="primary" icon="el-icon-video-camera" style="width: 100%" @click="$message.success('正在连接无人机画面...')">
+              调用实时监控
+            </el-button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <div class="map-tools">
+      <el-tooltip content="复位地图" placement="left">
+        <div class="tool-btn" @click="resetView"><i class="el-icon-refresh"></i></div>
+      </el-tooltip>
+      <el-tooltip content="定位到我" placement="left">
+        <div class="tool-btn" @click="autoLocate"><i class="el-icon-aim"></i></div>
+      </el-tooltip>
+    </div>
+  </div>
+</template>
+
+<script>
+export default {
+  name: 'FarmMapGaode',
+  data() {
+    return {
+      map: null,
+      // 使用一组更稳定的测试 Key (长期有效)
+      amapKey: '608d75903d29ad471362f8c58c550daf', 
+      securityCode: '346272916a8f766952c3ce99d2132877',
+      
+      allFarms: [],
+      searchKeyword: '',
+      currentFarm: null,
+      mapPitch: 60, 
+      mapError: false,
+      userMarker: null,  // 用户位置标记
+      expandedRegions: {
+        '吉首市': true,
+        '武陵源区': true,
+        '永定区': true
+      }
+    }
+  },
+  computed: {
+    displayFarms() {
+      if (!this.searchKeyword) return this.allFarms;
+      return this.allFarms.filter(f => f.farm && f.farm.includes(this.searchKeyword));
+    },
+    groupedFarms() {
+      const farms = this.searchKeyword ? this.displayFarms : this.allFarms;
+      const groups = {};
+      
+      // 使用正则表达式从地址中提取区县名称进行分组
+      farms.forEach(farm => {
+        const region = this.getRegionByFarm(farm);
+        
+        if (!groups[region]) {
+          groups[region] = [];
+        }
+        groups[region].push(farm);
+      });
+      
+      // 按照优先级排序：主要区县在前，"未知区县"在最后（参考Django版本）
+      const priorityOrder = ['永定区', '武陵源区', '慈利县', '桑植县'];
+      const sortedGroups = {};
+      
+      // 先添加优先区县
+      priorityOrder.forEach(region => {
+        if (groups[region]) {
+          sortedGroups[region] = groups[region];
+        }
+      });
+      
+      // 再添加其他动态识别的区县
+      Object.keys(groups).forEach(region => {
+        if (!priorityOrder.includes(region) && region !== '未知区县') {
+          sortedGroups[region] = groups[region];
+        }
+      });
+      
+      // 最后添加"未知区县"（参考Django版本）
+      if (groups['未知区县']) {
+        sortedGroups['未知区县'] = groups['未知区县'];
+      }
+      
+      return sortedGroups;
+    },
+    warningCount() {
+      return this.allFarms.filter(f => this.getFarmStatus(f).type === 'warning').length;
+    },
+    currentFarmStatus() {
+      return this.currentFarm ? this.getFarmStatus(this.currentFarm) : {};
+    }
+  },
+  mounted() {
+    this.loadAmapScript();
+    this.loadFarms();
+  },
+  beforeDestroy() {
+    if (this.map) this.map.destroy();
+  },
+  methods: {
+    retryLoadMap() {
+      this.mapError = false;
+      // 移除旧脚本防止重复
+      const oldScript = document.getElementById('amap-script');
+      if(oldScript) oldScript.remove();
+      this.loadAmapScript();
+    },
+    
+    getFarmStatus(farm) {
+      const random = (farm.id || 0) % 3;
+      if (random === 1) return { type: 'warning', color: '#E6A23C', label: '缺水' };
+      if (random === 2 && farm.area > 50) return { type: 'danger', color: '#F56C6C', label: '告警' };
+      return { type: 'success', color: '#67C23A', label: '正常' };
+    },
+
+    getRegionByFarm(farm) {
+      // 优先使用数据库中的district字段
+      if (farm.district && farm.district.trim()) {
+        const district = farm.district.trim();
+        
+        // 如果district是完整格式（如"长沙市岳麓区"），提取区县部分用于分组
+        const match = district.match(/市([\u4e00-\u9fa5]{2,3}(?:区|县))/);
+        if (match) {
+          return match[1]; // 返回"岳麓区"
+        }
+        
+        // 如果district只是区县名（如"永定区"），直接返回
+        if (district.match(/^[\u4e00-\u9fa5]{2,3}(?:区|县)$/)) {
+          return district;
+        }
+        
+        // 其他格式直接返回
+        return district;
+      }
+      
+      // 如果district字段为空，从地址中提取（兼容旧数据）
+      const address = farm.address || '';
+      
+      if (!address) {
+        return '未知区县';  // 统一使用"未知区县"
+      }
+      
+      // 精确匹配：X市 + (2-3个汉字) + 区/县
+      const match = address.match(/市([\u4e00-\u9fa5]{2,3}(?:区|县))/);
+      
+      if (match) {
+        return match[1];
+      }
+      
+      // 无法识别，归类到"未知区县"（参考Django版本）
+      return '未知区县';
+    },
+
+    toggleRegion(region) {
+      this.$set(this.expandedRegions, region, !this.expandedRegions[region]);
+    },
+
+    async loadFarms() {
+      try {
+        console.log('🔄 开始加载农田数据...');
+        const res = await this.request.get('/statistic/page', { params: { pageNum: 1, pageSize: 1000 } });
+        
+        if (res.code === '200') {
+          this.allFarms = res.data.records || [];
+          console.log(`✅ 农田数据加载成功，共 ${this.allFarms.length} 个地块`);
+          
+          // 数据验证
+          const invalidFarms = this.allFarms.filter(farm => {
+            if (!farm.farm) return true;  // 没有名称
+            if (farm.coordinates) {
+              try {
+                const coords = JSON.parse(farm.coordinates);
+                if (!Array.isArray(coords) || coords.length < 3) return true;
+              } catch (e) {
+                return true;  // 坐标解析失败
+              }
+            }
+            return false;
+          });
+          
+          if (invalidFarms.length > 0) {
+            console.warn(`⚠️ 发现 ${invalidFarms.length} 个数据异常的农田:`, 
+              invalidFarms.map(f => f.farm || f.id));
+          }
+          
+          // 渲染地图元素
+          if (this.map) {
+            this.renderMapElements();
+          } else {
+            console.warn('⚠️ 地图实例尚未创建，等待地图加载完成后渲染');
+          }
+        } else {
+          console.error('❌ 农田数据加载失败:', res.msg);
+          this.$message.error('农田数据加载失败: ' + (res.msg || '未知错误'));
+        }
+      } catch (e) {
+        console.error('❌ 加载农田数据时发生错误:', e);
+        this.$message.error('加载农田数据失败，请刷新页面重试');
+      }
+    },
+
+    loadAmapScript() {
+      // 1. 必须先设置安全密钥
+      window._AMapSecurityConfig = {
+        securityJsCode: this.securityCode,
+      };
+
+      // 2. 检查是否已加载
+      if (window.AMap && window.AMap.Map) {
+        console.log('✅ 高德地图已加载，直接初始化');
+        this.initMap();
+        return;
+      }
+
+      console.log('🔄 开始加载高德地图 SDK...');
+      console.log('Key:', this.amapKey);
+      console.log('SecurityCode:', this.securityCode);
+
+      // 3. 加载脚本
+      const script = document.createElement('script');
+      script.id = 'amap-script';
+      script.type = 'text/javascript';
+      script.async = true;
+      // 使用协议自适应 & 简化插件加载
+      script.src = `//webapi.amap.com/maps?v=2.0&key=${this.amapKey}&plugin=AMap.Scale,AMap.ToolBar`;
+      
+      script.onload = () => {
+        console.log('✅ 地图脚本加载成功');
+        this.mapError = false;
+        // 给一点缓冲时间确保对象挂载
+        setTimeout(() => {
+          this.initMap();
+        }, 300);
+      };
+      
+      script.onerror = (e) => {
+        console.error('❌ 高德地图脚本加载失败:', e);
+        console.error('可能原因: 1.网络问题 2.Key无效 3.Key和SecurityCode不匹配');
+        this.mapError = true;
+        this.$message.error('地图连接失败，请检查控制台日志');
+      };
+      
+      document.head.appendChild(script);
+    },
+
+    initMap() {
+      if (!window.AMap) {
+        console.error('❌ AMap 对象不存在');
+        this.mapError = true;
+        return;
+      }
+
+      console.log('🗺️ 开始初始化地图实例...');
+
+      this.$nextTick(() => {
+        try {
+          this.map = new window.AMap.Map('gaode-container', {
+            viewMode: '3D', 
+            pitch: this.mapPitch,
+            rotation: 0,
+            zoom: 16,  // 提高缩放级别，使比例尺默认显示200米左右
+            center: [110.479, 29.117],
+            mapStyle: 'amap://styles/normal'
+          });
+
+          console.log('✅ 地图实例创建成功');
+
+          // 叠加卫星图层
+          const satellite = new window.AMap.TileLayer.Satellite();
+          const roadNet = new window.AMap.TileLayer.RoadNet();
+          this.map.add([satellite, roadNet]);
+
+          // 添加比例尺（设置最大宽度为200米）
+          this.map.addControl(new window.AMap.Scale({ 
+            position: 'LB',
+            maxWidth: 200  // 设置比例尺最大宽度为200米
+          }));
+          
+          // 添加工具栏
+          this.map.addControl(new window.AMap.ToolBar({
+            position: { top: '110px', right: '10px' }
+          }));
+
+          this.map.on('complete', () => {
+            console.log('✅ 地图加载完成');
+            this.renderMapElements();
+          });
+          
+          this.$message.success('地图加载成功');
+        } catch (e) {
+          console.error('❌ 地图初始化错误:', e);
+          this.mapError = true;
+          this.$message.error('地图初始化失败: ' + e.message);
+        }
+      });
+    },
+
+    handlePitchChange(val) {
+      if(this.map) this.map.setPitch(val);
+    },
+
+    // 计算多边形的几何中心点
+    calculatePolygonCenter(coordinates) {
+      if (!coordinates || coordinates.length < 3) {
+        return [110.479, 29.117]; // 默认中心点
+      }
+
+      let sumLng = 0;
+      let sumLat = 0;
+      let validPoints = 0;
+
+      // 计算所有坐标点的平均值
+      coordinates.forEach(coord => {
+        const lng = parseFloat(coord.lng);
+        const lat = parseFloat(coord.lat);
+        
+        if (!isNaN(lng) && !isNaN(lat)) {
+          sumLng += lng;
+          sumLat += lat;
+          validPoints++;
+        }
+      });
+
+      if (validPoints === 0) {
+        return [110.479, 29.117]; // 默认中心点
+      }
+
+      // 返回几何中心点
+      return [sumLng / validPoints, sumLat / validPoints];
+    },
+
+    renderMapElements() {
+      if (!this.map) {
+        console.warn('⚠️ 地图实例不存在，无法渲染元素');
+        return;
+      }
+      
+      try {
+        // 清除地图上的所有覆盖物
+        this.map.clearMap();
+        
+        // 保留用户位置标记
+        if (this.userMarker) {
+          this.map.add(this.userMarker);
+        }
+        
+        let validFarmCount = 0;
+        let invalidFarmCount = 0;
+        
+        this.allFarms.forEach(farm => {
+          try {
+            const status = this.getFarmStatus(farm);
+            
+            // 1. 绘制多边形
+            if (farm.coordinates) {
+              try {
+                const coordsData = JSON.parse(farm.coordinates);
+                
+                // 验证坐标数据
+                if (!Array.isArray(coordsData) || coordsData.length < 3) {
+                  console.warn(`⚠️ 农田 [${farm.farm}] 坐标点数量不足，至少需要3个点`);
+                  throw new Error('坐标点数量不足');
+                }
+                
+                // 转换坐标并验证
+                const path = coordsData.map(c => {
+                  const lng = parseFloat(c.lng);
+                  const lat = parseFloat(c.lat);
+                  
+                  // 验证经纬度范围
+                  if (isNaN(lng) || isNaN(lat)) {
+                    throw new Error('坐标格式无效');
+                  }
+                  if (lng < -180 || lng > 180 || lat < -90 || lat > 90) {
+                    throw new Error('坐标超出有效范围');
+                  }
+                  
+                  return [lng, lat];
+                });
+                
+                const polygon = new window.AMap.Polygon({
+                  path: path,
+                  strokeColor: status.color,
+                  strokeWeight: 3,
+                  strokeOpacity: 1,
+                  fillColor: status.color,
+                  fillOpacity: 0.4, 
+                  zIndex: 10,
+                  bubble: true
+                });
+                polygon.on('click', () => this.focusFarm(farm));
+                this.map.add(polygon);
+                
+              } catch(coordError) {
+                console.error(`❌ 农田 [${farm.farm}] 坐标解析失败:`, coordError.message);
+                invalidFarmCount++;
+              }
+            }
+
+            // 2. 绘制标签
+            let center = [110.479, 29.117];  // 默认中心点
+            
+            // 如果有多边形坐标，计算多边形的几何中心点
+            if (farm.coordinates) {
+              try {
+                const coordsData = JSON.parse(farm.coordinates);
+                if (Array.isArray(coordsData) && coordsData.length >= 3) {
+                  // 计算多边形的几何中心（重心）
+                  center = this.calculatePolygonCenter(coordsData);
+                }
+              } catch (e) {
+                // 如果坐标解析失败，尝试使用数据库中的中心点
+                if (farm.centerLng && farm.centerLat) {
+                  const lng = parseFloat(farm.centerLng);
+                  const lat = parseFloat(farm.centerLat);
+                  
+                  if (!isNaN(lng) && !isNaN(lat) && 
+                      lng >= -180 && lng <= 180 && 
+                      lat >= -90 && lat <= 90) {
+                    center = [lng, lat];
+                  }
+                }
+              }
+            } else if (farm.centerLng && farm.centerLat) {
+              // 没有多边形坐标时，使用数据库中的中心点
+              const lng = parseFloat(farm.centerLng);
+              const lat = parseFloat(farm.centerLat);
+              
+              if (!isNaN(lng) && !isNaN(lat) && 
+                  lng >= -180 && lng <= 180 && 
+                  lat >= -90 && lat <= 90) {
+                center = [lng, lat];
+              }
+            }
+            
+            const text = new window.AMap.Text({
+              text: `<div class="map-tag" style="border-color:${status.color}; color:${status.color}">${farm.farm || '未命名'}</div>`,
+              anchor: 'center',
+              position: center,
+              offset: new window.AMap.Pixel(0, 0),  // 移除偏移，让标签完全居中
+              zIndex: 20
+            });
+            text.on('click', () => this.focusFarm(farm));
+            this.map.add(text);
+            
+            validFarmCount++;
+            
+          } catch (farmError) {
+            console.error(`❌ 渲染农田 [${farm.farm || farm.id}] 时出错:`, farmError);
+            invalidFarmCount++;
+          }
+        });
+        
+        console.log(`✅ 地图元素渲染完成: 成功 ${validFarmCount} 个，失败 ${invalidFarmCount} 个`);
+        
+        if (invalidFarmCount > 0) {
+          this.$message.warning(`有 ${invalidFarmCount} 个农田数据异常，请检查坐标信息`);
+        }
+        
+      } catch (error) {
+        console.error('❌ 渲染地图元素时发生严重错误:', error);
+        this.$message.error('地图渲染失败: ' + error.message);
+        this.mapError = true;
+      }
+    },
+
+    focusFarm(farm) {
+      this.currentFarm = farm;
+      let target = [110.479, 29.117];
+      if(farm.centerLng) target = [farm.centerLng, farm.centerLat];
+      
+      this.map.setZoomAndCenter(18, target);
+    },
+
+    resetView() {
+      this.map.setZoomAndCenter(14, [110.479, 29.117]);
+      this.mapPitch = 60;
+      this.map.setPitch(60);
+    },
+    autoLocate() {
+      if (!this.map) {
+        this.$message.warning('地图未初始化');
+        return;
+      }
+
+      // 显示加载提示
+      const loading = this.$loading({
+        lock: true,
+        text: '正在获取您的位置...',
+        spinner: 'el-icon-loading',
+        background: 'rgba(0, 0, 0, 0.7)'
+      });
+
+      this.map.plugin('AMap.Geolocation', () => {
+        const geolocation = new window.AMap.Geolocation({
+          enableHighAccuracy: true,  // 启用高精度定位
+          timeout: 10000,            // 超时时间10秒
+          zoomToAccuracy: true,      // 自动调整地图视野到定位点
+          showButton: false,         // 不显示定位按钮
+          showMarker: true,          // 显示定位标记
+          showCircle: true,          // 显示定位精度圈
+          panToLocation: true,       // 定位成功后将定位点移动到地图中心
+          extensions: 'all'          // 返回详细信息
+        });
+
+        geolocation.getCurrentPosition((status, result) => {
+          loading.close();
+          
+          if (status === 'complete') {
+            // 定位成功
+            const position = result.position;
+            const accuracy = result.accuracy;
+            
+            console.log('✅ 定位成功:', {
+              经度: position.lng,
+              纬度: position.lat,
+              精度: accuracy + '米',
+              地址: result.formattedAddress
+            });
+
+            // 移动地图到当前位置
+            this.map.setZoomAndCenter(16, [position.lng, position.lat]);
+            
+            // 添加自定义标记
+            if (this.userMarker) {
+              this.map.remove(this.userMarker);
+            }
+            
+            this.userMarker = new window.AMap.Marker({
+              position: [position.lng, position.lat],
+              icon: new window.AMap.Icon({
+                size: new window.AMap.Size(40, 40),
+                image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxOCIgZmlsbD0iIzQwOTBGRiIgZmlsbC1vcGFjaXR5PSIwLjMiLz48Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxMiIgZmlsbD0iIzQwOTBGRiIgZmlsbC1vcGFjaXR5PSIwLjYiLz48Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSI2IiBmaWxsPSIjRkZGRkZGIi8+PGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iMyIgZmlsbD0iIzQwOTBGRiIvPjwvc3ZnPg==',
+                imageSize: new window.AMap.Size(40, 40)
+              }),
+              title: '我的位置',
+              offset: new window.AMap.Pixel(-20, -20),
+              animation: 'AMAP_ANIMATION_DROP'
+            });
+            
+            this.map.add(this.userMarker);
+            
+            // 显示成功消息
+            this.$message.success({
+              message: `📍 定位成功！精度: ${Math.round(accuracy)}米`,
+              duration: 3000
+            });
+            
+            // 如果有地址信息，显示在控制台
+            if (result.formattedAddress) {
+              console.log('📍 当前位置:', result.formattedAddress);
+            }
+          } else {
+            // 定位失败
+            console.error('❌ 定位失败:', result);
+            
+            let errorMsg = '定位失败';
+            if (result.message) {
+              errorMsg += ': ' + result.message;
+            }
+            
+            this.$message.error({
+              message: errorMsg,
+              duration: 3000
+            });
+            
+            // 提供备选方案
+            this.$confirm('定位失败，是否使用浏览器定位？', '提示', {
+              confirmButtonText: '使用浏览器定位',
+              cancelButtonText: '取消',
+              type: 'warning'
+            }).then(() => {
+              this.useBrowserGeolocation();
+            }).catch(() => {});
+          }
+        });
+      });
+    },
+
+    // 使用浏览器原生定位API
+    useBrowserGeolocation() {
+      if (!navigator.geolocation) {
+        this.$message.error('您的浏览器不支持定位功能');
+        return;
+      }
+
+      const loading = this.$loading({
+        lock: true,
+        text: '正在使用浏览器定位...',
+        spinner: 'el-icon-loading',
+        background: 'rgba(0, 0, 0, 0.7)'
+      });
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          loading.close();
+          const lng = position.coords.longitude;
+          const lat = position.coords.latitude;
+          const accuracy = position.coords.accuracy;
+
+          console.log('✅ 浏览器定位成功:', { 经度: lng, 纬度: lat, 精度: accuracy + '米' });
+
+          // 移动地图到当前位置
+          this.map.setZoomAndCenter(16, [lng, lat]);
+
+          // 添加标记
+          if (this.userMarker) {
+            this.map.remove(this.userMarker);
+          }
+
+          this.userMarker = new window.AMap.Marker({
+            position: [lng, lat],
+            icon: new window.AMap.Icon({
+              size: new window.AMap.Size(40, 40),
+              image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxOCIgZmlsbD0iIzQwOTBGRiIgZmlsbC1vcGFjaXR5PSIwLjMiLz48Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxMiIgZmlsbD0iIzQwOTBGRiIgZmlsbC1vcGFjaXR5PSIwLjYiLz48Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSI2IiBmaWxsPSIjRkZGRkZGIi8+PGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iMyIgZmlsbD0iIzQwOTBGRiIvPjwvc3ZnPg==',
+              imageSize: new window.AMap.Size(40, 40)
+            }),
+            title: '我的位置',
+            offset: new window.AMap.Pixel(-20, -20),
+            animation: 'AMAP_ANIMATION_DROP'
+          });
+
+          this.map.add(this.userMarker);
+
+          this.$message.success({
+            message: `📍 定位成功！精度: ${Math.round(accuracy)}米`,
+            duration: 3000
+          });
+        },
+        (error) => {
+          loading.close();
+          console.error('❌ 浏览器定位失败:', error);
+          
+          let errorMsg = '浏览器定位失败';
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              errorMsg = '您拒绝了定位权限请求';
+              break;
+            case error.POSITION_UNAVAILABLE:
+              errorMsg = '位置信息不可用';
+              break;
+            case error.TIMEOUT:
+              errorMsg = '定位请求超时';
+              break;
+          }
+          
+          this.$message.error(errorMsg);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        }
+      );
+    }
+  }
+}
+</script>
+
+<style scoped>
+/* 全局样式 */
+.modern-map-page {
+  position: relative;
+  width: 100%;
+  height: calc(100vh - 60px);
+  background: #e8e8e8;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  display: flex;
+  padding: 15px;
+  gap: 15px;
+  box-sizing: border-box;
+}
+
+/* 地图外层包裹 - 白色边框 */
+.map-wrapper {
+  flex: 1;
+  height: 100%;
+  background: white;
+  border-radius: 20px;
+  padding: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.map-container { 
+  width: 100%;
+  flex: 1;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+/* 1. 顶部工具栏 */
+.top-glass-bar {
+  width: 100%;
+  height: 50px;
+  min-height: 50px;
+  background: #f8f9fa;
+  border-radius: 12px;
+  flex-shrink: 0;
+  z-index: 100;
+  display: flex; align-items: center; padding: 0 24px;
+  justify-content: space-between;
+}
+
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand .title { font-size: 18px; font-weight: 600; color: #333; letter-spacing: 1px; }
+
+.data-pills { display: flex; gap: 16px; }
+.pill {
+  background: #f5f7fa; padding: 6px 16px; border-radius: 20px;
+  display: flex; align-items: center; gap: 8px;
+  border: 1px solid #eee;
+}
+.pill .label { font-size: 12px; color: #666; }
+.pill .val { font-size: 16px; font-weight: bold; color: #333; }
+.pill.warning { background: #fef0f0; border-color: #fde2e2; }
+.pill.warning .val { color: #F56C6C; }
+
+.view-control { display: flex; align-items: center; width: 200px; gap: 10px; }
+.control-label { font-size: 12px; color: #999; white-space: nowrap; }
+.pitch-slider { flex: 1; }
+
+/* 2. 左侧边栏面板 */
+.left-sidebar-panel {
+  width: 260px;
+  min-width: 260px;
+  height: 100%;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebar-header {
+  padding: 20px;
+  background: white;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.sidebar-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+.search-wrapper {
+  padding: 15px 20px;
+  background: white;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.search-input {
+  width: 100%;
+}
+
+::v-deep .search-input .el-input__inner {
+  border-radius: 6px;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+}
+
+.region-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 0;
+  scrollbar-width: none;
+}
+
+.region-list::-webkit-scrollbar { 
+  display: none; 
+}
+
+/* 区域分组样式 */
+.region-section {
+  margin-bottom: 15px;
+}
+
+.region-header {
+  display: flex;
+  align-items: center;
+  padding: 12px 20px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.region-header:hover {
+  background: #f8f9fa;
+}
+
+.expand-icon {
+  color: #999;
+  margin-right: 8px;
+  font-size: 12px;
+  transition: transform 0.2s;
+}
+
+.region-icon {
+  color: #666;
+  margin-right: 8px;
+  font-size: 14px;
+}
+
+.region-name {
+  flex: 1;
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+}
+
+.region-count {
+  color: #999;
+  font-size: 12px;
+}
+
+.farm-list {
+  background: #f8f9fa;
+}
+
+.farm-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 20px;
+  background: white;
+  margin: 1px 0;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-left: 3px solid transparent;
+}
+
+.farm-item:hover {
+  background: #f0f9eb;
+  border-left-color: #4CAF50;
+}
+
+.farm-item.active {
+  background: #e8f5e9;
+  border-left-color: #4CAF50;
+}
+
+.farm-icon {
+  width: 32px;
+  height: 32px;
+  background: #e8f5e9;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+}
+
+.crop-initial {
+  color: #4CAF50;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.farm-info {
+  flex: 1;
+}
+
+.farm-name {
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.farm-details {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.area {
+  color: #666;
+}
+
+.crop {
+  color: #999;
+}
+
+.status {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.status-success {
+  background: #f0f9eb;
+  color: #67C23A;
+}
+
+.status-warning {
+  background: #fdf6ec;
+  color: #E6A23C;
+}
+
+.status-danger {
+  background: #fef0f0;
+  color: #F56C6C;
+}
+
+.card-img-placeholder {
+  width: 48px; height: 48px; background: #e8f5e9; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  color: #4CAF50; font-weight: bold; font-size: 18px; margin-right: 12px;
+}
+.card-info { flex: 1; }
+.card-info .name { font-weight: 600; color: #333; font-size: 15px; margin-bottom: 4px; }
+.card-info .meta { font-size: 12px; color: #999; display: flex; align-items: center; gap: 5px; }
+.card-info .divider { color: #ddd; }
+.arrow-icon { color: #ccc; font-size: 12px; }
+
+/* 3. 右侧详情卡片 */
+.right-detail-card {
+  position: absolute; top: 100px; right: 30px;
+  width: 320px; background: white; border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+  z-index: 95; overflow: hidden;
+}
+.detail-header {
+  padding: 20px; border-bottom: 1px solid #f5f5f5;
+  display: flex; justify-content: space-between; align-items: flex-start;
+}
+.dh-title { font-size: 18px; font-weight: bold; color: #333; margin-bottom: 8px; }
+.dh-address { 
+  font-size: 14px; 
+  color: #4CAF50; 
+  font-weight: 500;
+  background: linear-gradient(135deg, #e8f5e9 0%, #f1f8f4 100%);
+  padding: 6px 12px;
+  border-radius: 6px;
+  border-left: 3px solid #4CAF50;
+  display: inline-flex;
+  align-items: center;
+}
+
+.detail-body { padding: 20px; }
+.kpi-row { display: flex; justify-content: space-between; text-align: center; }
+.k-val { font-size: 18px; font-weight: bold; color: #333; }
+.k-label { font-size: 12px; color: #999; margin-top: 4px; }
+
+.env-list { margin-top: 10px; margin-bottom: 20px; }
+.env-item { display: flex; align-items: center; margin-bottom: 15px; }
+.env-icon {
+  width: 36px; height: 36px; background: #f5f7fa; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; color: #666; margin-right: 12px;
+}
+.env-info { flex: 1; margin-right: 12px; }
+.env-name { font-size: 12px; color: #666; margin-bottom: 4px; }
+.env-val { font-size: 13px; font-weight: bold; color: #333; }
+.env-val.warning { color: #F56C6C; }
+
+/* 地图工具 */
+.map-tools {
+  position: absolute; bottom: 30px; right: 30px;
+  display: flex; flex-direction: column; gap: 12px;
+  z-index: 100;
+}
+
+/* 错误提示 */
+.map-error-overlay {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  background: #f0f2f5;
+  display: flex; align-items: center; justify-content: center;
+  z-index: 50;
+}
+.error-content { text-align: center; color: #909399; }
+.error-content i { font-size: 48px; margin-bottom: 16px; color: #F56C6C; }
+.error-content p { margin-bottom: 20px; font-size: 16px; }
+
+.tool-btn {
+  width: 44px; height: 44px; background: white; border-radius: 50%;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all 0.2s; color: #666; font-size: 18px;
+}
+.tool-btn:hover { background: #4CAF50; color: white; transform: scale(1.1); }
+
+/* 地图标签 */
+::v-deep .map-tag {
+  background: white; padding: 4px 10px; border-radius: 4px;
+  font-size: 12px; font-weight: bold;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2); border: 2px solid;
+  white-space: nowrap;
+}
+</style>

@@ -1,0 +1,16 @@
+# IDE本地配置
+.idea/
+# 日志文件
+logs/
+# SpringBoot编译产物
+target/
+# Vue依赖包
+node_modules/
+# Vue编译产物
+dist/
+# 环境配置（含敏感信息则忽略）
+.env.development
+.env.production
+# 临时文件
+*.tmp
+*.log
