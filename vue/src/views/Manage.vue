@@ -11,7 +11,9 @@
       </el-header>
 
       <el-main class="green-main">
-        <router-view @refreshUser="getUser" />
+        <keep-alive :include="['FarmMapGaode', 'FarmMap3D']">
+          <router-view @refreshUser="getUser" />
+        </keep-alive>
       </el-main>
 
     </el-container>
@@ -79,12 +81,13 @@ export default {
 </script>
 
 <style scoped>
-/* 清新绿主题布局 - 像素级修复 */
+/* 清新绿主题布局 - 响应式优化 */
 .green-theme-container {
   min-height: 100vh;
-  background: #f1f5f9; /* 淡灰蓝背景 (最底层) */
+  background: #f1f5f9;
   display: flex;
   gap: 0 !important;
+  position: relative;
 }
 
 .green-sidebar {
@@ -93,18 +96,18 @@ export default {
   left: 0;
   top: 0;
   z-index: 1000;
-  /* 强制移除所有边框、阴影、轮廓、圆角 */
   box-shadow: none !important;
   border: none !important;
   border-right: none !important;
   border-left: none !important;
   outline: none !important;
-  border-radius: 0 !important; /* 移除圆角 */
-  background: #f8faf9; /* 淡薄荷灰 (中间层) */
+  border-radius: 0 !important;
+  background: #f8faf9;
   overflow: hidden;
   margin: 0 !important;
   padding: 0 !important;
   flex-shrink: 0;
+  transition: transform 0.3s ease;
 }
 
 /* 深度穿透：确保 Element UI 的 el-aside 也无边框 */
@@ -118,17 +121,19 @@ export default {
 .main-container {
   background: transparent;
   margin: 0 !important;
-  margin-left: 240px !important; /* 为固定侧边栏留出空间 */
+  margin-left: 240px !important;
   padding: 0;
   flex: 1;
   min-width: 0;
   box-shadow: none !important;
   border: none !important;
   transition: margin-left 0.3s ease;
+  width: calc(100% - 240px);
 }
 
 .main-container.collapsed {
-  margin-left: 64px !important; /* 收缩时的左边距 */
+  margin-left: 64px !important;
+  width: calc(100% - 64px);
 }
 
 .green-header-wrapper {
@@ -137,11 +142,12 @@ export default {
 }
 
 .green-main {
-  background: #f1f5f9; /* 淡灰蓝 - 让卡片突出 */
+  background: #f1f5f9;
   padding: 0;
   height: calc(100vh - 60px);
   overflow-y: auto;
   overflow-x: hidden;
+  max-width: 100%;
 }
 
 .green-main::-webkit-scrollbar {
@@ -270,6 +276,104 @@ export default {
   background: rgba(76, 175, 80, 0.1);
   border-color: #4caf50;
   color: #2c5530;
+}
+
+/* =================== 响应式布局 =================== */
+
+/* 平板设备 (768px - 1024px) */
+@media screen and (max-width: 1024px) {
+  .green-main {
+    padding: 10px;
+  }
+  
+  :deep(.el-card) {
+    margin: 10px 0;
+  }
+}
+
+/* 移动设备 (< 768px) */
+@media screen and (max-width: 768px) {
+  /* 侧边栏默认隐藏，点击按钮显示 */
+  .green-sidebar {
+    transform: translateX(-100%);
+    box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+  }
+  
+  .green-sidebar.mobile-show {
+    transform: translateX(0);
+  }
+  
+  /* 主内容区占满屏幕 */
+  .main-container {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+  
+  .main-container.collapsed {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+  
+  .green-main {
+    padding: 8px;
+    height: calc(100vh - 50px);
+  }
+  
+  /* 卡片间距缩小 */
+  :deep(.el-card) {
+    margin: 8px 0;
+    border-radius: 8px;
+  }
+  
+  /* 表格滚动 */
+  :deep(.el-table) {
+    font-size: 13px;
+  }
+  
+  :deep(.el-table th),
+  :deep(.el-table td) {
+    padding: 8px 4px;
+  }
+  
+  /* 按钮组响应式 */
+  :deep(.el-button) {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+}
+
+/* 小屏手机 (< 480px) */
+@media screen and (max-width: 480px) {
+  .green-main {
+    padding: 5px;
+  }
+  
+  :deep(.el-card) {
+    margin: 5px 0;
+    padding: 10px;
+  }
+  
+  :deep(.el-table) {
+    font-size: 12px;
+  }
+  
+  :deep(.el-button) {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+  
+  /* 输入框自适应 */
+  :deep(.el-input) {
+    width: 100% !important;
+    max-width: 100%;
+  }
+}
+
+/* 横屏移动设备 */
+@media screen and (max-width: 896px) and (orientation: landscape) {
+  .green-main {
+    height: calc(100vh - 45px);
+  }
 }
 </style>
 

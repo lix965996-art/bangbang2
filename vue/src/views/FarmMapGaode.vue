@@ -1,18 +1,27 @@
 <template>
-  <div class="modern-map-page">
-    <div class="left-sidebar-panel">
-      <div class="sidebar-header">
-        <h3 class="sidebar-title">农场列表</h3>
+  <div class="gis-cockpit">
+    <!-- 全屏地图 -->
+    <div id="gaode-container" class="fullscreen-map"></div>
+    
+    <!-- HUD: 左侧农田列表 -->
+    <div class="hud-left-panel">
+      <div class="hud-header">
+        <div class="hud-title">
+          <i class="el-icon-location"></i>
+          <span>地块监控</span>
+        </div>
+        <div class="hud-status">
+          <span class="status-dot"></span>
+          <span class="status-text">ONLINE</span>
+        </div>
       </div>
       
-      <div class="search-wrapper">
-        <el-input
-          v-model="searchKeyword"
-          placeholder="搜索农场名称"
-          prefix-icon="el-icon-search"
-          clearable
-          class="search-input"
-        ></el-input>
+      <div class="hud-search">
+        <input 
+          v-model="searchKeyword" 
+          placeholder="搜索地块..." 
+          class="hud-input"
+        />
       </div>
 
       <div class="region-list">
@@ -52,33 +61,42 @@
       </div>
     </div>
 
-    <div class="map-wrapper">
-      <div class="top-glass-bar">
-        <div class="brand">
-          <i class="el-icon-location-information" style="color: #4CAF50; font-size: 20px;"></i>
-          <span class="title">智慧农田 GIS 驾驶舱</span>
-        </div>
-        
-        <div class="data-pills">
-          <div class="pill">
-            <span class="label">监测地块</span>
-            <span class="val">{{ allFarms.length }}</span>
-          </div>
-        </div>
+    <!-- 欢迎横幅 -->
+    <div class="welcome-banner">
+      <span class="welcome-icon">🌱</span>
+      <span class="welcome-text">欢迎回到 10号示范田，今日气象适宜。</span>
+    </div>
 
-        <div class="view-control">
-          <span class="control-label">3D 视角</span>
-          <el-slider 
-            v-model="mapPitch" 
-            :min="0" 
-            :max="80" 
-            :format-tooltip="val => val + '°'"
-            @input="handlePitchChange"
-            class="pitch-slider"
-          ></el-slider>
-        </div>
+    <!-- 顶部数据栏 -->
+    <div class="data-metrics">
+      <div class="metric-card">
+        <div class="metric-label">监测地块</div>
+        <div class="metric-value">{{ allFarms.length }}</div>
       </div>
-      <div id="gaode-container" class="map-container"></div>
+      <div class="metric-card">
+        <div class="metric-label">异常提示</div>
+        <div class="metric-value alert">{{ warningCount }}</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">土壤湿度</div>
+        <div class="metric-value">{{ avgHumidity }}%</div>
+      </div>
+    </div>
+
+    <!-- 图层控制器 - 圆润胶囊风格 -->
+    <div class="layer-controller">
+      <div class="layer-pill" :class="{active: layers.satellite}" @click="toggleLayer('satellite')">
+        <i class="el-icon-view"></i>
+        <span>卫星光谱</span>
+      </div>
+      <div class="layer-pill" :class="{active: layers.underground}" @click="toggleLayer('underground')">
+        <i class="el-icon-connection"></i>
+        <span>管网水流</span>
+      </div>
+      <div class="layer-pill" :class="{active: layers.drone}" @click="toggleLayer('drone')">
+        <i class="el-icon-airplane"></i>
+        <span>巡检轨迹</span>
+      </div>
     </div>
 
     <div v-if="mapError" class="map-error-overlay">
@@ -89,8 +107,9 @@
       </div>
     </div>
 
-    <transition name="el-zoom-in-top">
-      <div class="right-detail-card" v-if="currentFarm">
+    <!-- HUD: 右侧智能详情卡片 -->
+    <transition name="fade">
+      <div class="hud-detail-card" v-if="currentFarm">
         <div class="detail-header">
           <div class="header-left">
             <div class="dh-title">{{ currentFarm.farm }}</div>
@@ -165,21 +184,46 @@ export default {
   data() {
     return {
       map: null,
-      // 使用一组更稳定的测试 Key (长期有效)
-      amapKey: '608d75903d29ad471362f8c58c550daf', 
-      securityCode: '346272916a8f766952c3ce99d2132877',
+      // 高德地图 JS API 2.0 配置（必须同时设置 Key 和 SecurityCode）
+      amapKey: 'c3685874d99f880cd919b0149d061860',
+      securityCode: '7b145cdc181c76f925611dc751d6af65', // 必须启用安全密钥
       
       allFarms: [],
       searchKeyword: '',
       currentFarm: null,
       mapPitch: 60, 
       mapError: false,
-      userMarker: null,  // 用户位置标记
+      userMarker: null,
       expandedRegions: {
         '吉首市': true,
         '武陵源区': true,
         '永定区': true
-      }
+      },
+      
+      // 图层控制
+      layers: {
+        satellite: false,  // 卫星光谱
+        underground: false, // 地下管网
+        drone: false       // 无人机空域
+      },
+      
+      // 地下管网数据（天空蓝水流）
+      undergroundPipes: [
+        { path: [[110.478, 29.116], [110.479, 29.117], [110.480, 29.118]], color: '#0ea5e9' },
+        { path: [[110.477, 29.115], [110.479, 29.116], [110.481, 29.117]], color: '#0ea5e9' }
+      ],
+      
+      // 无人机路径
+      dronePath: [
+        [110.478, 29.120],
+        [110.480, 29.119],
+        [110.482, 29.118],
+        [110.481, 29.116]
+      ],
+      
+      pipeLines: [],  // 管网覆盖物
+      droneMarker: null, // 无人机标记
+      dronePathLine: null // 无人机路径线
     }
   },
   computed: {
@@ -231,18 +275,87 @@ export default {
     },
     currentFarmStatus() {
       return this.currentFarm ? this.getFarmStatus(this.currentFarm) : {};
+    },
+    // 平均土壤湿度
+    avgHumidity() {
+      if (this.allFarms.length === 0) return 0;
+      const total = this.allFarms.reduce((sum, f) => sum + (Number(f.soilhumidity) || 0), 0);
+      return Math.round(total / this.allFarms.length);
     }
   },
   mounted() {
+    console.log('📍 FarmMapGaode 组件挂载');
     this.loadAmapScript();
     this.loadFarms();
   },
+  activated() {
+    // 支持 keep-alive：组件被激活时重新加载数据
+    console.log('📍 FarmMapGaode 组件激活');
+    
+    // 使用 nextTick 确保 DOM 已经渲染完成
+    this.$nextTick(() => {
+      const container = document.getElementById('gaode-container');
+      
+      if (!container) {
+        console.error('❌ 地图容器不存在，等待下次激活');
+        return;
+      }
+      
+      // 检查地图实例状态
+      if (this.map) {
+        try {
+          // 验证地图实例是否有效
+          this.map.getZoom();
+          console.log('✅ 地图实例有效，刷新数据');
+          this.loadFarms();
+        } catch (e) {
+          // 地图实例无效，需要重新初始化
+          console.warn('⚠️ 地图实例无效，重新初始化:', e);
+          this.map = null;
+          this.loadAmapScript();
+          this.loadFarms();
+        }
+      } else {
+        // 地图不存在，重新初始化
+        console.log('🔄 地图不存在，重新初始化');
+        this.loadAmapScript();
+        this.loadFarms();
+      }
+    });
+  },
   beforeDestroy() {
-    if (this.map) this.map.destroy();
+    console.log('🗑️ FarmMapGaode 组件销毁');
+    this.cleanupMap();
+  },
+  deactivated() {
+    // 支持 keep-alive：组件失活时不销毁地图，保持状态
+    console.log('💤 FarmMapGaode 组件失活');
   },
   methods: {
+    cleanupMap() {
+      try {
+        // 清理地图覆盖物
+        if (this.map) {
+          this.map.clearMap();
+          this.map.destroy();
+          this.map = null;
+          console.log('✅ 地图实例已清理');
+        }
+        
+        // 清理相关标记
+        this.userMarker = null;
+        this.pipeLines = [];
+        this.droneMarker = null;
+        this.dronePathLine = null;
+      } catch (e) {
+        console.error('❌ 清理地图时出错:', e);
+      }
+    },
+    
     retryLoadMap() {
       this.mapError = false;
+      // 清理旧实例
+      this.cleanupMap();
       // 移除旧脚本防止重复
       const oldScript = document.getElementById('amap-script');
       if(oldScript) oldScript.remove();
@@ -343,44 +456,82 @@ export default {
     },
 
     loadAmapScript() {
-      // 1. 必须先设置安全密钥
-      window._AMapSecurityConfig = {
-        securityJsCode: this.securityCode,
-      };
+      // 1. 设置安全密钥（高德地图 2.0 必须设置）
+      if (!window._AMapSecurityConfig) {
+        window._AMapSecurityConfig = {
+          securityJsCode: this.securityCode,
+        };
+        console.log('🔐 安全密钥已设置');
+      }
 
       // 2. 检查是否已加载
       if (window.AMap && window.AMap.Map) {
-        console.log('✅ 高德地图已加载，直接初始化');
-        this.initMap();
+        console.log('✅ 高德地图 SDK 已存在，直接初始化');
+        setTimeout(() => {
+          this.initMap();
+        }, 100);
+        return;
+      }
+      
+      // 3. 检查脚本是否正在加载
+      const existingScript = document.getElementById('amap-script');
+      if (existingScript) {
+        console.log('⏳ 地图脚本正在加载中，等待完成...');
+        
+        // 设置超时机制，避免永久等待
+        const timeout = setTimeout(() => {
+          console.warn('⚠️ 脚本加载超时，尝试重新加载');
+          existingScript.remove();
+          this.loadAmapScript();
+        }, 10000);
+        
+        // 监听加载完成
+        const onLoad = () => {
+          clearTimeout(timeout);
+          console.log('✅ 已存在的脚本加载完成');
+          if (window.AMap && window.AMap.Map) {
+            this.initMap();
+          }
+        };
+        
+        if (existingScript.complete || existingScript.readyState === 'complete') {
+          onLoad();
+        } else {
+          existingScript.addEventListener('load', onLoad, { once: true });
+        }
         return;
       }
 
       console.log('🔄 开始加载高德地图 SDK...');
       console.log('Key:', this.amapKey);
-      console.log('SecurityCode:', this.securityCode);
 
-      // 3. 加载脚本
+      // 4. 加载新脚本
       const script = document.createElement('script');
       script.id = 'amap-script';
       script.type = 'text/javascript';
       script.async = true;
-      // 使用协议自适应 & 简化插件加载
-      script.src = `//webapi.amap.com/maps?v=2.0&key=${this.amapKey}&plugin=AMap.Scale,AMap.ToolBar`;
+      script.src = `https://webapi.amap.com/maps?v=2.0&key=${this.amapKey}&plugin=AMap.Scale,AMap.ToolBar`;
       
       script.onload = () => {
         console.log('✅ 地图脚本加载成功');
         this.mapError = false;
-        // 给一点缓冲时间确保对象挂载
         setTimeout(() => {
-          this.initMap();
+          if (window.AMap && window.AMap.Map) {
+            this.initMap();
+          } else {
+            console.error('❌ AMap 对象未正确加载');
+            this.mapError = true;
+          }
         }, 300);
       };
       
       script.onerror = (e) => {
         console.error('❌ 高德地图脚本加载失败:', e);
-        console.error('可能原因: 1.网络问题 2.Key无效 3.Key和SecurityCode不匹配');
+        console.error('可能原因: 1.网络问题 2.Key无效 3.Key和SecurityCode不匹配 4.域名未配置白名单');
         this.mapError = true;
-        this.$message.error('地图连接失败，请检查控制台日志');
+        this.$message.error('地图连接失败，请检查API Key配置和域名白名单');
+        // 移除失败的脚本
+        script.remove();
       };
       
       document.head.appendChild(script);
@@ -392,6 +543,44 @@ export default {
         this.mapError = true;
         return;
       }
+      
+      // 检查容器是否存在并且有尺寸
+      const checkContainer = () => {
+        const container = document.getElementById('gaode-container');
+        if (!container) {
+          console.error('❌ 地图容器 #gaode-container 不存在');
+          return false;
+        }
+        
+        const rect = container.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) {
+          console.warn('⚠️ 地图容器尺寸为0，width:', rect.width, 'height:', rect.height);
+          return false;
+        }
+        
+        console.log('✅ 地图容器准备就绪，尺寸:', rect.width, 'x', rect.height);
+        return true;
+      };
+      
+      // 如果容器还没准备好，延迟重试
+      if (!checkContainer()) {
+        console.log('⏳ 容器未就绪，延迟100ms后重试...');
+        setTimeout(() => {
+          if (!checkContainer()) {
+            console.error('❌ 容器超时未就绪，初始化失败');
+            this.mapError = true;
+            return;
+          }
+          this.initMap();
+        }, 100);
+        return;
+      }
+      
+      // 如果地图已存在，先销毁
+      if (this.map) {
+        console.log('🔄 销毁旧地图实例...');
+        this.cleanupMap();
+      }
 
       console.log('🗺️ 开始初始化地图实例...');
 
@@ -401,9 +590,10 @@ export default {
             viewMode: '3D', 
             pitch: this.mapPitch,
             rotation: 0,
-            zoom: 16,  // 提高缩放级别，使比例尺默认显示200米左右
+            zoom: 16,
             center: [110.479, 29.117],
-            mapStyle: 'amap://styles/normal'
+            mapStyle: 'amap://styles/normal',
+            resizeEnable: true
           });
 
           console.log('✅ 地图实例创建成功');
@@ -413,10 +603,10 @@ export default {
           const roadNet = new window.AMap.TileLayer.RoadNet();
           this.map.add([satellite, roadNet]);
 
-          // 添加比例尺（设置最大宽度为200米）
+          // 添加比例尺
           this.map.addControl(new window.AMap.Scale({ 
             position: 'LB',
-            maxWidth: 200  // 设置比例尺最大宽度为200米
+            maxWidth: 200
           }));
           
           // 添加工具栏
@@ -429,6 +619,7 @@ export default {
             this.renderMapElements();
           });
           
+          this.mapError = false;
           this.$message.success('地图加载成功');
         } catch (e) {
           console.error('❌ 地图初始化错误:', e);
@@ -620,6 +811,162 @@ export default {
       this.mapPitch = 60;
       this.map.setPitch(60);
     },
+    
+    // 图层控制
+    toggleLayer(layerName) {
+      this.layers[layerName] = !this.layers[layerName];
+      
+      if (layerName === 'satellite') {
+        this.toggleSatelliteLayer();
+      } else if (layerName === 'underground') {
+        this.toggleUndergroundLayer();
+      } else if (layerName === 'drone') {
+        this.toggleDroneLayer();
+      }
+    },
+    
+    // 卫星光谱图层（NDVI伪彩色）
+    toggleSatelliteLayer() {
+      if (this.layers.satellite) {
+        // 为所有多边形添加NDVI伪彩色效果
+        this.renderMapElements();
+        this.$message.success('卫星光谱图层已开启');
+      } else {
+        this.renderMapElements();
+        this.$message.info('卫星光谱图层已关闭');
+      }
+    },
+    
+    // 地下管网图层 - 流动水网特效
+    toggleUndergroundLayer() {
+      if (this.layers.underground) {
+        // 绘制管网线条
+        this.undergroundPipes.forEach((pipe, index) => {
+          const line = new window.AMap.Polyline({
+            path: pipe.path,
+            strokeColor: '#38bdf8',
+            strokeWeight: 5,
+            strokeStyle: 'dashed',
+            strokeOpacity: 0,
+            strokeDasharray: [10, 10],
+            zIndex: 5,
+            extData: { pipeIndex: index }
+          });
+          
+          // 添加水光晕效果（通过描边模拟）
+          const glowLine = new window.AMap.Polyline({
+            path: pipe.path,
+            strokeColor: '#38bdf8',
+            strokeWeight: 8,
+            strokeOpacity: 0,
+            zIndex: 4
+          });
+          
+          this.pipeLines.push(line, glowLine);
+          this.map.add([line, glowLine]);
+          
+          // 渐入动画
+          setTimeout(() => {
+            line.setOptions({ strokeOpacity: 0.85 });
+            glowLine.setOptions({ strokeOpacity: 0.15 });
+          }, index * 200);
+          
+          // 添加阀门节点（管道端点）
+          pipe.path.forEach((point, idx) => {
+            if (idx === 0 || idx === pipe.path.length - 1) {
+              const valve = new window.AMap.Marker({
+                position: point,
+                content: `<div class="valve-node"><div class="valve-pulse"></div></div>`,
+                offset: new window.AMap.Pixel(-6, -6),
+                zIndex: 10
+              });
+              this.pipeLines.push(valve);
+              this.map.add(valve);
+            }
+          });
+        });
+        
+        this.$message.success('💧 智慧灌溉管网已激活');
+      } else {
+        // 渐出动画后移除
+        this.pipeLines.forEach((item, index) => {
+          setTimeout(() => {
+            this.map.remove(item);
+          }, index * 50);
+        });
+        this.pipeLines = [];
+        this.$message.info('管网图层已关闭');
+      }
+    },
+    
+    // 无人机空域图层 - 激光雷达扫描特效
+    toggleDroneLayer() {
+      if (this.layers.drone) {
+        // 绘制无人机路径（虽然色）
+        this.dronePathLine = new window.AMap.Polyline({
+          path: this.dronePath,
+          strokeColor: '#f59e0b',
+          strokeWeight: 3,
+          strokeStyle: 'dashed',
+          strokeOpacity: 0,
+          strokeDasharray: [8, 8],
+          zIndex: 100
+        });
+        this.map.add(this.dronePathLine);
+        
+        // 渐入路径
+        setTimeout(() => {
+          this.dronePathLine.setOptions({ strokeOpacity: 0.6 });
+        }, 300);
+        
+        // 添加无人机标记（带雷达扫描和投影）
+        this.droneMarker = new window.AMap.Marker({
+          position: this.dronePath[0],
+          content: `
+            <div class="drone-container">
+              <div class="drone-shadow"></div>
+              <div class="radar-scan"></div>
+              <div class="drone-body">
+                <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                    <filter id="drone-shadow" x="-50%" y="-50%" width="200%" height="200%">
+                      <feGaussianBlur in="SourceAlpha" stdDeviation="2"/>
+                      <feOffset dx="0" dy="2" result="offsetblur"/>
+                      <feComponentTransfer>
+                        <feFuncA type="linear" slope="0.3"/>
+                      </feComponentTransfer>
+                      <feMerge>
+                        <feMergeNode/>
+                        <feMergeNode in="SourceGraphic"/>
+                      </feMerge>
+                    </filter>
+                  </defs>
+                  <circle cx="20" cy="20" r="14" fill="#10b981" fill-opacity="0.2" filter="url(#drone-shadow)"/>
+                  <circle cx="20" cy="20" r="10" fill="#10b981" filter="url(#drone-shadow)"/>
+                  <circle cx="20" cy="20" r="6" fill="#fff"/>
+                  <path d="M 20 14 L 20 8 M 20 26 L 20 32 M 14 20 L 8 20 M 26 20 L 32 20" stroke="#10b981" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+              </div>
+            </div>
+          `,
+          offset: new window.AMap.Pixel(-20, -20),
+          zIndex: 101
+        });
+        this.map.add(this.droneMarker);
+        this.$message.success('🛫 AI巡检无人机已启动');
+      } else {
+        // 移除无人机
+        if (this.dronePathLine) {
+          this.map.remove(this.dronePathLine);
+          this.dronePathLine = null;
+        }
+        if (this.droneMarker) {
+          this.map.remove(this.droneMarker);
+          this.droneMarker = null;
+        }
+        this.$message.info('巡检图层已关闭');
+      }
+    },
     autoLocate() {
       if (!this.map) {
         this.$message.warning('地图未初始化');
@@ -801,52 +1148,405 @@ export default {
 </script>
 
 <style scoped>
-/* 全局样式 */
-.modern-map-page {
+/* 🌱 生态农业示范基地 - 清新明亮风格 */
+.gis-cockpit {
   position: relative;
   width: 100%;
   height: calc(100vh - 60px);
-  background: #e8e8e8;
+  background: #f9fafb;
   overflow: hidden;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  display: flex;
-  padding: 15px;
-  gap: 15px;
-  box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
-/* 地图外层包裹 - 白色边框 */
-.map-wrapper {
-  flex: 1;
+/* 全屏地图 */
+.fullscreen-map {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
   height: 100%;
-  background: white;
-  border-radius: 20px;
-  padding: 10px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  box-sizing: border-box;
+  z-index: 0;
+}
+
+/* 左侧面板 - 白色卡片 */
+.hud-left-panel {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  width: 320px;
+  max-height: calc(100vh - 140px);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+.hud-header {
+  padding: 20px;
+  border-bottom: 1px solid #f3f4f6;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.hud-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #059669;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.hud-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  background: #10b981;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.status-text {
+  color: #10b981;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.hud-search {
+  padding: 15px 20px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.hud-input {
+  width: 100%;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 15px;
+  color: #374151;
+  font-size: 13px;
+  outline: none;
+  transition: all 0.3s;
+}
+
+.hud-input:focus {
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+.hud-input::placeholder {
+  color: #9ca3af;
+}
+
+/* 欢迎横幅 */
+.welcome-banner {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px 24px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  z-index: 100;
+  display: flex;
+  align-items: center;
   gap: 10px;
 }
 
-.map-container { 
-  width: 100%;
-  flex: 1;
-  border-radius: 14px;
+.welcome-icon {
+  font-size: 20px;
+}
+
+.welcome-text {
+  color: #059669;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* 顶部数据栏 */
+.data-metrics {
+  position: absolute;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 15px;
+  z-index: 100;
+}
+
+.metric-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px 24px;
+  min-width: 130px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.metric-label {
+  color: #6b7280;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.metric-value {
+  color: #059669;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.metric-value.alert {
+  color: #f59e0b;
+  animation: gentlePulse 3s infinite;
+}
+
+@keyframes gentlePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* 图层控制器 - 圆润胶囊按钮 */
+.layer-controller {
+  position: absolute;
+  bottom: 30px;
+  right: 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 100;
+}
+
+.layer-pill {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  border: 2px solid #e5e7eb;
+  border-radius: 24px;
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #6b7280;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  user-select: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.layer-pill:hover {
+  border-color: #10b981;
+  background: #f0fdf4;
+  transform: translateX(-5px);
+}
+
+.layer-pill.active {
+  border-color: #10b981;
+  color: #fff;
+  background: #10b981;
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.3);
+}
+
+.layer-pill i {
+  font-size: 18px;
+}
+
+/* 右侧详情卡片 - 白色卡片 */
+.hud-detail-card {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 380px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  z-index: 100;
   overflow: hidden;
 }
 
-/* 1. 顶部工具栏 */
-.top-glass-bar {
-  width: 100%;
-  height: 50px;
-  min-height: 50px;
-  background: #f8f9fa;
-  border-radius: 12px;
-  flex-shrink: 0;
-  z-index: 100;
-  display: flex; align-items: center; padding: 0 24px;
+.detail-header {
+  padding: 20px;
+  border-bottom: 1px solid #f3f4f6;
+  display: flex;
   justify-content: space-between;
+  align-items: flex-start;
+}
+
+.dh-title {
+  color: #059669;
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.dh-address {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.detail-body {
+  padding: 20px;
+  color: #374151;
+}
+
+/* ========== 工业级视觉特效 ========== */
+
+/* 阀门节点 - 呼吸脉冲 */
+.valve-node {
+  position: relative;
+  width: 12px;
+  height: 12px;
+  background: #38bdf8;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.6),
+              0 0 16px rgba(56, 189, 248, 0.3);
+  animation: valvePulse 2s ease-in-out infinite;
+}
+
+.valve-pulse {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  height: 100%;
+  background: rgba(56, 189, 248, 0.4);
+  border-radius: 50%;
+  animation: pulseRing 2s ease-out infinite;
+}
+
+@keyframes valvePulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 8px rgba(56, 189, 248, 0.6),
+                0 0 16px rgba(56, 189, 248, 0.3);
+  }
+  50% {
+    transform: scale(1.2);
+    box-shadow: 0 0 12px rgba(56, 189, 248, 0.8),
+                0 0 24px rgba(56, 189, 248, 0.4);
+  }
+}
+
+@keyframes pulseRing {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.6;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(3);
+    opacity: 0;
+  }
+}
+
+/* 无人机容器 */
+.drone-container {
+  position: relative;
+  width: 40px;
+  height: 40px;
+}
+
+/* 地面投影 - 樭圆阴影 */
+.drone-shadow {
+  position: absolute;
+  bottom: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 30px;
+  height: 12px;
+  background: radial-gradient(ellipse, rgba(0, 0, 0, 0.25) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: shadowPulse 3s ease-in-out infinite;
+}
+
+@keyframes shadowPulse {
+  0%, 100% {
+    width: 30px;
+    opacity: 0.25;
+  }
+  50% {
+    width: 36px;
+    opacity: 0.35;
+  }
+}
+
+/* 雷达扫描光波 - 扫形扫描 */
+.radar-scan {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 80px;
+  height: 80px;
+  transform: translate(-50%, -50%);
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    transparent 270deg,
+    rgba(16, 185, 129, 0.15) 270deg,
+    rgba(16, 185, 129, 0.3) 315deg,
+    rgba(16, 185, 129, 0.5) 360deg
+  );
+  border-radius: 50%;
+  animation: radarScan 3s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes radarScan {
+  0% {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  100% {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+/* 无人机本体 - 悄悬浮 */
+.drone-body {
+  position: relative;
+  z-index: 2;
+  animation: droneHover 3s ease-in-out infinite;
+}
+
+@keyframes droneHover {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+/* 管网流动动画（全局样式，需要通过JS动态添加） */
+@keyframes flowDash {
+  0% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: 40;
+  }
 }
 
 .brand { display: flex; align-items: center; gap: 10px; }

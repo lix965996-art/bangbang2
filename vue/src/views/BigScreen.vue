@@ -199,9 +199,14 @@ export default {
     window.addEventListener('resize', this.resizeCharts);
   },
   beforeDestroy() {
-    clearInterval(this.timer);
-    window.removeEventListener('resize', this.resizeCharts);
-    Object.values(this.charts).forEach(chart => chart.dispose());
+    this._isDestroyed = true; // 标记组件已销毁
+    if (this.timer) clearInterval(this.timer);
+    if (this.animateTimer) clearInterval(this.animateTimer); // 停止动画定时器
+    if (this.animationId) cancelAnimationFrame(this.animationId);
+    // 安全销毁图表实例
+    if (this.charts.left1 && !this.charts.left1.isDisposed()) this.charts.left1.dispose();
+    if (this.charts.center && !this.charts.center.isDisposed()) this.charts.center.dispose();
+    if (this.charts.right2 && !this.charts.right2.isDisposed()) this.charts.right2.dispose();
   },
   methods: {
     startClock() {
@@ -280,13 +285,17 @@ export default {
         this.todayOrders = this.totalOrders;
         
         // 计算待发货（简化：库存中数量低于安全库存的品类）
-        this.pendingShipments = this.inventoryData.filter(item => 
-          parseFloat(item.number || 0) < parseFloat(item.safeStock || 0)
-        ).length;
+        if (this.inventoryData && Array.isArray(this.inventoryData)) {
+          this.pendingShipments = this.inventoryData.filter(item => 
+            parseFloat(item.number || 0) < parseFloat(item.safeStock || 10)
+          ).length;
+        }
         
         // 计算任务进度
-        const doneTasks = this.todayTasks.filter(t => t.status === 'done').length;
-        this.taskProgress = Math.round((doneTasks / this.todayTasks.length) * 100);
+        if (this.todayTasks && Array.isArray(this.todayTasks) && this.todayTasks.length > 0) {
+          const doneTasks = this.todayTasks.filter(t => t.status === 'done').length;
+          this.taskProgress = Math.round((doneTasks / this.todayTasks.length) * 100);
+        }
         
       } catch (error) {
         console.warn("加载额外统计失败:", error);
@@ -410,9 +419,12 @@ export default {
       this.initChartRight2(); // 销售占比饼图
       // 启动数据模拟跳动
       this.rotateAngle = 0; // 初始化旋转角度
-      setInterval(this.animateData, 100); // 加快频率以流畅旋转
+      this.animateTimer = setInterval(this.animateData, 100); // 保存定时器引用以便清理
     },
     animateData() {
+      // 检查组件是否已销毁
+      if (this._isDestroyed) return;
+      
       // 1. KPI 数字脉冲效果 (每秒一次)
       if (this.rotateAngle % 10 === 0) { 
         const kpiValue = document.querySelector('.jump-num');
@@ -423,7 +435,7 @@ export default {
       }
 
       // 2. 雷达图背景环旋转动画 (平滑旋转，这是唯一持续的动态效果)
-      if (this.charts.center) {
+      if (this.charts.center && !this.charts.center.isDisposed()) {
         this.rotateAngle = (this.rotateAngle + 1) % 360;
         this.charts.center.setOption({
           series: [
@@ -441,7 +453,11 @@ export default {
       }
     },
     resizeCharts() {
-      Object.values(this.charts).forEach(chart => chart.resize());
+      Object.values(this.charts).forEach(chart => {
+        if (chart && !chart.isDisposed()) {
+          chart.resize();
+        }
+      });
     },
 
     // 左1：作物销量柱状图 (真实数据)

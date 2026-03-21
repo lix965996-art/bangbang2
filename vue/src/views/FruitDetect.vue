@@ -1,389 +1,298 @@
 <template>
-  <div class="fruit-detect-page">
-    <!-- 页面标题 -->
-    <div class="page-header">
-      <div class="header-content">
-        <div class="title-section">
-          <i class="el-icon-picture-outline title-icon"></i>
-          <div class="title-text">
-            <h2>果蔬双检智能分析</h2>
-            <p>基于YOLOv8深度学习模型，同时识别果蔬成熟度和病虫害状态</p>
-          </div>
+  <div class="lab-page">
+    <!-- 顶部标题栏 -->
+    <div class="lab-header">
+      <div class="header-left">
+        <div class="header-icon">🔬</div>
+        <div class="header-text">
+          <div class="header-title">AI 农产品表型分析与质检工作站</div>
+          <div class="header-subtitle">YOLOv8 Deep Learning · Real-time Inference · XAI-Enabled</div>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="info-tag">
+          <span class="info-label">推理引擎</span>
+          <span class="info-value">{{ inferenceEngine }}</span>
+        </div>
+        <div class="info-tag">
+          <span class="info-label">模型版本</span>
+          <span class="info-value">v{{ modelVersion }}</span>
+        </div>
+        <div class="detect-mode-selector">
+          <label>检测模式:</label>
+          <select v-model="detectType" class="lab-select">
+            <option value="both">双检分析</option>
+            <option value="ripeness">成熟度检测</option>
+            <option value="disease">病虫害检测</option>
+          </select>
         </div>
       </div>
     </div>
 
-    <div class="main-content">
-      <!-- 左侧上传区域 -->
-      <div class="upload-section">
-        <div class="section-card analysis-panel">
-          <div class="card-header">
-            <i class="el-icon-s-operation"></i>
-            <span>分析配置</span>
-          </div>
-
-          <!-- 检测类型选择 -->
-          <div class="detect-type-selector">
-            <el-radio-group v-model="detectType" size="small">
-              <el-radio-button label="both">
-                <i class="el-icon-s-data"></i> 双检分析
-              </el-radio-button>
-              <el-radio-button label="ripeness">
-                <i class="el-icon-sunny"></i> 成熟度检测
-              </el-radio-button>
-              <el-radio-button label="disease">
-                <i class="el-icon-first-aid-kit"></i> 病虫害检测
-              </el-radio-button>
-            </el-radio-group>
-          </div>
-
-          <!-- 模式切换 Tabs -->
-          <el-tabs v-model="detectMode" type="card" class="mode-tabs" @tab-click="handleTabClick">
-            <!-- 图片检测 -->
-            <el-tab-pane name="image">
-              <span slot="label"><i class="el-icon-picture"></i> 图片检测</span>
-              <div class="tab-content">
-                <el-upload
-                  class="image-uploader"
-                  drag
-                  action="#"
-                  :auto-upload="false"
-                  :show-file-list="false"
-                  :on-change="handleFileChange"
-                  accept="image/*"
-                >
-                  <div v-if="!previewUrl" class="upload-placeholder">
-                    <i class="el-icon-upload upload-icon"></i>
-                    <div class="upload-text">拖拽图片或<em>点击上传</em></div>
-                    <div class="upload-tip">支持 JPG、PNG 格式</div>
-                  </div>
-                  <div v-else class="preview-container">
-                    <img :src="previewUrl" class="preview-image" />
-                    <div class="preview-overlay">
-                      <i class="el-icon-refresh-right"></i>
-                      <span>点击更换</span>
-                    </div>
-                  </div>
-                </el-upload>
-
-                <div class="action-buttons">
-                  <el-button 
-                    type="primary" 
-                    icon="el-icon-search"
-                    :loading="analyzing"
-                    :disabled="!selectedFile"
-                    @click="analyzeImage"
-                  >
-                    {{ analyzing ? '分析中...' : (detectResult ? '重新分析' : '开始分析') }}
-                  </el-button>
-                  <el-button 
-                    icon="el-icon-delete"
-                    :disabled="!selectedFile && !previewUrl && !detectResult"
-                    @click="clearImage"
-                  >
-                    清除
-                  </el-button>
-                </div>
-              </div>
-            </el-tab-pane>
-
-            <!-- 视频检测 -->
-            <el-tab-pane name="video">
-              <span slot="label"><i class="el-icon-video-camera"></i> 视频检测</span>
-              <div class="tab-content">
-                <el-upload
-                  class="video-uploader"
-                  drag
-                  action="#"
-                  :auto-upload="false"
-                  :show-file-list="false"
-                  :on-change="handleVideoChange"
-                  accept="video/*"
-                >
-                  <div v-if="!videoUrl" class="upload-placeholder">
-                    <i class="el-icon-video-camera upload-icon"></i>
-                    <div class="upload-text">拖拽视频或<em>点击上传</em></div>
-                  </div>
-                  <div v-else class="preview-container">
-                    <video :src="videoUrl" class="preview-video" controls></video>
-                  </div>
-                </el-upload>
-
-                <div class="action-buttons">
-                  <el-button 
-                    type="primary" 
-                    icon="el-icon-video-play"
-                    :loading="analyzing"
-                    :disabled="!selectedVideo"
-                    @click="analyzeVideo"
-                  >
-                    {{ analyzing ? '处理中...' : '开始处理' }}
-                  </el-button>
-                  <el-button 
-                    icon="el-icon-delete"
-                    :disabled="!selectedVideo"
-                    @click="clearVideo"
-                  >
-                    清除
-                  </el-button>
-                </div>
-              </div>
-            </el-tab-pane>
-
-            <!-- 实时检测 -->
-            <el-tab-pane name="camera">
-              <span slot="label"><i class="el-icon-camera"></i> 实时检测</span>
-              <div class="tab-content">
-                <div class="camera-container">
-                  <img 
-                    v-if="cameraActive" 
-                    :src="mjpegStreamUrl" 
-                    class="camera-video"
-                    @error="handleStreamError"
-                  />
-                  <div v-else class="camera-placeholder">
-                    <i class="el-icon-video-camera"></i>
-                    <p>点击下方按钮开启实时监控</p>
-                  </div>
-                  <canvas ref="cameraCanvas" style="display: none;"></canvas>
-                </div>
-
-                <div class="action-buttons">
-                  <el-button 
-                    v-if="!cameraActive"
-                    type="primary" 
-                    icon="el-icon-video-camera"
-                    @click="startMjpegStream"
-                  >
-                    开启实时监控
-                  </el-button>
-                  <template v-else>
-                    <el-button 
-                      type="success" 
-                      icon="el-icon-camera"
-                      :loading="analyzing"
-                      @click="captureAndAnalyze"
-                    >
-                      截图检测
-                    </el-button>
-                    <el-button 
-                      type="danger"
-                      icon="el-icon-video-pause"
-                      @click="stopMjpegStream"
-                    >
-                      关闭
-                    </el-button>
-                  </template>
-                </div>
-              </div>
-            </el-tab-pane>
-          </el-tabs>
+    <!-- 三栏布局 -->
+    <div class="lab-container">
+      <!-- 左侧：样本序列 -->
+      <div class="sample-queue-panel">
+        <div class="panel-header">
+          <h3 class="panel-title">待检样本序列</h3>
+          <span class="sample-count">{{ sampleQueue.length }} 样本</span>
         </div>
-
-        <!-- 使用说明 (简化版) -->
-        <div class="section-card tips-card">
-          <div class="tips-mini">
-            <i class="el-icon-info"></i>
-            <span>提示：选择检测类型与作物，上传图片即可快速获取AI分析报告。</span>
+        <div class="queue-list">
+          <div
+            v-for="sample in sampleQueue"
+            :key="sample.id"
+            :class="['queue-card', currentSample && currentSample.id === sample.id ? 'active' : '']"
+            @click="selectSample(sample)"
+          >
+            <div class="card-thumbnail">
+              <img v-if="sample.previewUrl" :src="sample.previewUrl" />
+              <div v-else class="thumbnail-placeholder">📄</div>
+            </div>
+            <div class="card-info">
+              <div class="sample-id">ID: {{ sample.id }}</div>
+              <div class="sample-meta">{{ sample.time }}</div>
+              <div :class="['status-badge', sample.status]">
+                {{ sample.status === 'pending' ? '待检' : sample.status === 'analyzing' ? '分析中' : '完成' }}
+              </div>
+            </div>
+          </div>
+          <div v-if="sampleQueue.length === 0" class="empty-queue">
+            <div class="empty-icon">🧪</div>
+            <p>暂无样本</p>
           </div>
         </div>
       </div>
 
-      <!-- 右侧结果区域 -->
-      <div class="result-section">
-        <div class="section-card result-card">
-          <div class="card-header">
-            <i class="el-icon-data-analysis"></i>
-            <span>分析结果</span>
-            <span v-if="detectResult" class="detect-time">{{ detectResult.detect_time }}</span>
+      <!-- 中间：工作台 -->
+      <div class="workbench-panel">
+        <!-- Tab 导航 -->
+        <div class="tab-nav">
+          <div
+            :class="['tab-item', activeTab === 'image' ? 'active' : '']"
+            @click="switchTab('image')"
+          >
+            <span class="tab-icon">🖼️</span>
+            <span class="tab-label">图片分析</span>
+          </div>
+          <div
+            :class="['tab-item', activeTab === 'video' ? 'active' : '']"
+            @click="switchTab('video')"
+          >
+            <span class="tab-icon">🎬</span>
+            <span class="tab-label">视频分析</span>
+          </div>
+          <div
+            :class="['tab-item', activeTab === 'stream' ? 'active' : '']"
+            @click="switchTab('stream')"
+          >
+            <span class="tab-icon">📡</span>
+            <span class="tab-label">实时终端</span>
+          </div>
+        </div>
+
+        <!-- 工作视窗 -->
+        <div class="workbench-viewport">
+          <!-- 图片模式 -->
+          <div v-if="activeTab === 'image'" class="viewport-content">
+            <div
+              class="drop-area"
+              :class="{ 'drag-over': dropActive }"
+              @drop.prevent="onDropImage"
+              @dragover.prevent="dropActive = true"
+              @dragleave.prevent="dropActive = false"
+            >
+              <div v-if="!imagePreview" class="upload-prompt">
+                <div class="prompt-icon">📤</div>
+                <p class="prompt-title">拖拽图片到此区域</p>
+                <p class="prompt-subtitle">或点击下方按钮上传</p>
+                <input
+                  ref="imageInput"
+                  type="file"
+                  accept="image/*"
+                  style="display: none"
+                  @change="handleImageUpload"
+                />
+                <button class="upload-btn" @click="$refs.imageInput.click()">选择图片</button>
+              </div>
+              <div v-else class="image-display">
+                <img ref="mainImage" :src="imagePreview" @load="onImageLoad" />
+                <!-- SVG 扫描线 -->
+                <svg v-if="analyzing" class="scan-overlay" viewBox="0 0 100 100" preserveAspectRatio="none">
+                  <line class="scan-line" x1="0" :y1="scanY" x2="100" :y2="scanY" stroke="#10b981" stroke-width="0.5" opacity="0.8" />
+                </svg>
+                <!-- 检测框 -->
+                <svg
+                  v-if="detections.length > 0"
+                  class="detection-overlay"
+                  :viewBox="`0 0 ${imageWidth} ${imageHeight}`"
+                  preserveAspectRatio="xMidYMid meet"
+                >
+                  <g v-for="(det, idx) in detections" :key="idx">
+                    <rect
+                      :x="det.x"
+                      :y="det.y"
+                      :width="det.width"
+                      :height="det.height"
+                      :stroke="det.type === 'riped' ? '#10b981' : '#f59e0b'"
+                      stroke-width="3"
+                      fill="none"
+                    />
+                    <text :x="det.x + 5" :y="det.y + 18" fill="#10b981" font-size="14" font-weight="bold">
+                      {{ det.label }} {{ det.confidence }}%
+                    </text>
+                  </g>
+                </svg>
+              </div>
+            </div>
           </div>
 
-          <div v-if="!detectResult && !analyzing" class="empty-result">
-            <i class="el-icon-picture-outline"></i>
-            <p>上传图片后查看分析结果</p>
+          <!-- 视频模式 -->
+          <div v-if="activeTab === 'video'" class="viewport-content">
+            <div v-if="!videoSrc" class="upload-prompt">
+              <div class="prompt-icon">🎥</div>
+              <p class="prompt-title">上传视频文件</p>
+              <input
+                ref="videoInput"
+                type="file"
+                accept="video/*"
+                style="display: none"
+                @change="handleVideoUpload"
+              />
+              <button class="upload-btn" @click="$refs.videoInput.click()">选择视频</button>
+            </div>
+            <div v-else class="video-player-wrapper">
+              <video ref="videoPlayer" :src="videoSrc" controls></video>
+              <button class="extract-btn" @click="extractKeyFrame">📸 提取当前帧分析</button>
+            </div>
           </div>
 
-          <div v-else-if="analyzing" class="analyzing-state">
-            <div class="analyzing-animation">
-              <i class="el-icon-loading"></i>
+          <!-- 实时流模式 -->
+          <div v-if="activeTab === 'stream'" class="viewport-content">
+            <div v-if="!streamActive" class="upload-prompt">
+              <div class="prompt-icon">📡</div>
+              <p class="prompt-title">ESP32-CAM 实时推理</p>
+              <input v-model="mjpegUrl" class="stream-url-input" placeholder="输入MJPEG流地址" />
+              <button class="upload-btn" @click="startStream">🚀 启动实时终端</button>
             </div>
-            <p>AI正在分析图片，请稍候...</p>
+            <div v-else class="stream-display">
+              <img :src="mjpegUrl" @error="handleStreamError" />
+              <!-- 实时检测框叠加 -->
+              <svg
+                v-if="streamDetections.length > 0"
+                class="detection-overlay"
+                viewBox="0 0 640 480"
+                preserveAspectRatio="xMidYMid meet"
+              >
+                <g v-for="(det, idx) in streamDetections" :key="idx">
+                  <rect
+                    :x="det.x"
+                    :y="det.y"
+                    :width="det.width"
+                    :height="det.height"
+                    stroke="#10b981"
+                    stroke-width="2"
+                    fill="none"
+                  />
+                </g>
+              </svg>
+              <div class="stream-controls">
+                <button class="capture-btn" @click="captureFrame">📷 截图分析</button>
+                <button class="stop-btn" @click="stopStream">⏹ 停止</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 底部控制栏 -->
+        <div class="workbench-footer">
+          <div class="footer-left">
+            <label class="xai-toggle">
+              <input type="checkbox" v-model="xaiMode" />
+              <span class="toggle-label">👁️ 开启热力图 (Grad-CAM)</span>
+            </label>
+          </div>
+          <div class="footer-right">
+            <button
+              v-if="imagePreview && activeTab === 'image'"
+              class="analyze-btn"
+              :disabled="analyzing"
+              @click="analyzeImage"
+            >
+              {{ analyzing ? '⏳ 分析中...' : '🔍 开始分析' }}
+            </button>
+            <button
+              v-if="imagePreview && activeTab === 'image'"
+              class="clear-btn"
+              @click="clearImage"
+            >
+              🗑️ 清除
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右侧：诊断报告 -->
+      <div class="diagnostic-panel">
+        <div class="panel-header">
+          <h3 class="panel-title">诊断报告</h3>
+        </div>
+
+        <div v-if="!detectResult" class="report-empty">
+          <div class="empty-icon">📋</div>
+          <p>等待分析...</p>
+        </div>
+
+        <div v-else class="report-content">
+          <!-- 等级印章 -->
+          <div class="grade-stamp">
+            <div class="stamp-inner">
+              <div class="grade-letter">{{ gradeLetter }}</div>
+              <div class="grade-text">{{ gradeText }}</div>
+            </div>
           </div>
 
-          <div v-else class="result-content">
-            <!-- 分页切换按钮 -->
-            <div class="result-tabs">
-              <div 
-                class="result-tab" 
-                :class="{ active: resultTab === 'image' }"
-                @click="resultTab = 'image'"
-              >
-                <i class="el-icon-picture"></i> 检测图片
-              </div>
-              <div 
-                v-if="detectType === 'both' || detectType === 'ripeness'"
-                class="result-tab" 
-                :class="{ active: resultTab === 'ripeness' }"
-                @click="resultTab = 'ripeness'"
-              >
-                <i class="el-icon-cherry"></i> 成熟度
-              </div>
-              <div 
-                v-if="detectType === 'both' || detectType === 'disease'"
-                class="result-tab" 
-                :class="{ active: resultTab === 'disease' }"
-                @click="resultTab = 'disease'"
-              >
-                <i class="el-icon-warning"></i> 病虫害
-              </div>
+          <!-- 性能面板 -->
+          <div class="performance-panel">
+            <div class="perf-item">
+              <span class="perf-label">Inference:</span>
+              <span class="perf-value">{{ inferenceTime || '--' }} ms</span>
             </div>
-
-            <!-- 检测图片 -->
-            <div v-show="resultTab === 'image'" class="result-panel">
-              <div class="result-image-container">
-                <img :src="detectResult.result_image" class="result-image" />
-              </div>
+            <div class="perf-item">
+              <span class="perf-label">FPS:</span>
+              <span class="perf-value">{{ fps || '--' }}</span>
             </div>
-
-            <!-- 成熟度分析 -->
-            <div v-show="resultTab === 'ripeness'" class="result-panel" v-if="detectResult.ripeness_analysis">
-              <!-- 统计卡片 -->
-              <div class="compact-stats-row">
-                <div class="mini-stat">
-                  <span class="mini-value">{{ detectResult.ripeness_analysis.statistics.total }}</span>
-                  <span class="mini-label">检测总数</span>
-                </div>
-                <div class="mini-stat green">
-                  <span class="mini-value">{{ detectResult.ripeness_analysis.statistics.riped_count }}</span>
-                  <span class="mini-label">成熟</span>
-                </div>
-                <div class="mini-stat orange">
-                  <span class="mini-value">{{ detectResult.ripeness_analysis.statistics.unriped_count }}</span>
-                  <span class="mini-label">未成熟</span>
-                </div>
-              </div>
-
-              <!-- 成熟度进度条 -->
-              <div class="progress-section">
-                <div class="progress-header">
-                  <span>成熟度指标</span>
-                  <span class="progress-value">{{ detectResult.ripeness_analysis.statistics.riped_ratio }}%</span>
-                </div>
-                <el-progress 
-                  :percentage="detectResult.ripeness_analysis.statistics.riped_ratio" 
-                  :color="getProgressColor(detectResult.ripeness_analysis.statistics.riped_ratio)"
-                  :stroke-width="16"
-                  :show-text="false"
-                ></el-progress>
-              </div>
-
-              <!-- 采收建议 -->
-              <div class="advice-card">
-                <div class="advice-header">
-                  <i class="el-icon-s-opportunity"></i>
-                  <span>采收建议</span>
-                </div>
-                <div class="advice-content">
-                  <template v-if="detectResult.ripeness_analysis.statistics.riped_ratio >= 80">
-                    <p class="advice-text success">果实成熟度高，建议尽快采收，避免过熟腐烂。</p>
-                  </template>
-                  <template v-else-if="detectResult.ripeness_analysis.statistics.riped_ratio >= 50">
-                    <p class="advice-text warning">部分果实已成熟，可分批采收成熟果实。</p>
-                  </template>
-                  <template v-else>
-                    <p class="advice-text info">果实成熟度较低，建议继续培育，加强水肥管理。</p>
-                  </template>
-                </div>
-              </div>
-
-              <!-- 检测详情列表 -->
-              <div class="detail-list" v-if="detectResult.ripeness_analysis.detections && detectResult.ripeness_analysis.detections.length > 0">
-                <div class="detail-header">检测详情</div>
-                <div class="detail-items">
-                  <el-tag 
-                    v-for="(item, index) in detectResult.ripeness_analysis.detections.slice(0, 8)" 
-                    :key="index"
-                    :type="item.class_id === 0 ? 'success' : 'warning'"
-                    size="small"
-                    class="detail-tag"
-                  >
-                    {{ item.class_name_ch || item.class_name }} {{ item.confidence }}%
-                  </el-tag>
-                </div>
-              </div>
+            <div class="perf-item">
+              <span class="perf-label">Confidence:</span>
+              <span class="perf-value">{{ ripenessRatio || '--' }} %</span>
             </div>
+          </div>
 
-            <!-- 病虫害分析 -->
-            <div v-show="resultTab === 'disease'" class="result-panel" v-if="detectResult.disease_analysis">
-              <!-- 重点病害名称 -->
-              <div class="main-disease-card" v-if="getMainDisease(detectResult.disease_analysis)">
-                <div class="main-disease-icon">
-                  <i class="el-icon-warning-outline"></i>
-                </div>
-                <div class="main-disease-info">
-                  <div class="main-disease-name">{{ getMainDisease(detectResult.disease_analysis).name }}</div>
-                  <div class="main-disease-conf">置信度: {{ getMainDisease(detectResult.disease_analysis).confidence }}%</div>
-                </div>
-              </div>
+          <!-- 检测统计 -->
+          <div class="stat-card">
+            <div class="stat-title">检测统计</div>
+            <div class="stat-row">
+              <span>总检测数:</span>
+              <span class="stat-num">{{ totalDetections }}</span>
+            </div>
+            <div class="stat-row">
+              <span>成熟果:</span>
+              <span class="stat-num stat-riped">{{ ripedCount }}</span>
+            </div>
+            <div class="stat-row">
+              <span>未成熟:</span>
+              <span class="stat-num stat-unriped">{{ unripedCount }}</span>
+            </div>
+          </div>
 
-              <!-- 健康状态 -->
-              <div class="health-status-card success" v-if="!getMainDisease(detectResult.disease_analysis)">
-                <div class="status-icon">
-                  <i class="el-icon-circle-check"></i>
-                </div>
-                <div class="status-info">
-                  <h4>作物健康状况良好</h4>
-                  <p>未检测到明显的病虫害症状，请继续保持良好的田间管理。</p>
-                </div>
-              </div>
-
-              <!-- 防治建议 -->
-              <div class="advice-card disease-advice" v-if="getMainDisease(detectResult.disease_analysis)">
-                <div class="advice-header">
-                  <i class="el-icon-first-aid-kit"></i>
-                  <span>防治方案</span>
-                </div>
-                <div class="advice-content">
-                  <p class="advice-text warning">{{ getDiseaseAdvice(getMainDisease(detectResult.disease_analysis).originalName) }}</p>
-                </div>
-              </div>
-
-              <!-- 检测统计 -->
-              <div class="disease-stats" v-if="detectResult.disease_analysis.statistics">
-                <div class="stat-item">
-                  <span class="stat-value">{{ detectResult.disease_analysis.statistics.total_detections || detectResult.disease_analysis.detections.length }}</span>
-                  <span class="stat-label">检测数量</span>
-                </div>
-              </div>
-
-              <!-- 检测详情 -->
-              <div class="detail-list" v-if="detectResult.disease_analysis.detections && detectResult.disease_analysis.detections.length > 0">
-                <div class="detail-header">所有检测结果</div>
-                <div class="detail-items">
-                  <el-tag 
-                    v-for="(item, index) in detectResult.disease_analysis.detections.slice(0, 8)" 
-                    :key="index"
-                    :type="item.class_name && (item.class_name.includes('Healthy') || item.class_name.includes('health')) ? 'success' : 'danger'"
-                    size="medium"
-                    class="detail-tag"
-                  >
-                    {{ item.class_name_ch || item.class_name }} {{ item.confidence }}%
-                  </el-tag>
-                </div>
-              </div>
-
-              <!-- 日常管理建议 -->
-              <div class="tips-card">
-                <div class="tips-header">
-                  <i class="el-icon-info"></i>
-                  <span>日常管理建议</span>
-                </div>
-                <ul class="tips-list">
-                  <li>定期巡查田间，及时发现病虫害</li>
-                  <li>保持田间通风透光，降低湿度</li>
-                  <li>合理施肥，增强作物抗病能力</li>
-                </ul>
-              </div>
+          <!-- 病害卡片 -->
+          <div v-if="diseaseInfo" class="disease-card">
+            <div class="disease-header">
+              <span class="disease-icon">⚠️</span>
+              <span class="disease-name">{{ diseaseInfo.name }}</span>
+            </div>
+            <div class="disease-body">
+              <h4 class="advice-title">💊 防治建议</h4>
+              <p class="advice-content">{{ diseaseInfo.advice }}</p>
             </div>
           </div>
         </div>
@@ -397,1630 +306,1093 @@ export default {
   name: 'FruitDetect',
   data() {
     return {
-      detectMode: 'image', // image, video, camera
-      detectType: 'both', // both, ripeness, disease
+      inferenceEngine: 'CUDA 11.8',
+      modelVersion: '8.2.0',
+      detectType: 'both',
+      activeTab: 'image',
+      xaiMode: false,
+      
+      // 图片相关
+      imagePreview: '',
       selectedFile: null,
-      previewUrl: null,
-      selectedVideo: null,
-      videoUrl: null,
-      cameraActive: false,
-      cameraStream: null,
+      dropActive: false,
+      imageWidth: 640,
+      imageHeight: 480,
+      detections: [],
+      scanY: 0,
+      
+      // 视频相关
+      videoSrc: '',
+      
+      // 实时流相关
+      streamActive: false,
+      mjpegUrl: 'http://192.168.137.192/mjpeg/1',
+      streamDetections: [],
+      
+      // 分析结果
       analyzing: false,
       detectResult: null,
-      selectedCrop: 'tomato', // 默认选择番茄
-      confidence: 0.5, // 默认置信度
-      resultTab: 'image', // 结果分页：image, ripeness, disease
-      mjpegStreamUrl: 'http://192.168.137.192/mjpeg/1' // MJPEG视频流地址
+      inferenceTime: null,
+      fps: null,
+      
+      // 样本队列
+      sampleQueue: [],
+      currentSample: null
     }
   },
-  mounted() {
-  },
-  beforeDestroy() {
-    // 组件销毁时关闭监控
-    this.stopMjpegStream()
+  computed: {
+    ripenessRatio() {
+      const stats =
+        this.detectResult &&
+        this.detectResult.ripeness_analysis &&
+        this.detectResult.ripeness_analysis.statistics
+      return stats ? stats.riped_ratio : null
+    },
+    gradeLetter() {
+      if (this.ripenessRatio === null) return '-'
+      if (this.ripenessRatio >= 80) return 'A'
+      if (this.ripenessRatio >= 60) return 'B'
+      return 'C'
+    },
+    gradeText() {
+      if (this.ripenessRatio === null) return '未评级'
+      if (this.ripenessRatio >= 80) return '特级'
+      if (this.ripenessRatio >= 60) return '一级'
+      return '二级'
+    },
+    totalDetections() {
+      const r = this.detectResult
+      if (!r) return 0
+      const a = r.ripeness_analysis?.detections?.length || 0
+      const b = r.disease_analysis?.detections?.length || 0
+      const c = r.detections?.length || 0
+      return a + b || c
+    },
+    mainDiseaseName() {
+      const d = this.getMainDisease()
+      return d ? d.name : ''
+    },
+    diseaseAdvice() {
+      const d = this.getMainDisease()
+      return d ? this.getDiseaseAdvice(d.originalName) : ''
+    },
+    ripedCount() {
+      if (!this.detectResult || !this.detectResult.ripeness_analysis) return 0
+      const dets = this.detectResult.ripeness_analysis.detections || []
+      return dets.filter(d => d.class_id === 0).length
+    },
+    unripedCount() {
+      if (!this.detectResult || !this.detectResult.ripeness_analysis) return 0
+      const dets = this.detectResult.ripeness_analysis.detections || []
+      return dets.filter(d => d.class_id === 1).length
+    },
+    diseaseInfo() {
+      const d = this.getMainDisease()
+      if (!d) return null
+      return {
+        name: d.name,
+        advice: this.getDiseaseAdvice(d.originalName)
+      }
+    }
   },
   methods: {
-    // 处理文件选择
-    handleFileChange(file) {
-      this.selectedFile = file.raw
-      this.previewUrl = URL.createObjectURL(file.raw)
-      this.detectResult = null
-    },
-
-    // 清除图片
-    clearImage() {
-      // 清除所有状态
-      this.selectedFile = null
-      this.previewUrl = null
-      this.detectResult = null
-      this.analyzing = false
-      
-      // 重置文件上传组件
-      const uploadInput = document.querySelector('.el-upload__input')
-      if (uploadInput) {
-        uploadInput.value = ''
+    triggerFileSelect() {
+      if (this.$refs.fileInputRef) {
+        this.$refs.fileInputRef.click()
       }
-      
-      this.$message.success('已清除')
     },
+    handleFileChange(event) {
+      const files = event.target.files
+      if (!files || !files[0]) return
+      const file = files[0]
+      this.loadFileAsSample(file)
+    },
+    onDragOver() {
+      this.dropActive = true
+    },
+    onDragLeave() {
+      this.dropActive = false
+    },
+    onDrop(event) {
+      this.dropActive = false
+      const files = event.dataTransfer && event.dataTransfer.files
+      if (!files || !files[0]) return
+      const file = files[0]
+      this.loadFileAsSample(file)
+    },
+    loadFileAsSample(file) {
+      if (this.previewUrl) {
+        URL.revokeObjectURL(this.previewUrl)
+      }
 
-    // 分析图片
+      this.selectedFile = file
+      this.previewUrl = URL.createObjectURL(file)
+      this.detectResult = null
+      this.inferenceTime = null
+
+      const sample = {
+        id: Date.now().toString(),
+        name: file.name,
+        time: new Date().toLocaleTimeString('zh-CN', {
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+        status: 'pending',
+      }
+
+      this.sampleQueue.unshift(sample)
+      this.currentSample = sample
+    },
+    selectSample(sample) {
+      this.currentSample = sample
+    },
+    onImageLoad(event) {
+      const img = event.target
+      this.imageWidth = img.naturalWidth || 0
+      this.imageHeight = img.naturalHeight || 0
+    },
+    clearImage() {
+      if (this.previewUrl) {
+        URL.revokeObjectURL(this.previewUrl)
+      }
+      this.previewUrl = ''
+      this.selectedFile = null
+      this.detectResult = null
+      this.inferenceTime = null
+      this.currentSample = null
+    },
     async analyzeImage() {
       if (!this.selectedFile) {
         this.$message.warning('请先上传图片')
         return
       }
 
-      if (!this.selectedCrop) {
-        this.$message.warning('请选择作物类型')
-        return
+      this.analyzing = true
+      this.inferenceTime = null
+      if (this.currentSample) {
+        this.currentSample.status = 'analyzing'
       }
 
-      this.analyzing = true
-      this.detectResult = null
+      const start = performance.now()
 
       try {
         const formData = new FormData()
         formData.append('file', this.selectedFile)
-        formData.append('crop_type', this.selectedCrop)
-        formData.append('conf', this.confidence.toString())
-        
-        // 根据检测类型选择不同的接口
+        formData.append('crop_type', 'tomato')
+        formData.append('conf', '0.5')
+
         const apiEndpoints = {
           both: 'http://localhost:5000/api/detect/both',
           ripeness: 'http://localhost:5000/api/detect/ripeness',
-          disease: 'http://localhost:5000/api/detect/disease'
+          disease: 'http://localhost:5000/api/detect/disease',
         }
-        const apiUrl = apiEndpoints[this.detectType]
-        
+
+        const apiUrl = apiEndpoints[this.detectType] || apiEndpoints.both
+
         const response = await fetch(apiUrl, {
           method: 'POST',
-          body: formData
+          body: formData,
         })
-        
+
         const res = await response.json()
 
         if (res.code === '200') {
-          // 统一数据格式
-          let result = res.data
-          
-          // 单独成熟度检测时，将数据包装成统一格式
-          if (this.detectType === 'ripeness' && result.statistics) {
-            result = {
-              result_image: result.result_image,
-              detect_time: result.detect_time,
+          let data = res.data || {}
+
+          if (this.detectType === 'ripeness' && data.statistics) {
+            data = {
+              result_image: data.result_image,
+              detect_time: data.detect_time,
               ripeness_analysis: {
-                detections: result.detections,
-                statistics: result.statistics
-              }
+                detections: data.detections,
+                statistics: data.statistics,
+              },
             }
           }
-          
-          // 单独病虫害检测时，将数据包装成统一格式
-          if (this.detectType === 'disease' && result.detections && !result.disease_analysis) {
-            result = {
-              result_image: result.result_image,
-              detect_time: result.detect_time,
+
+          if (
+            this.detectType === 'disease' &&
+            data.detections &&
+            !data.disease_analysis
+          ) {
+            data = {
+              result_image: data.result_image,
+              detect_time: data.detect_time,
               disease_analysis: {
-                detections: result.detections,
-                statistics: result.statistics
-              }
+                detections: data.detections,
+                statistics: data.statistics,
+              },
             }
           }
-          
-          this.detectResult = result
-          
-          // 自动切换到对应的结果标签页
-          if (this.detectType === 'ripeness') {
-            this.resultTab = 'ripeness'
-          } else if (this.detectType === 'disease') {
-            this.resultTab = 'disease'
-          } else {
-            this.resultTab = 'image'
+
+          this.detectResult = data
+          this.inferenceTime = Math.round(performance.now() - start)
+          if (this.currentSample) {
+            this.currentSample.status = 'done'
           }
-          
-          const typeNames = { both: '双检分析', ripeness: '成熟度检测', disease: '病虫害检测' }
-          this.$message.success(`${typeNames[this.detectType]}完成!`)
+          this.$message.success('分析完成')
         } else {
           this.$message.error(res.msg || '分析失败')
+          if (this.currentSample) {
+            this.currentSample.status = 'pending'
+          }
         }
-      } catch (e) {
-        console.error(e)
-        this.$message.error('分析请求失败，请确保Flask服务已启动 (python integrated_api_server.py)')
+      } catch (err) {
+        console.error(err)
+        this.$message.error('分析请求失败，请确认后端服务已启动')
+        if (this.currentSample) {
+          this.currentSample.status = 'pending'
+        }
       } finally {
         this.analyzing = false
       }
     },
-
-    // 获取进度条颜色
-    getProgressColor(percentage) {
-      if (percentage >= 80) return '#67C23A'
-      if (percentage >= 50) return '#E6A23C'
-      return '#F56C6C'
-    },
-
-    // 获取主要病害（置信度最高的非健康检测）
-    getMainDisease(diseaseAnalysis) {
-      if (!diseaseAnalysis || !diseaseAnalysis.detections || diseaseAnalysis.detections.length === 0) {
+    getMainDisease() {
+      const analysis = this.detectResult && this.detectResult.disease_analysis
+      if (!analysis || !analysis.detections || !analysis.detections.length) {
         return null
       }
-      
-      // 过滤掉健康的检测结果，找出真正的病害
-      const diseases = diseaseAnalysis.detections.filter(d => {
+      const diseases = analysis.detections.filter((d) => {
         const name = d.class_name || ''
-        return !name.includes('Healthy') && !name.includes('health')
+        return !name.includes('Healthy') && !name.toLowerCase().includes('health')
       })
-      
-      if (diseases.length === 0) {
-        return null
-      }
-      
-      // 按置信度排序，取最高的
-      const sorted = diseases.sort((a, b) => b.confidence - a.confidence)
+      if (!diseases.length) return null
+      const sorted = diseases.slice().sort((a, b) => (b.confidence || 0) - (a.confidence || 0))
       const main = sorted[0]
-      
       return {
         name: main.class_name_ch || main.class_name,
         originalName: main.class_name,
-        confidence: main.confidence
+        confidence: main.confidence,
       }
     },
-
-    // 获取病害防治建议
     getDiseaseAdvice(diseaseName) {
-      const adviceMap = {
-        'Early Blight（早疫病）': '建议使用代森锰锌、百菌清等杀菌剂进行喷雾防治；及时摘除病叶，减少菌源；加强通风透光，降低湿度。',
-        'Late Blight（晚疫病）': '建议选用甲霜灵·锰锌、烯酰吗啉等药剂防治；发现中心病株立即拔除；控制浇水，避免田间积水。',
-        'Leaf Miner（潜叶病）': '建议使用阿维菌素、灭蝇胺等药剂进行防治；利用黄板诱杀成虫；清洁田园，处理残枝败叶。',
-        'Leaf Mold（叶霉病）': '建议喷洒多菌灵、甲基托布津等药剂；加强温湿度管理，适时通风；选用抗病品种。',
-        'Mosaic Virus（花叶病毒）': '主要通过蚜虫传播，建议使用吡虫啉防治蚜虫；发病初期喷洒病毒A、植病灵等抗病毒药剂；拔除病株，防止蔓延。',
-        'Septoria（壳针孢属）': '建议使用苯醚甲环唑、代森锰锌等药剂防治；实行轮作倒茬；及时清除田间病残体。',
-        'Spider Mites（蜘蛛螨）': '建议使用哒螨灵、阿维菌素等杀螨剂；清除田边杂草；保护利用天敌，如捕食螨。',
-        'Yellow Leaf Curl Virus（黄化卷叶病毒）': '主要由烟粉虱传播，重点防治烟粉虱；使用防虫网阻隔；选用抗病毒品种。',
-        'Brown_Spot（褐斑病）': '建议使用三环唑、多菌灵等药剂；增施磷钾肥，提高抗病力；合理灌溉，避免深水漫灌。',
-        'Rice_Blast（稻瘟病）': '建议使用三环唑、富士一号等特异性药剂；选用抗病品种；科学施肥，避免氮肥过量。',
-        'Bacterial_Blight（细菌性叶枯病）': '建议使用叶枯唑、农用链霉素等药剂；浅水勤灌，适时晒田；严禁带菌稻草还田。',
-        'Gray Mold（灰霉病）': '建议使用腐霉利、异菌脲等药剂；控制浇水，降低湿度；及时摘除病叶病果。',
-        'Powdery Mildew Leaf（白粉病叶）': '建议使用三唑酮、粉锈宁等药剂；及时清除病叶；保持田间清洁。'
+      const map = {
+        'Early Blight': '建议使用代森锰锌、百菌清等杀菌剂进行喷雾防治；及时摘除病叶，减少菌源；加强通风透光，降低湿度。',
+        'Late Blight': '建议选用甲霜灵·锰锌、烯酰吗啉等药剂防治；发现中心病株立即拔除；控制浇水，避免田间积水。',
+        'Leaf Miner': '建议使用阿维菌素、灭蝇胺等药剂进行防治；利用黄板诱杀成虫；清洁田园，处理残枝败叶。',
+        'Mosaic Virus':
+          '主要通过蚜虫传播，建议使用吡虫啉防治蚜虫；发病初期喷洒病毒A、植病灵等抗病毒药剂；拔除病株，防止蔓延。',
       }
+      return (
+        map[diseaseName] ||
+        '建议及时采取防治措施，可使用对应的杀菌剂或杀虫剂进行喷洒处理，并加强田间管理。'
+      )
+    },
+    // Tab切换
+    switchTab(tab) {
+      this.activeTab = tab
+    },
+    // 图片处理
+    onDropImage(e) {
+      this.dropActive = false
+      const files = e.dataTransfer?.files
+      if (files && files[0]) this.handleImageFile(files[0])
+    },
+    handleImageUpload(e) {
+      const files = e.target.files
+      if (files && files[0]) this.handleImageFile(files[0])
+    },
+    handleImageFile(file) {
+      if (this.imagePreview) URL.revokeObjectURL(this.imagePreview)
+      this.selectedFile = file
+      this.imagePreview = URL.createObjectURL(file)
+      this.detections = []
+      this.detectResult = null
       
-      return adviceMap[diseaseName] || '建议及时采取防治措施，可使用对应的杀菌剂或杀虫剂进行喷洒处理，并加强田间管理。'
-    },
-
-    // 切换检测模式 Tab
-    handleTabClick(tab) {
-      this.detectMode = tab.name
-      this.clearAll()
-      if (tab.name !== 'camera') {
-        this.stopCamera()
+      const sample = {
+        id: `#${Date.now().toString().slice(-6)}`,
+        name: file.name,
+        time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+        status: 'pending',
+        previewUrl: this.imagePreview
       }
+      this.sampleQueue.unshift(sample)
+      this.currentSample = sample
     },
-
-    // 处理视频文件选择
-    handleVideoChange(file) {
-      this.selectedVideo = file.raw
-      this.videoUrl = URL.createObjectURL(file.raw)
-      this.detectResult = null
+    // 视频处理
+    handleVideoUpload(e) {
+      const file = e.target.files[0]
+      if (file) this.videoSrc = URL.createObjectURL(file)
     },
-
-    // 清除视频
-    clearVideo() {
-      this.selectedVideo = null
-      this.videoUrl = null
-      this.detectResult = null
-      this.analyzing = false
+    extractKeyFrame() {
+      const video = this.$refs.videoPlayer
+      if (!video) return
       
-      const uploadInput = document.querySelector('.el-upload__input')
-      if (uploadInput) {
-        uploadInput.value = ''
-      }
+      const canvas = document.createElement('canvas')
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+      canvas.getContext('2d').drawImage(video, 0, 0)
       
-      this.$message.success('已清除')
+      canvas.toBlob(blob => {
+        this.switchTab('image')
+        this.handleImageFile(new File([blob], 'frame.jpg', { type: 'image/jpeg' }))
+        this.$message.success('关键帧已提取')
+      })
     },
-
-    // 清除所有
-    clearAll() {
-      this.selectedFile = null
-      this.previewUrl = null
-      this.selectedVideo = null
-      this.videoUrl = null
-      this.detectResult = null
-      this.analyzing = false
+    // 实时流
+    startStream() {
+      if (!this.mjpegUrl) return this.$message.warning('请输入MJPEG流地址')
+      this.streamActive = true
+      this.$message.success('实时终端已启动')
     },
-
-    // 分析视频（提取关键帧）
-    async analyzeVideo() {
-      if (!this.selectedVideo) {
-        this.$message.warning('请先上传视频')
-        return
-      }
-
-      this.analyzing = true
-      this.detectResult = null
-
-      try {
-        // 创建视频元素提取第一帧
-        const video = document.createElement('video')
-        video.src = this.videoUrl
-        
-        await new Promise((resolve) => {
-          video.onloadeddata = resolve
-        })
-
-        // 跳到视频中间位置
-        video.currentTime = video.duration / 2
-
-        await new Promise((resolve) => {
-          video.onseeked = resolve
-        })
-
-        // 创建canvas提取帧
-        const canvas = document.createElement('canvas')
-        canvas.width = video.videoWidth
-        canvas.height = video.videoHeight
-        const ctx = canvas.getContext('2d')
-        ctx.drawImage(video, 0, 0)
-
-        // 将canvas转为blob
-        const blob = await new Promise((resolve) => {
-          canvas.toBlob(resolve, 'image/jpeg', 0.95)
-        })
-
-        // 发送到API
-        const formData = new FormData()
-        formData.append('file', blob, 'video_frame.jpg')
-
-        const detectApiUrl = process.env.VUE_APP_DETECT_API_URL || 'http://localhost:5000'
-        const response = await fetch(`${detectApiUrl}/api/detect`, {
-          method: 'POST',
-          body: formData
-        })
-
-        const res = await response.json()
-
-        if (res.code === '200') {
-          this.detectResult = res.data
-          this.$message.success('视频分析完成!')
-        } else {
-          this.$message.error(res.msg || '分析失败')
-        }
-      } catch (e) {
-        console.error(e)
-        this.$message.error('视频处理失败: ' + e.message)
-      } finally {
-        this.analyzing = false
-      }
+    stopStream() {
+      this.streamActive = false
+      this.streamDetections = []
     },
-
-    // 关闭摄像头（保留兼容）
-    stopCamera() {
-      this.stopMjpegStream()
-    },
-
-    // 开启MJPEG视频流
-    startMjpegStream() {
-      this.cameraActive = true
-      this.$message.success('实时监控已开启')
-    },
-
-    // 关闭MJPEG视频流
-    stopMjpegStream() {
-      this.cameraActive = false
-    },
-
-    // 处理视频流加载错误
     handleStreamError() {
-      this.$message.error('视频流加载失败，请检查摄像头地址是否正确')
-      this.cameraActive = false
+      this.$message.error('视频流加载失败')
+      this.streamActive = false
     },
-
-    // 截图并分析
-    async captureAndAnalyze() {
-      if (!this.cameraActive) {
-        this.$message.warning('请先开启实时监控')
-        return
-      }
+    captureFrame() {
+      const img = document.querySelector('.stream-display img')
+      if (!img) return
+      
+      const canvas = document.createElement('canvas')
+      canvas.width = 640
+      canvas.height = 480
+      canvas.getContext('2d').drawImage(img, 0, 0, 640, 480)
+      
+      canvas.toBlob(blob => {
+        this.switchTab('image')
+        this.handleImageFile(new File([blob], 'stream_capture.jpg', { type: 'image/jpeg' }))
+        this.$message.success('截图成功')
+      })
+    },
+    // 图片分析（含Mock数据）
+    async analyzeImage() {
+      if (!this.selectedFile) return this.$message.warning('请先上传图片')
 
       this.analyzing = true
-      this.detectResult = null
+      this.startScanAnimation()
+      if (this.currentSample) this.currentSample.status = 'analyzing'
+
+      const start = performance.now()
 
       try {
-        // 从MJPEG流截取当前帧
-        const img = document.querySelector('.camera-video')
-        const canvas = this.$refs.cameraCanvas
-        
-        canvas.width = img.naturalWidth || 640
-        canvas.height = img.naturalHeight || 480
-        
-        const ctx = canvas.getContext('2d')
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-
-        // 将canvas转为blob
-        const blob = await new Promise((resolve) => {
-          canvas.toBlob(resolve, 'image/jpeg', 0.95)
-        })
-
-        // 发送到Flask API进行双检分析
         const formData = new FormData()
-        formData.append('file', blob, 'stream_capture.jpg')
-        formData.append('crop_type', this.selectedCrop)
-        formData.append('conf', this.confidence.toString())
+        formData.append('file', this.selectedFile)
+        formData.append('crop_type', 'tomato')
+        formData.append('conf', '0.5')
 
-        const response = await fetch('http://localhost:5000/api/detect/both', {
-          method: 'POST',
-          body: formData
-        })
-
+        const apiUrl = `http://localhost:5000/api/detect/${this.detectType}`
+        const response = await fetch(apiUrl, { method: 'POST', body: formData })
         const res = await response.json()
 
         if (res.code === '200') {
-          this.detectResult = res.data
-          this.$message.success('双检分析完成!')
+          this.processDetectionResult(res.data, performance.now() - start)
+          this.$message.success('分析完成')
         } else {
-          this.$message.error(res.msg || '检测失败')
+          throw new Error(res.msg)
         }
-      } catch (e) {
-        console.error(e)
-        this.$message.error('截图检测失败: ' + e.message)
+      } catch (err) {
+        console.warn('后端未连接，使用Mock数据', err)
+        this.generateMockResult(performance.now() - start)
+        this.$message.warning('后端未启动，展示模拟数据')
       } finally {
         this.analyzing = false
+        if (this.currentSample) this.currentSample.status = 'done'
       }
     },
-
-    // 格式化置信度显示
-    formatConfidence(val) {
-      return `${(val * 100).toFixed(0)}%`
-    },
-
-    // 获取作物中文名称
-    getCropName(cropType) {
-      const cropNames = {
-        'tomato': '番茄',
-        'corn': '玉米',
-        'rice': '水稻',
-        'strawberry': '草莓'
-      }
-      return cropNames[cropType] || cropType
-    },
-
-    // 获取检测列表
-    getDetections() {
-      if (!this.detectResult) return []
+    processDetectionResult(data, time) {
+      this.detectResult = data
+      this.inferenceTime = Math.round(time)
+      this.fps = Math.round(1000 / time)
       
-      if (this.detectType === 'both' && this.detectResult.ripeness_analysis) {
-        // 双检分析：合并成熟度和病虫害检测结果
-        const ripenessDetections = this.detectResult.ripeness_analysis.detections || []
-        const diseaseDetections = this.detectResult.disease_analysis.detections || []
-        return [...ripenessDetections, ...diseaseDetections]
-      } else if (this.detectResult.detections) {
-        // 单独检测
-        return this.detectResult.detections
+      this.detections = []
+      if (data.ripeness_analysis?.detections) {
+        data.ripeness_analysis.detections.forEach(d => {
+          if (d.bbox) {
+            this.detections.push({
+              x: d.bbox[0],
+              y: d.bbox[1],
+              width: d.bbox[2] - d.bbox[0],
+              height: d.bbox[3] - d.bbox[1],
+              label: d.class_name_ch || d.class_name,
+              confidence: Math.round(d.confidence * 100),
+              type: d.class_id === 0 ? 'riped' : 'unriped'
+            })
+          }
+        })
       }
-      return []
     },
-
-    // 获取检测项名称
-    getDetectionName(item) {
-      if (item.class_name_ch) {
-        return item.class_name_ch
-      } else if (item.class_name) {
-        return item.class_name
-      }
-      return '未知'
-    },
-
-    // 获取检测项样式类
-    getDetectionClass(item) {
-      if (this.detectType === 'disease' || this.detectType === 'both') {
-        // 病虫害检测
-        if (item.class_name && item.class_name.includes('Healthy')) {
-          return 'healthy'
-        } else {
-          return 'disease'
+    generateMockResult(time) {
+      this.detectResult = {
+        ripeness_analysis: {
+          detections: [
+            { class_id: 0, class_name: 'Riped', confidence: 0.95, bbox: [80, 100, 220, 260] },
+            { class_id: 1, class_name: 'Unriped', confidence: 0.88, bbox: [280, 140, 400, 280] }
+          ],
+          statistics: { riped_ratio: 85 }
+        },
+        disease_analysis: {
+          detections: [{ class_name: 'Healthy', confidence: 0.92 }]
         }
-      } else {
-        // 成熟度检测
-        return item.class_id === 0 ? 'riped' : 'unriped'
       }
+      this.processDetectionResult(this.detectResult, time)
+    },
+    startScanAnimation() {
+      this.scanY = 0
+      const animate = () => {
+        if (this.analyzing && this.scanY < 100) {
+          this.scanY += 2
+          requestAnimationFrame(animate)
+        } else if (this.analyzing) {
+          this.scanY = 0
+          requestAnimationFrame(animate)
+        }
+      }
+      animate()
     }
+  },
+  beforeDestroy() {
+    if (this.imagePreview) URL.revokeObjectURL(this.imagePreview)
+    if (this.videoSrc) URL.revokeObjectURL(this.videoSrc)
   }
 }
 </script>
 
 <style scoped>
-.fruit-detect-page {
-  padding: 20px;
-  background: #f0f2f5;
-  min-height: calc(100vh - 60px);
-}
+/* ========== 现代科研实验室风格 ========== */
+/* 主色调: 白色 + 浅灰 + 翡翠绿 */
 
-/* 页面头部 */
-.page-header {
-  background: linear-gradient(135deg, #67C23A 0%, #529b2e 100%);
-  border-radius: 16px;
-  padding: 25px 30px;
-  margin-bottom: 20px;
-  box-shadow: 0 4px 15px rgba(103, 194, 58, 0.3);
-}
-
-.header-content {
+.lab-page {
+  height: 100vh;
+  background: #f1f5f9;
   display: flex;
+  flex-direction: column;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* 顶部标题栏 */
+.lab-header {
+  background: #ffffff;
+  border-bottom: 2px solid #e2e8f0;
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
   justify-content: space-between;
-  align-items: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
-.title-section {
+.header-left {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 12px;
 }
 
-.title-icon {
-  font-size: 40px;
-  color: rgba(255, 255, 255, 0.9);
+.header-icon {
+  font-size: 32px;
 }
 
-.title-text h2 {
-  margin: 0;
-  color: white;
-  font-size: 24px;
+.header-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1e293b;
+  letter-spacing: -0.3px;
+}
+
+.header-subtitle {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.info-tag {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 6px 12px;
+}
+
+.info-label {
+  font-size: 10px;
+  color: #64748b;
+  text-transform: uppercase;
+}
+
+.info-value {
+  font-size: 13px;
   font-weight: 600;
+  color: #10b981;
+  margin-left: 6px;
 }
 
-.title-text p {
-  margin: 5px 0 0;
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 14px;
-}
-
-/* 主内容区 */
-.main-content {
-  display: flex;
-  gap: 12px;
-  height: calc(100% - 60px);
-}
-
-.upload-section {
-  width: 480px;
-  min-width: 480px;
+/* ===== 中间工作台 ===== */
+.workbench-panel {
+  flex: 1;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;
-  gap: 10px;
 }
 
-/* 模式选择器 */
-.mode-selector {
+.tab-nav {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
+  border-bottom: 2px solid #e2e8f0;
+  padding: 0 16px;
 }
 
-.mode-selector ::v-deep .el-radio {
-  margin-right: 0;
-  padding: 12px 16px;
-  border: 2px solid #e4e7ed;
-  border-radius: 8px;
-  transition: all 0.3s;
-}
-
-.mode-selector ::v-deep .el-radio:hover {
-  border-color: #67C23A;
-  background: #f0f9ff;
-}
-
-.mode-selector ::v-deep .el-radio.is-checked {
-  border-color: #67C23A;
-  background: #f0f9ff;
-}
-
-.mode-selector ::v-deep .el-radio__label {
+.tab-item {
+  padding: 12px 20px;
+  cursor: pointer;
   display: flex;
   align-items: center;
   gap: 8px;
+  color: #64748b;
   font-size: 14px;
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: all 0.2s;
 }
 
-.mode-selector ::v-deep .el-radio__label i {
+.tab-item:hover {
+  color: #10b981;
+}
+
+.tab-item.active {
+  color: #10b981;
+  border-bottom-color: #10b981;
+}
+
+.tab-icon {
   font-size: 18px;
 }
 
-.result-section {
+.workbench-viewport {
   flex: 1;
-  max-width: 600px;
+  overflow: hidden;
 }
 
-/* 卡片样式 */
-.section-card {
-  background: white;
-  border-radius: 16px;
-  padding: 20px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
-}
-
-.analysis-panel {
-  padding-bottom: 10px;
-}
-
-/* 配置工具栏 */
-.config-toolbar {
-  margin-bottom: 15px;
-}
-
-.toolbar-row {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  margin-bottom: 15px;
-  flex-wrap: wrap;
-}
-
-.slider-row {
-  background: #f8f9fa;
-  padding: 10px 15px;
-  border-radius: 8px;
-  margin-bottom: 0;
-}
-
-.slider-row .label {
-  font-size: 13px;
-  color: #606266;
-  white-space: nowrap;
-}
-
-.custom-divider {
-  margin: 15px 0 20px 0;
-}
-
-.config-label {
-  font-size: 13px;
-  color: #606266;
-  white-space: nowrap;
-}
-
-/* 检测类型选择器 */
-.detect-type-selector {
-  margin-bottom: 15px;
-}
-
-.detect-type-selector ::v-deep .el-radio-group {
-  display: flex;
-  width: 100%;
-}
-
-.detect-type-selector ::v-deep .el-radio-button {
-  flex: 1;
-}
-
-.detect-type-selector ::v-deep .el-radio-button__inner {
-  width: 100%;
-  padding: 10px 8px;
-  font-size: 13px;
-  border-radius: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-}
-
-.detect-type-selector ::v-deep .el-radio-button:first-child .el-radio-button__inner {
-  border-radius: 8px 0 0 8px;
-}
-
-.detect-type-selector ::v-deep .el-radio-button:last-child .el-radio-button__inner {
-  border-radius: 0 8px 8px 0;
-}
-
-.detect-type-selector ::v-deep .el-radio-button__orig-radio:checked + .el-radio-button__inner {
-  background: linear-gradient(135deg, #67C23A 0%, #529B2E 100%);
-  border-color: #67C23A;
-  box-shadow: none;
-}
-
-.detect-type-selector ::v-deep .el-radio-button__inner i {
-  font-size: 14px;
-}
-
-/* Tabs 样式 */
-.mode-tabs ::v-deep .el-tabs__header {
-  margin-bottom: 20px;
-}
-
-.mode-tabs ::v-deep .el-tabs__item {
-  font-size: 14px;
-  height: 40px;
-  line-height: 40px;
-}
-
-.mode-tabs ::v-deep .el-tabs__item.is-active {
-  color: #67C23A;
-  font-weight: bold;
-}
-
-.tab-content {
-  padding: 5px 0;
-}
-
-/* 简化的 Tips */
-.tips-mini {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #909399;
-  font-size: 13px;
-}
-
-.tips-mini i {
-  color: #67C23A;
-  font-size: 16px;
-}
-
-.card-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 16px;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 20px;
-  padding-bottom: 15px;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.card-header i {
-  color: #67C23A;
-  font-size: 20px;
-}
-
-.detect-time {
-  margin-left: auto;
-  font-size: 12px;
-  color: #999;
-  font-weight: normal;
-}
-
-/* 上传区域 */
-.image-uploader {
-  width: 100%;
-}
-
-::v-deep .el-upload-dragger {
-  width: 435px;
-  height: 220px;
-  border: 2px dashed #dcdfe6;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s;
-}
-
-::v-deep .el-upload-dragger:hover {
-  border-color: #67C23A;
-}
-
-.upload-placeholder {
-  text-align: center;
-}
-
-.upload-icon {
-  font-size: 50px;
-  color: #c0c4cc;
-  margin-bottom: 10px;
-}
-
-.upload-text {
-  color: #606266;
-  font-size: 14px;
-}
-
-.upload-text em {
-  color: #67C23A;
-  font-style: normal;
-}
-
-.upload-tip {
-  color: #909399;
-  font-size: 12px;
-  margin-top: 5px;
-}
-
-.preview-container {
-  position: relative;
-  width: 100%;
+.viewport-content {
   height: 100%;
+  padding: 20px;
 }
 
-.preview-image {
+.drop-area {
+  height: 100%;
+  border: 2px dashed #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.drop-area.drag-over {
+  border-color: #10b981;
+  background: #ecfdf5;
+}
+
+.upload-prompt {
+  text-align: center;
+  padding: 40px;
+}
+
+.prompt-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+}
+
+.prompt-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 8px;
+}
+
+.prompt-subtitle {
+  font-size: 13px;
+  color: #64748b;
+  margin-bottom: 20px;
+}
+
+.upload-btn {
+  background: #10b981;
+  color: #ffffff;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.upload-btn:hover {
+  background: #059669;
+}
+
+.image-display {
+  height: 100%;
+  position: relative;
+}
+
+.image-display img {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
 }
 
-.preview-overlay {
+.scan-overlay, .detection-overlay {
   position: absolute;
   top: 0;
   left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.video-player-wrapper {
+  height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: white;
-  opacity: 0;
-  transition: opacity 0.3s;
-  border-radius: 10px;
+  gap: 16px;
 }
 
-.preview-container:hover .preview-overlay {
-  opacity: 1;
+.video-player-wrapper video {
+  max-width: 100%;
+  max-height: 80%;
+  border-radius: 8px;
 }
 
-.preview-overlay i {
-  font-size: 30px;
-  margin-bottom: 10px;
+.extract-btn {
+  background: #10b981;
+  color: #ffffff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
 }
 
-/* 摄像头样式 */
-.camera-container {
+.stream-url-input {
   width: 100%;
-  height: 280px;
-  background: #000;
+  max-width: 400px;
+  padding: 10px 16px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.stream-display {
+  height: 100%;
+  position: relative;
+}
+
+.stream-display img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.stream-controls {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 12px;
+}
+
+.capture-btn, .stop-btn {
+  background: #10b981;
+  color: #ffffff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.stop-btn {
+  background: #ef4444;
+}
+
+.workbench-footer {
+  padding: 16px 20px;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.xai-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.xai-toggle input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.toggle-label {
+  font-size: 13px;
+  color: #475569;
+}
+
+.footer-right {
+  display: flex;
+  gap: 12px;
+}
+
+.analyze-btn {
+  background: #10b981;
+  color: #ffffff;
+  border: none;
+  padding: 8px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.analyze-btn:hover:not(:disabled) {
+  background: #059669;
+}
+
+.analyze-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.clear-btn {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  padding: 8px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+/* ===== 右侧诊断面板 ===== */
+.diagnostic-panel {
+  width: 320px;
+  background: #ffffff;
   border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+}
+
+.report-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: #94a3b8;
+}
+
+.report-content {
+  padding: 16px;
+}
+
+.grade-stamp {
+  text-align: center;
+  margin: 20px 0;
+}
+
+.stamp-inner {
+  display: inline-block;
+  padding: 20px 30px;
+  border: 4px double #10b981;
+  border-radius: 50%;
+  transform: rotate(-12deg);
+  background: #ecfdf5;
+}
+
+.grade-letter {
+  font-size: 48px;
+  font-weight: 900;
+  color: #10b981;
+  line-height: 1;
+}
+
+.grade-text {
+  font-size: 14px;
+  color: #059669;
+  margin-top: 4px;
+  font-weight: 600;
+}
+
+.performance-panel {
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.perf-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.perf-item:last-child {
+  margin-bottom: 0;
+}
+
+.perf-label {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.perf-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1e293b;
+  font-family: 'Courier New', monospace;
+}
+
+.stat-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.stat-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 12px;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: #475569;
+}
+
+.stat-num {
+  font-weight: 700;
+  color: #1e293b;
+  font-family: 'Courier New', monospace;
+}
+
+.stat-num.stat-riped {
+  color: #10b981;
+}
+
+.stat-num.stat-unriped {
+  color: #f59e0b;
+}
+
+.disease-card {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.disease-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.disease-icon {
+  font-size: 20px;
+}
+
+.disease-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #dc2626;
+}
+
+.disease-body {
+  background: #ffffff;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.advice-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 8px;
+}
+
+.advice-content {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.6;
+}
+
+/* 滚动条 */
+.queue-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.queue-list::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.queue-list::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.queue-list::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* ===== 左侧样本队列（已添加到上面）===== */
+.lab-container {
+  flex: 1;
+  display: flex;
+  gap: 16px;
+  padding: 16px;
   overflow: hidden;
+}
+
+.sample-queue-panel {
+  width: 280px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-header {
+  padding: 16px;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.panel-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0;
+}
+
+.sample-count {
+  font-size: 12px;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.queue-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 10px;
+  display: flex;
+  gap: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.queue-card:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.queue-card.active {
+  background: #ecfdf5;
+  border-color: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.1);
+}
+
+.card-thumbnail {
+  width: 50px;
+  height: 50px;
+  border-radius: 6px;
+  background: #e2e8f0;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 20px;
+  overflow: hidden;
 }
 
-.camera-video {
+.card-thumbnail img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.camera-placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: #666;
-  text-align: center;
-}
-
-.camera-placeholder i {
-  font-size: 50px;
-  color: #999;
-  margin-bottom: 10px;
-}
-
-.camera-placeholder p {
-  margin: 0;
-  font-size: 14px;
-  color: #999;
-}
-
-/* 视频预览 */
-.preview-video {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-}
-
-.video-uploader {
-  width: 100%;
-}
-
-/* 操作按钮 */
-.action-buttons {
-  display: flex;
-  gap: 10px;
-  margin-top: 20px;
-}
-
-.action-buttons .el-button {
-  flex: 1;
-}
-
-/* 去掉按钮浮动效果 */
-::v-deep .action-buttons .el-button {
-  transition: none !important;
-  transform: none !important;
-}
-
-::v-deep .action-buttons .el-button:hover,
-::v-deep .action-buttons .el-button:focus,
-::v-deep .action-buttons .el-button:active {
-  transform: none !important;
-  box-shadow: none !important;
-}
-
-/* 使用说明 */
-.tips-content {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.tip-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 15px;
-  background: #f8f9fa;
-  border-radius: 8px;
-}
-
-.tip-num {
-  width: 24px;
-  height: 24px;
-  background: #67C23A;
-  color: white;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: bold;
-}
-
-
-/* 结果区域 */
-.result-card {
-  min-height: 400px;
-}
-
-.empty-result, .analyzing-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 200px;
-  color: #909399;
-}
-
-.empty-result i, .analyzing-state i {
-  font-size: 40px;
-  margin-bottom: 8px;
-  color: #dcdfe6;
-}
-
-.analyzing-animation i {
-  font-size: 60px;
-  color: #67C23A;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-/* 结果图片 */
-.result-image-container {
-  width: 100%;
-  max-height: 400px;
-  overflow: hidden;
-  border-radius: 12px;
-  margin-bottom: 20px;
-  background: #f5f5f5;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.result-image {
-  max-width: 100%;
-  max-height: 400px;
-  object-fit: contain;
-}
-
-/* 统计卡片 */
-.statistics-row {
-  display: flex;
-  gap: 15px;
-  margin-bottom: 20px;
-}
-
-.stat-card {
-  flex: 1;
-  padding: 15px;
-  border-radius: 12px;
-  text-align: center;
-}
-
-.stat-card.total {
-  background: linear-gradient(135deg, #409EFF 0%, #337ecc 100%);
-  color: white;
-}
-
-.stat-card.riped {
-  background: linear-gradient(135deg, #67C23A 0%, #529b2e 100%);
-  color: white;
-}
-
-.stat-card.unriped {
-  background: linear-gradient(135deg, #E6A23C 0%, #cf9236 100%);
-  color: white;
-}
-
-.stat-card.ratio {
-  background: linear-gradient(135deg, #909399 0%, #73767a 100%);
-  color: white;
-}
-
-.stat-value {
-  font-size: 28px;
-  font-weight: bold;
-}
-
-.stat-label {
-  font-size: 12px;
-  margin-top: 5px;
-  opacity: 0.9;
-}
-
-/* 成熟度进度条 */
-.maturity-bar {
-  background: #f8f9fa;
-  padding: 15px 20px;
-  border-radius: 12px;
-  margin-bottom: 20px;
-}
-
-.bar-label {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 10px;
-  font-size: 14px;
-  color: #606266;
-}
-
-.bar-value {
-  font-weight: bold;
-  color: #67C23A;
-}
-
-/* 检测详情列表 */
-.detection-list {
-  background: #f8f9fa;
-  border-radius: 12px;
-  padding: 15px;
-}
-
-.list-header {
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 12px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #eee;
-}
-
-.detection-items {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.detection-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 15px;
-  border-radius: 8px;
-  font-size: 13px;
-}
-
-.detection-item.riped {
-  background: rgba(103, 194, 58, 0.1);
-  border: 1px solid rgba(103, 194, 58, 0.3);
-}
-
-.detection-item.unriped {
-  background: rgba(230, 162, 60, 0.1);
-  border: 1px solid rgba(230, 162, 60, 0.3);
-}
-
-.item-index {
-  color: #909399;
-  font-weight: 500;
-}
-
-.item-class {
-  font-weight: 600;
-}
-
-.detection-item.riped .item-class {
-  color: #67C23A;
-}
-
-.detection-item.unriped .item-class {
-  color: #E6A23C;
-}
-
-.item-conf {
-  color: #909399;
-  font-size: 12px;
-}
-
-/* 检测类型选择器 */
-.type-selector {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.type-selector ::v-deep .el-radio {
-  margin-right: 0;
-  padding: 12px 16px;
-  border: 2px solid #e4e7ed;
-  border-radius: 8px;
-  transition: all 0.3s;
-}
-
-.type-selector ::v-deep .el-radio:hover {
-  border-color: #409EFF;
-  background: #f0f9ff;
-}
-
-.type-selector ::v-deep .el-radio.is-checked {
-  border-color: #409EFF;
-  background: #f0f9ff;
-}
-
-.type-selector ::v-deep .el-radio__label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-}
-
-.type-selector ::v-deep .el-radio__label i {
-  font-size: 18px;
-}
-
-/* 作物选择器 */
-.crop-selector {
-  margin-top: 20px;
-  margin-bottom: 15px;
-}
-
-.selector-label {
-  display: block;
-  font-size: 14px;
-  color: #606266;
-  margin-bottom: 8px;
-  font-weight: 500;
-}
-
-/* 置信度滑块 */
-.confidence-slider {
-  margin-top: 15px;
-}
-
-.slider-label {
-  display: block;
-  font-size: 14px;
-  color: #606266;
-  margin-bottom: 5px;
-  font-weight: 500;
-}
-
-/* 双检分析结果 */
-.dual-analysis-result {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.analysis-section {
-  background: #f8f9fa;
-  border-radius: 12px;
-  padding: 20px;
-}
-
-.section-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 16px;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 15px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #eee;
-}
-
-.section-title i {
-  font-size: 18px;
-}
-
-.section-title i.el-icon-cherry {
-  color: #67C23A;
-}
-
-.section-title i.el-icon-warning {
-  color: #E6A23C;
-}
-
-/* 病虫害统计 */
-.disease-stats {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.disease-stat-card {
-  padding: 20px;
-  border-radius: 12px;
-  text-align: center;
-  transition: all 0.3s;
-}
-
-.disease-stat-card.healthy {
-  background: linear-gradient(135deg, #67C23A 0%, #529b2e 100%);
-  color: white;
-}
-
-.disease-stat-card.has-disease {
-  background: linear-gradient(135deg, #E6A23C 0%, #cf9236 100%);
-  color: white;
-}
-
-.crop-type-info {
-  text-align: center;
-  font-size: 14px;
-  color: #666;
-  padding: 10px;
-  background: white;
-  border-radius: 8px;
-}
-
-/* 单独分析结果 */
-.single-analysis-result {
-  margin-bottom: 20px;
-}
-
-/* 病虫害检测项样式 */
-.detection-item.disease {
-  background: rgba(230, 162, 60, 0.1);
-  border: 1px solid rgba(230, 162, 60, 0.3);
-}
-
-.detection-item.healthy {
-  background: rgba(103, 194, 58, 0.1);
-  border: 1px solid rgba(103, 194, 58, 0.3);
-}
-
-.detection-item.disease .item-class {
-  color: #E6A23C;
-}
-
-.detection-item.healthy .item-class {
-  color: #67C23A;
-}
-
-/* 结果分页标签 */
-.result-tabs {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 15px;
-  background: #f5f7fa;
-  padding: 6px;
-  border-radius: 10px;
-}
-
-.result-tab {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  font-size: 13px;
-  color: #606266;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.result-tab:hover {
-  background: rgba(103, 194, 58, 0.1);
-  color: #67C23A;
-}
-
-.result-tab.active {
-  background: #67C23A;
-  color: white;
-  font-weight: 500;
-}
-
-.result-tab i {
-  font-size: 15px;
-}
-
-.result-panel {
-  min-height: 200px;
-}
-
-/* 紧凑统计行 */
-.compact-stats-row {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.mini-stat {
-  flex: 1;
-  background: #f8f9fa;
-  border-radius: 10px;
-  padding: 15px;
-  text-align: center;
-}
-
-.mini-stat.green {
-  background: rgba(103, 194, 58, 0.1);
-}
-
-.mini-stat.orange {
-  background: rgba(230, 162, 60, 0.1);
-}
-
-.mini-value {
-  display: block;
+.thumbnail-placeholder {
   font-size: 24px;
-  font-weight: bold;
-  color: #333;
 }
 
-.mini-stat.green .mini-value {
-  color: #67C23A;
+.card-info {
+  flex: 1;
+  min-width: 0;
 }
 
-.mini-stat.orange .mini-value {
-  color: #E6A23C;
-}
-
-.mini-label {
-  display: block;
+.sample-id {
   font-size: 12px;
-  color: #909399;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.sample-meta {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.status-badge {
+  display: inline-block;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
   margin-top: 4px;
+  font-weight: 500;
 }
 
-/* 进度条区域 */
-.progress-section {
-  background: #f8f9fa;
-  border-radius: 10px;
-  padding: 15px;
+.status-badge.pending {
+  background: #fef3c7;
+  color: #92400e;
 }
 
-.progress-header {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 10px;
-  font-size: 14px;
-  color: #606266;
+.status-badge.analyzing {
+  background: #dbeafe;
+  color: #1e40af;
 }
 
-.progress-value {
-  font-weight: bold;
-  color: #67C23A;
+.status-badge.done {
+  background: #d1fae5;
+  color: #065f46;
 }
 
-/* 主要病害卡片 - 重点突出 */
-.main-disease-card {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  padding: 20px 25px;
-  border-radius: 12px;
-  margin-bottom: 15px;
-  background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
-  color: white;
-  box-shadow: 0 4px 15px rgba(238, 90, 90, 0.3);
-}
-
-.main-disease-icon {
-  width: 60px;
-  height: 60px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.main-disease-icon i {
-  font-size: 32px;
-  color: white;
-}
-
-.main-disease-info {
-  flex: 1;
-}
-
-.main-disease-name {
-  font-size: 20px;
-  font-weight: bold;
-  margin-bottom: 5px;
-}
-
-.main-disease-conf {
-  font-size: 14px;
-  opacity: 0.9;
-}
-
-/* 病虫害统计 */
-.disease-stats {
-  display: flex;
-  gap: 15px;
-  margin-bottom: 15px;
-}
-
-.disease-stats .stat-item {
-  flex: 1;
-  background: #f8f9fa;
-  border-radius: 10px;
-  padding: 15px;
+.empty-queue {
   text-align: center;
+  padding: 40px 20px;
+  color: #94a3b8;
 }
 
-.disease-stats .stat-value {
-  font-size: 24px;
-  font-weight: bold;
-  color: #333;
-}
-
-.disease-stats .stat-label {
-  font-size: 12px;
-  color: #666;
-  margin-top: 5px;
-}
-
-/* 病虫害防治建议 */
-.disease-advice {
-  background: #fff8e6;
-  border: 1px solid #ffeeba;
-}
-
-.disease-advice .advice-header {
-  color: #856404;
-}
-
-.disease-advice .advice-header i {
-  color: #e6a23c;
-}
-
-/* 健康状态卡片 */
-.health-status-card.success {
-  background: linear-gradient(135deg, rgba(103, 194, 58, 0.1) 0%, rgba(82, 155, 46, 0.15) 100%);
-  border: 1px solid rgba(103, 194, 58, 0.3);
-  border-radius: 12px;
-  padding: 20px;
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  margin-bottom: 15px;
-}
-
-.health-status-card .status-icon i {
-  font-size: 40px;
-  color: #67C23A;
-}
-
-.health-status-card .status-info h4 {
-  margin: 0 0 5px 0;
-  color: #333;
-  font-size: 16px;
-}
-
-.health-status-card .status-info p {
-  margin: 0;
-  color: #666;
-  font-size: 13px;
-}
-
-/* 病虫害结果卡片 */
-.disease-result-card {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  padding: 25px;
-  border-radius: 12px;
-  margin-bottom: 15px;
-}
-
-.disease-result-card.healthy {
-  background: linear-gradient(135deg, rgba(103, 194, 58, 0.1) 0%, rgba(82, 155, 46, 0.15) 100%);
-  border: 1px solid rgba(103, 194, 58, 0.3);
-}
-
-.disease-result-card.has-disease {
-  background: linear-gradient(135deg, rgba(230, 162, 60, 0.1) 0%, rgba(207, 146, 54, 0.15) 100%);
-  border: 1px solid rgba(230, 162, 60, 0.3);
-}
-
-.disease-result-card i {
-  font-size: 40px;
-}
-
-.disease-result-card.healthy i {
-  color: #67C23A;
-}
-
-.disease-result-card.has-disease i {
-  color: #E6A23C;
-}
-
-.disease-info {
-  display: flex;
-  flex-direction: column;
-}
-
-.disease-count {
-  font-size: 28px;
-  font-weight: bold;
-  color: #333;
-}
-
-.disease-label {
-  font-size: 14px;
-  color: #606266;
-}
-
-.detection-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-/* 建议卡片 */
-.advice-card {
-  background: #f8f9fa;
-  border-radius: 10px;
-  padding: 15px;
-  margin-top: 15px;
-}
-
-.advice-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 10px;
-}
-
-.advice-header i {
-  color: #67C23A;
-  font-size: 16px;
-}
-
-.advice-content {
-  padding-left: 24px;
-}
-
-.advice-text {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.6;
-}
-
-.advice-text.success {
-  color: #67C23A;
-}
-
-.advice-text.warning {
-  color: #E6A23C;
-}
-
-.advice-text.info {
-  color: #909399;
-}
-
-/* 健康状态卡片 */
-.health-status-card {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  background: linear-gradient(135deg, rgba(103, 194, 58, 0.08) 0%, rgba(82, 155, 46, 0.12) 100%);
-  border: 1px solid rgba(103, 194, 58, 0.2);
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 15px;
-}
-
-.status-icon {
-  width: 50px;
-  height: 50px;
-  background: rgba(103, 194, 58, 0.15);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.status-icon i {
-  font-size: 28px;
-  color: #67C23A;
-}
-
-.status-info h4 {
-  margin: 0 0 5px 0;
-  font-size: 15px;
-  color: #333;
-}
-
-.status-info p {
-  margin: 0;
-  font-size: 13px;
-  color: #606266;
-}
-
-/* 详情列表 */
-.detail-list {
-  background: #f8f9fa;
-  border-radius: 10px;
-  padding: 15px;
-  margin-top: 15px;
-}
-
-.detail-header {
-  font-size: 14px;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 10px;
-}
-
-.detail-items {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.detail-tag {
-  margin: 0;
-}
-
-/* 提示卡片 */
-.tips-card {
-  background: #f8f9fa;
-  border-radius: 10px;
-  padding: 15px;
-  margin-top: 15px;
-}
-
-.tips-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 10px;
-}
-
-.tips-header i {
-  color: #409EFF;
-  font-size: 16px;
-}
-
-.tips-list {
-  margin: 0;
-  padding-left: 24px;
-  font-size: 13px;
-  color: #606266;
-  line-height: 1.8;
-}
-
-.tips-list li {
-  margin-bottom: 5px;
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 8px;
 }
 </style>

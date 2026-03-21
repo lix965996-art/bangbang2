@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="env-monitor-page">
     <!-- 超炫渐变背景 -->
     <div class="bg-gradient"></div>
@@ -81,7 +81,7 @@
         </div>
       </div>
       <div class="ai-footer">
-        <span><i class="el-icon-lightning"></i> DeepSeek智能分析</span>
+        <span><i class="el-icon-lightning"></i> 通义千问智能分析</span>
         <span><i class="el-icon-cpu"></i> 实时数据融合</span>
         <span><i class="el-icon-trophy"></i> 精准产量预测</span>
       </div>
@@ -154,6 +154,7 @@ export default {
       typing: false,
       fullAiText: '',
       aiAnalyzing: false,
+
       
       // 农田信息卡片数据
       kpiData: [
@@ -179,8 +180,8 @@ export default {
         cropStatus: '' // 作物状态
       },
       
-      // DeepSeek分析状态
-      deepseekAnalyzing: false,
+      // AI分析状态
+      qwenAnalyzing: false,
       
       // 自动控制状态
       autoControl: {
@@ -232,8 +233,8 @@ export default {
   },
   beforeDestroy() {
     window.removeEventListener('resize', this.handleResize);
-    if(this.radarChart) this.radarChart.dispose();
-    if(this.compareChart) this.compareChart.dispose();
+    if(this.radarChart && !this.radarChart.isDisposed()) this.radarChart.dispose();
+    if(this.compareChart && !this.compareChart.isDisposed()) this.compareChart.dispose();
     if(this.animationId) cancelAnimationFrame(this.animationId);
   },
   methods: {
@@ -276,8 +277,8 @@ export default {
       // 清空之前的分析内容
       this.clearPreviousAnalysis();
       
-      // 调用DeepSeek分析
-      await this.analyzeWithDeepSeek();
+      // 调用通义千问分析
+      await this.analyzeWithQwen();
       
       // 更新农田信息KPI卡片
       this.updateFarmKPI();
@@ -306,9 +307,15 @@ export default {
       this.animatedValues = [0, 0, 0, 0];
     },
     
-    // 使用DeepSeek分析农田数据
-    async analyzeWithDeepSeek() {
-      this.deepseekAnalyzing = true;
+    // 使用通义千问分析农田数据
+    async analyzeWithQwen() {
+      // 防止重复调用
+      if (this.qwenAnalyzing) {
+        console.log('AI分析正在进行中，跳过重复调用');
+        return;
+      }
+      
+      this.qwenAnalyzing = true;
       this.aiAnalyzing = true;
       
       try {
@@ -342,77 +349,87 @@ export default {
           请以JSON格式返回结果。
         `;
         
-        // 调用DeepSeek API（这里需要实际的API配置）
-        const response = await this.callDeepSeekAPI(prompt);
+        // 调用通义千问API
+        const response = await this.callQwenAPI(prompt);
         
         // 解析结果
         if (response) {
-          this.processDeepSeekResult(response);
+          this.processQwenResult(response);
         } else {
           // 使用本地模拟分析
           this.performLocalAnalysis();
         }
       } catch (e) {
-        console.error('DeepSeek分析失败:', e);
+        console.error('通义千问分析失败:', e);
         // 降级到本地分析
         this.performLocalAnalysis();
       } finally {
-        this.deepseekAnalyzing = false;
-        this.aiAnalyzing = false;
+        // 延迟重置状态，避免频繁调用
+        setTimeout(() => {
+          this.qwenAnalyzing = false;
+          this.aiAnalyzing = false;
+        }, 2000);
       }
     },
     
-    // 调用DeepSeek API
-    async callDeepSeekAPI(prompt) {
+    // 调用通义千问API（通过后端代理，解决CORS问题）
+    async callQwenAPI(prompt) {
       try {
-        // 注意：这里需要配置实际的DeepSeek API
-        const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer YOUR_DEEPSEEK_API_KEY' // 需要替换为实际的API Key
-          },
-          body: JSON.stringify({
-            model: 'deepseek-chat',
-            messages: [
-              { role: 'system', content: '你是一个农业专家，善于分析农田数据并给出产量和市场预测。' },
-              { role: 'user', content: prompt }
-            ],
-            temperature: 0.7
-          })
+        // 调用后端代理接口
+        const response = await this.request.post('/api/chat/qwen-proxy', {
+          prompt: prompt,
+          systemPrompt: '你是一个农业专家，善于分析农田数据并给出产量和市场预测。请以JSON格式返回结果。'
         });
         
-        if (response.ok) {
-          const data = await response.json();
-          const content = data.choices[0].message.content;
-          try {
-            return JSON.parse(content);
-          } catch {
-            return null;
+        if (response && response.code === 200 && response.data) {
+          // 如果返回的是对象，直接返回
+          if (typeof response.data === 'object') {
+            return response.data;
+          }
+          // 如果是字符串，尝试解析为JSON
+          if (typeof response.data === 'string') {
+            try {
+              return JSON.parse(response.data);
+            } catch {
+              console.error('无法解析通义千问返回的数据:', response.data);
+              return null;
+            }
           }
         }
         return null;
       } catch (e) {
-        console.error('DeepSeek API调用失败:', e);
+        console.error('通义千问API调用失败:', e);
         return null;
       }
     },
     
-    // 处理DeepSeek返回结果
-    processDeepSeekResult(result) {
-      // 更新AI预测数据
-      this.aiPredictions.expectedYield = result.yieldPerAcre || 2.5;
+    // 处理通义千问返回结果
+    processQwenResult(result) {
+      // 确保 result 是有效对象
+      if (!result || typeof result !== 'object') {
+        this.performLocalAnalysis();
+        return;
+      }
+      
+      // 更新AI预测数据（使用安全的默认值）
+      const yieldPerAcre = result.yieldPerAcre || 2.5;
+      const totalYield = result.totalYield || (yieldPerAcre * (this.currentFarmData.area || 10));
+      const suggestions = Array.isArray(result.suggestions) ? result.suggestions : ['适时灌溉', '注意病虫害防治'];
+      const marketAnalysis = result.marketAnalysis || '市场价格稳定，需求量较大';
+      const weatherImpact = result.weatherImpact || '天气适宜，对产量有积极影响';
+      
+      this.aiPredictions.expectedYield = yieldPerAcre;
       this.aiPredictions.harvestDate = result.harvestDate || this.calculateHarvestDate();
-      this.aiPredictions.marketAnalysis = result.marketAnalysis || '市场价格稳定，需求量较大';
-      this.aiPredictions.weatherImpact = result.weatherImpact || '天气适宜，对产量有积极影响';
-      this.aiPredictions.suggestions = result.suggestions || ['适时灌溉', '注意病虫害防治'];
+      this.aiPredictions.marketAnalysis = marketAnalysis;
+      this.aiPredictions.weatherImpact = weatherImpact;
+      this.aiPredictions.suggestions = suggestions;
       
       // 更新KPI数据
-      this.kpiData[0].value = result.yieldPerAcre || 2.5; // 亩产
+      this.kpiData[0].value = yieldPerAcre; // 亩产
       this.kpiData[1].value = result.expectedIncome || 50; // 预计收入
       
-      // 生成AI分析文本
-      this.fullAiText = `【DeepSeek智能分析】基于${this.currentFarmData.name}的实时数据分析，预计亩产可达${result.yieldPerAcre}吨，总产量约${result.totalYield}吨。${result.marketAnalysis}。${result.weatherImpact}。建议：${result.suggestions.join('；')}。`;
+      // 生成AI分析文本（使用安全的变量）
+      this.fullAiText = `【通义千问智能分析】基于${this.currentFarmData.name}的实时数据分析，预计亩产可达${yieldPerAcre}吨，总产量约${totalYield}吨。${marketAnalysis}。${weatherImpact}。建议：${suggestions.join('；')}。`;
       
       this.startAITyping();
     },
@@ -728,6 +745,7 @@ export default {
     },
 
     initRadarChart() {
+      if (!this.$refs.radarChart) return; // DOM不存在则跳过
       this.radarChart = echarts.init(this.$refs.radarChart);
       const option = {
         radar: {
@@ -749,7 +767,7 @@ export default {
           ]
         }]
       };
-      this.radarChart.setOption(option);
+      if (this.radarChart) this.radarChart.setOption(option);
     },
 
     initParticleCanvas() {
@@ -813,6 +831,7 @@ export default {
 
     // 多地块对比图
     initCompareChart() {
+      if (!this.$refs.compareChart) return; // DOM不存在则跳过
       this.compareChart = echarts.init(this.$refs.compareChart);
       const farms = this.farmList.filter(f => this.selectedFarms.includes(f.id)).map(f => f.name);
       
@@ -1399,5 +1418,158 @@ export default {
 
 .text-info {
   color: #6b7280;
+}
+
+/* Agent 区域 */
+.agent-card {
+  margin-bottom: 16px;
+  padding: 16px;
+}
+
+.agent-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.agent-sub {
+  margin: 4px 0 0 0;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.agent-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.agent-plan {
+  margin-top: 12px;
+  border: 1px dashed #e2e8f0;
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.agent-advice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #475569;
+  margin-bottom: 10px;
+}
+
+.agent-action-item {
+  padding: 8px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.agent-action-item:last-child {
+  border-bottom: none;
+}
+
+.action-title {
+  font-weight: 700;
+  margin-right: 10px;
+}
+
+.action-desc {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.action-route {
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.agent-results {
+  margin-top: 12px;
+  background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.results-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: white;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.results-title i {
+  font-size: 16px;
+}
+
+.agent-result-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  transition: all 0.3s;
+}
+
+.agent-result-item:last-child {
+  border-bottom: none;
+}
+
+.agent-result-item:hover {
+  background: rgba(37, 99, 235, 0.05);
+}
+
+.result-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.agent-result-item.success .result-icon {
+  background: rgba(22, 163, 74, 0.1);
+  color: #16a34a;
+}
+
+.agent-result-item.pending-client .result-icon {
+  background: rgba(37, 99, 235, 0.1);
+  color: #2563eb;
+}
+
+.agent-result-item.failed .result-icon {
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+}
+
+.result-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.result-message {
+  color: #1e293b;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.result-route {
+  color: #64748b;
+  font-size: 12px;
+  font-family: 'Courier New', monospace;
 }
 </style>

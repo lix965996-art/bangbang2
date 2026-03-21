@@ -3,7 +3,7 @@ import router from "@/router";
 
 const request = axios.create({
     baseURL: process.env.VUE_APP_API_BASE_URL || 'http://localhost:9090',
-    timeout: 5000
+    timeout: 60000  // 60秒超时，AI接口响应较慢
 })
 
 // request 拦截器
@@ -49,7 +49,12 @@ request.interceptors.response.use(
             // 清除无效的用户信息
             localStorage.removeItem("user");
             localStorage.removeItem("menus");
-            router.push("/login");
+            router.push("/login").catch(err => {
+                // 忽略路由重复跳转错误
+                if (err.name !== 'NavigationDuplicated') {
+                    console.error(err);
+                }
+            });
         }
         return res;
     },
@@ -69,7 +74,12 @@ request.interceptors.response.use(
                 console.warn('未授权访问，跳转到登录页');
                 localStorage.removeItem("user");
                 localStorage.removeItem("menus");
-                router.push("/login");
+                router.push("/login").catch(err => {
+                    // 忽略路由重复跳转错误
+                    if (err.name !== 'NavigationDuplicated') {
+                        console.error(err);
+                    }
+                });
                 break;
             case 403:
                 console.warn('权限不足');

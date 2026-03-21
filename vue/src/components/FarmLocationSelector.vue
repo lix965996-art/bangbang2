@@ -20,7 +20,7 @@
         <label class="search-label">搜索地址：</label>
         <div class="search-input-wrapper">
           <input 
-            id="amap-search-input" 
+            ref="searchInput"
             v-model="searchKeyword" 
             class="search-input" 
             placeholder="请输入地址关键词（至少2个字）" 
@@ -476,42 +476,8 @@ export default {
           const center = e.obj.getBounds().getCenter();
           console.log('📍 绘制区域完成，中心点:', center.lng, center.lat);
           
-          // 使用逆地理编码获取详细地址
-          this.geocoder.getAddress([center.lng, center.lat], (status, result) => {
-            if (status === 'complete' && result.regeocode) {
-              const addressComponent = result.regeocode.addressComponent;
-              const formattedAddress = result.regeocode.formattedAddress;
-              
-              console.log('📍 逆地理编码结果:', addressComponent);
-              console.log('📍 完整地址:', formattedAddress);
-              
-              // 更新选中的位置信息
-              if (!this.selectedLocation.lng) {
-                this.selectedLocation = {
-                  lng: center.lng,
-                  lat: center.lat,
-                  address: formattedAddress
-                };
-              }
-              
-              // 优先使用addressComponent中的区县信息
-              if (addressComponent.district) {
-                // 拼接完整的区县名称：市 + 区县
-                const fullDistrict = (addressComponent.city || '') + addressComponent.district;
-                this.calculatedDistrict = fullDistrict;
-                console.log('✅ 从逆地理编码获取区县:', fullDistrict);
-              } else {
-                // 如果没有district，尝试从完整地址提取
-                this.extractAndSetDistrict(formattedAddress);
-              }
-            } else {
-              console.warn('⚠️ 逆地理编码失败');
-              // 如果已有地址，尝试提取区县
-              if (this.selectedLocation.address) {
-                this.extractAndSetDistrict(this.selectedLocation.address);
-              }
-            }
-          });
+          // 使用后端代理接口进行逆地理编码（解决前端 geocoder 失败问题）
+          this.getAddressByBackend(center.lng, center.lat);
           
           this.$message.success(`区域绘制完成！面积约 ${areaInMu} 亩`);
           
@@ -619,7 +585,9 @@ export default {
     },
 
     // 处理输入变化
-    handleInputChange() {
+    handleInputChange(e) {
+      console.log('⌨️ 输入框变化事件触发，当前值:', this.searchKeyword);
+      
       // 清除之前的定时器
       if (this.inputTimer) {
         clearTimeout(this.inputTimer);
@@ -627,10 +595,13 @@ export default {
       
       // 如果输入为空或小于2个字符，隐藏提示
       if (!this.searchKeyword || this.searchKeyword.trim().length < 2) {
+        console.log('⚠️ 输入内容少于2个字符，不触发搜索');
         this.showTips = false;
         this.inputTips = [];
         return;
       }
+      
+      console.log('✅ 输入内容符合要求，200ms后触发搜索');
       
       // 防抖处理，200ms后执行
       this.inputTimer = setTimeout(() => {
@@ -651,26 +622,40 @@ export default {
           }
         });
         
-        console.log('📥 后端返回:', response);
+        console.log('📥 后端返回完整数据:', JSON.stringify(response, null, 2));
         
         if (response && response.status === '1' && response.tips) {
-          // 过滤掉没有坐标的结果
-          this.inputTips = response.tips.filter(tip => {
-            // 确保有location字段且不为空
-            return tip.location && tip.location !== '';
+          console.log('✅ 返回的tips数量:', response.tips.length);
+          
+          // 处理返回的提示：保留所有结果，包括没有坐标的行政区
+          this.inputTips = response.tips.map(tip => {
+            // 如果 location 是数组且为空，转换为空字符串
+            if (Array.isArray(tip.location) && tip.location.length === 0) {
+              tip.location = '';
+            }
+            return tip;
           });
           
           this.showTips = this.inputTips.length > 0;
-          console.log('✅ 获取到', this.inputTips.length, '条有效提示');
+          console.log('✅ 获取到', this.inputTips.length, '条提示（包括行政区）');
+          
+          if (this.inputTips.length > 0) {
+            console.log('📍 第一条提示示例:', this.inputTips[0]);
+          }
         } else {
-          console.warn('⚠️ 未获取到有效提示');
+          console.warn('⚠️ 未获取到有效提示，response.status:', response?.status);
+          console.warn('⚠️ response.tips:', response?.tips);
           this.showTips = false;
           this.inputTips = [];
         }
       } catch (error) {
         console.error('❌ 获取输入提示失败:', error);
+        console.error('❌ 错误堆栈:', error.stack);
         this.showTips = false;
         this.inputTips = [];
+        
+        // 显示用户友好的错误提示
+        this.$message.warning('搜索提示获取失败，请检查网络连接');
       }
     },
     
@@ -744,32 +729,53 @@ export default {
     },
     
     // 选择提示项
-    selectTip(tip) {
+    async selectTip(tip) {
       this.searchKeyword = tip.name;
       this.showTips = false;
       
-      // 如果有坐标信息
-      if (tip.location) {
-        const coords = tip.location.split(',');
-        if (coords.length === 2) {
-          const lng = parseFloat(coords[0]);
-          const lat = parseFloat(coords[1]);
-          
-          this.selectedLocation = {
-            lng: lng,
-            lat: lat,
-            address: tip.name + (tip.address ? ', ' + tip.address : '')
-          };
-          
-          // 设置地图中心并添加标记
-          this.map.setCenter([lng, lat]);
-          this.map.setZoom(16);
-          this.addMarker([lng, lat]);
-          
-          // 自动提取区县信息
-          const fullAddress = tip.district + tip.name + tip.address;
-          this.extractAndSetDistrict(fullAddress);
+      let lng, lat;
+      
+      // 如果有坐标信息，直接使用
+      if (tip.location && tip.location !== '') {
+        // 处理不同格式的 location：字符串 "lng,lat" 或对象 {lng, lat}
+        if (typeof tip.location === 'string') {
+          const coords = tip.location.split(',');
+          if (coords.length === 2) {
+            lng = parseFloat(coords[0]);
+            lat = parseFloat(coords[1]);
+          }
+        } else if (typeof tip.location === 'object' && tip.location.lng && tip.location.lat) {
+          lng = tip.location.lng;
+          lat = tip.location.lat;
         }
+      } else {
+        // 如果没有坐标，通过地理编码获取坐标
+        console.log('📍 该地点没有坐标，尝试地理编码:', tip.name);
+        const geocodeResult = await this.geocodeAddress(tip.district + tip.name);
+        if (geocodeResult) {
+          lng = geocodeResult.lng;
+          lat = geocodeResult.lat;
+          console.log('✅ 地理编码成功:', lng, lat);
+        } else {
+          this.$message.warning('无法定位该地点，请尝试更具体的地址');
+          return;
+        }
+      }
+      
+      if (lng && lat && !isNaN(lng) && !isNaN(lat)) {
+        this.selectedLocation = {
+          lng: lng,
+          lat: lat,
+          address: tip.name + (tip.address ? ', ' + tip.address : '')
+        };
+        
+        // 设置地图中心并添加标记
+        this.map.setCenter([lng, lat]);
+        this.map.setZoom(12); // 行政区用更大的视野
+        this.addMarker([lng, lat]);
+        
+        // 使用后端接口获取真实地址和区县
+        this.getAddressByBackend(lng, lat);
       }
     },
     
@@ -1025,6 +1031,107 @@ export default {
       
       this.calculatedDistrict = '未知区县';
       console.log('⚠️ 无法识别区县，设为: 未知区县');
+    },
+    
+    // 通过后端接口进行地理编码（地址转坐标）
+    async geocodeAddress(address) {
+      try {
+        console.log('🌐 调用后端地理编码接口，地址:', address);
+        
+        const response = await this.request.get('/amap/geocode', {
+          params: {
+            address: address
+          }
+        });
+        
+        console.log('📥 地理编码返回:', response);
+        
+        if (response && response.status === '1' && response.geocodes && response.geocodes.length > 0) {
+          const geocode = response.geocodes[0];
+          const location = geocode.location;
+          
+          // location 格式可能是 "lng,lat" 字符串
+          if (typeof location === 'string') {
+            const coords = location.split(',');
+            if (coords.length === 2) {
+              return {
+                lng: parseFloat(coords[0]),
+                lat: parseFloat(coords[1])
+              };
+            }
+          }
+        }
+        
+        console.warn('⚠️ 地理编码失败');
+        return null;
+      } catch (error) {
+        console.error('❌ 地理编码请求失败:', error);
+        return null;
+      }
+    },
+    
+    // 通过后端代理接口获取真实地址（解决前端 geocoder 失败问题）
+    async getAddressByBackend(lng, lat) {
+      try {
+        console.log('🌐 调用后端逆地理编码接口，坐标:', lng, lat);
+        
+        const location = `${lng},${lat}`;
+        const response = await this.request.get('/amap/regeocode', {
+          params: {
+            location: location,
+            extensions: 'all'
+          }
+        });
+        
+        console.log('📥 后端逆地理编码返回:', response);
+        
+        if (response && response.status === '1' && response.regeocode) {
+          const regeocode = response.regeocode;
+          const formattedAddress = regeocode.formatted_address;
+          const addressComponent = regeocode.addressComponent;
+          
+          console.log('📍 真实地址:', formattedAddress);
+          console.log('📍 地址组件:', addressComponent);
+          
+          // 更新选中的位置信息
+          this.selectedLocation = {
+            lng: lng,
+            lat: lat,
+            address: formattedAddress
+          };
+          
+          // 获取区县信息
+          if (addressComponent && addressComponent.district) {
+            const city = addressComponent.city || addressComponent.province || '';
+            const district = addressComponent.district;
+            this.calculatedDistrict = city + district;
+            console.log('✅ 真实区县:', this.calculatedDistrict);
+          } else {
+            // 从地址中提取区县
+            this.extractAndSetDistrict(formattedAddress);
+          }
+          
+          console.log('✅ 地址和区县已更新');
+        } else {
+          console.warn('⚠️ 后端逆地理编码返回失败:', response);
+          // 使用坐标作为备用显示
+          this.selectedLocation = {
+            lng: lng,
+            lat: lat,
+            address: `坐标位置 (${lng.toFixed(4)}, ${lat.toFixed(4)})`
+          };
+          this.calculatedDistrict = '';
+        }
+      } catch (error) {
+        console.error('❌ 后端逆地理编码请求失败:', error);
+        // 使用坐标作为备用显示
+        this.selectedLocation = {
+          lng: lng,
+          lat: lat,
+          address: `坐标位置 (${lng.toFixed(4)}, ${lat.toFixed(4)})`
+        };
+        this.calculatedDistrict = '';
+      }
     }
   }
 }

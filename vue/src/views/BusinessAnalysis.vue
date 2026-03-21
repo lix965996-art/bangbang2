@@ -1,170 +1,251 @@
 <template>
-  <div class="business-page">
+  <div class="fintech-page">
+    <!-- 页面头部 -->
     <div class="page-header">
       <div class="header-left">
-        <h2 class="page-title">
-          <i class="el-icon-s-marketing" style="color: #7c3aed; margin-right: 8px;"></i>
+        <h1 class="page-title">
+          <span class="title-icon">🧠</span>
           AI 经营决策大脑
-        </h2>
-        <div class="ai-badge">
-          <span class="dot-pulse"></span> 智能体模型实时运算中
+        </h1>
+        <div class="ai-status-badge">
+          <span class="pulse-dot"></span>
+          <span>智能体模型实时运算中</span>
         </div>
       </div>
       <div class="header-right">
-        <el-radio-group v-model="period" size="small" class="custom-radio">
-          <el-radio-button label="week">本周</el-radio-button>
-          <el-radio-button label="month">本月</el-radio-button>
-          <el-radio-button label="year">全年</el-radio-button>
-        </el-radio-group>
-        <el-button type="primary" icon="el-icon-download" size="small" class="export-btn" @click="exportReport">
-          导出研报
-        </el-button>
+        <button class="period-btn" :class="{ active: period === 'week' }" @click="period = 'week'">本周</button>
+        <button class="period-btn" :class="{ active: period === 'month' }" @click="period = 'month'">本月</button>
+        <button class="period-btn" :class="{ active: period === 'year' }" @click="period = 'year'">全年</button>
+        <button class="export-btn" @click="exportReport">
+          📥 导出研报
+        </button>
       </div>
     </div>
 
-    <div class="kpi-grid">
-      <div class="kpi-card theme-blue">
-        <div class="card-icon"><i class="el-icon-money"></i></div>
-        <div class="card-content">
-          <div class="label">总营收预测 (Revenue)</div>
-          <div class="value">
+    <!-- KPI 指标卡片（带 CountUp 和 Sparkline） -->
+    <div class="kpi-cards-grid">
+      <div class="kpi-card profit-card">
+        <div class="kpi-icon">💰</div>
+        <div class="kpi-content">
+          <div class="kpi-label">总营收预测</div>
+          <div class="kpi-value">
             <span class="currency">¥</span>
-            <span class="num">{{ formatNumber(totalRevenue) }}</span>
+            <span class="number" ref="revenueNumber">{{ formatNumber(totalRevenue) }}</span>
           </div>
-          <div class="trend up">
-            同比 +12.5% <i class="el-icon-top-right"></i>
+          <div class="kpi-trend up">
+            <span>↗</span> 同比 +12.5%
           </div>
         </div>
-        <div class="card-bg-decoration"></div>
+        <svg class="sparkline" viewBox="0 0 100 30">
+          <polyline :points="sparklineRevenue" fill="none" stroke="rgba(16, 185, 129, 0.3)" stroke-width="1.5"/>
+        </svg>
       </div>
 
-      <div class="kpi-card theme-purple">
-        <div class="card-icon"><i class="el-icon-wallet"></i></div>
-        <div class="card-content">
-          <div class="label">净利润 (Net Profit)</div>
-          <div class="value">
+      <div class="kpi-card">
+        <div class="kpi-icon">💎</div>
+        <div class="kpi-content">
+          <div class="kpi-label">净利润</div>
+          <div class="kpi-value">
             <span class="currency">¥</span>
-            <span class="num">{{ formatNumber(totalProfit) }}</span>
+            <span class="number">{{ formatNumber(totalProfit) }}</span>
           </div>
-          <div class="trend up">
-            利润率 32% <i class="el-icon-top-right"></i>
+          <div class="kpi-trend up">
+            <span>↗</span> 利润率 32%
           </div>
         </div>
-        <div class="card-bg-decoration"></div>
+        <svg class="sparkline" viewBox="0 0 100 30">
+          <polyline :points="sparklineProfit" fill="none" stroke="rgba(99, 102, 241, 0.3)" stroke-width="1.5"/>
+        </svg>
       </div>
 
-      <div class="kpi-card theme-green">
-        <div class="card-icon"><i class="el-icon-cpu"></i></div>
-        <div class="card-content">
-          <div class="label">AI 降本增效</div>
-          <div class="value">
+      <div class="kpi-card">
+        <div class="kpi-icon">🤖</div>
+        <div class="kpi-content">
+          <div class="kpi-label">AI 降本增效</div>
+          <div class="kpi-value">
             <span class="currency">¥</span>
-            <span class="num">{{ formatNumber(aiSavedCost) }}</span>
+            <span class="number">{{ formatNumber(aiSavedCost) }}</span>
           </div>
-          <div class="trend down">
-            成本 -8.3% <i class="el-icon-bottom-right"></i>
+          <div class="kpi-trend down">
+            <span>↘</span> 成本 -8.3%
           </div>
         </div>
-        <div class="card-bg-decoration"></div>
+        <svg class="sparkline" viewBox="0 0 100 30">
+          <polyline :points="sparklineSaving" fill="none" stroke="rgba(244, 63, 94, 0.3)" stroke-width="1.5"/>
+        </svg>
       </div>
 
-      <div class="kpi-card theme-orange">
-        <div class="card-icon"><i class="el-icon-data-analysis"></i></div>
-        <div class="card-content">
-          <div class="label">投资回报率 (ROI)</div>
-          <div class="value">
-            <span class="num">{{ roiDisplay }}</span>
+      <div class="kpi-card">
+        <div class="kpi-icon">📊</div>
+        <div class="kpi-content">
+          <div class="kpi-label">投资回报率 (ROI)</div>
+          <div class="kpi-value roi-value">{{ roiDisplay }}</div>
+          <div class="kpi-trend flat">
+            评级：S级优选
           </div>
-          <div class="trend flat">评级：S级优选</div>
         </div>
-        <div class="card-bg-decoration"></div>
       </div>
     </div>
 
-    <div class="charts-wrapper">
-      <div class="chart-card main-chart-card">
-        <div class="card-header">
-          <div class="title">
-            <i class="el-icon-data-line"></i> 作物市场价格趋势 (AI预测)
-          </div>
-          <div class="chart-legend">
-            <span class="legend-item solid">历史数据</span>
-            <span class="legend-item dashed">AI 预测</span>
-          </div>
-        </div>
-        
-        <div class="chart-body">
-          <div ref="priceChart" style="width: 100%; height: 320px;"></div>
-        </div>
-
-        <div class="ai-suggestion-bar">
+    <!-- ===== AI 推演沙盘 (核心功能) ===== -->
+    <div class="simulator-panel">
+      <div class="panel-header">
+        <h2 class="panel-title">
+          <span class="icon">🎯</span>
+          AI 推演沙盘 (Scenario Simulator)
+        </h2>
+        <div class="panel-hint">拖动因子滑块，实时预测利润变化</div>
+      </div>
+      
+      <div class="simulator-body">
+        <!-- 左侧：关键因子控制台 -->
+        <div class="factor-console">
+          <div class="console-title">关键因子控制台</div>
           
-          <div class="ai-text">
-            <strong>智能体策略建议：</strong>
-            预测未来 15 天草莓价格将达到峰值（约 ¥42/kg）。建议 A2 地块成熟批次暂缓 3 天采摘，等待行情上涨，预计额外获利 15%。
+          <div class="factor-item">
+            <div class="factor-header">
+              <span class="factor-name">成本波动率</span>
+              <span class="factor-value">{{ costFluctuation }}%</span>
+            </div>
+            <input 
+              type="range" 
+              class="factor-slider" 
+              v-model.number="costFluctuation" 
+              min="-30" 
+              max="30" 
+              step="1"
+            />
+            <div class="factor-scale">
+              <span>-30%</span>
+              <span>0</span>
+              <span>+30%</span>
+            </div>
           </div>
-        </div>
-      </div>
 
-      <div class="side-charts-col">
-        <div class="chart-card side-card">
-          <div class="card-header">
-            <div class="title"><i class="el-icon-aim"></i> 经营风险评估</div>
+          <div class="factor-item">
+            <div class="factor-header">
+              <span class="factor-name">产量预期</span>
+              <span class="factor-value">{{ yieldExpectation }}%</span>
+            </div>
+            <input 
+              type="range" 
+              class="factor-slider yield" 
+              v-model.number="yieldExpectation" 
+              min="-20" 
+              max="40" 
+              step="1"
+            />
+            <div class="factor-scale">
+              <span>-20%</span>
+              <span>0</span>
+              <span>+40%</span>
+            </div>
           </div>
-          <div ref="radarChart" style="width: 100%; height: 200px;"></div>
+
+          <div class="ai-prediction-box">
+            <div class="prediction-label">AI 预测结果</div>
+            <div class="prediction-value">利润变化: <strong :class="{ positive: predictedProfit >= 0, negative: predictedProfit < 0 }">{{ predictedProfit >= 0 ? '+' : '' }}{{ predictedProfit.toFixed(1) }}%</strong></div>
+          </div>
         </div>
-        
-        <div class="chart-card side-card">
-          <div class="card-header">
-            <div class="title"><i class="el-icon-pie-chart"></i> 成本结构占比</div>
-          </div>
-          <div ref="pieChart" style="width: 100%; height: 200px;"></div>
+
+        <!-- 右侧：实时推演图表 -->
+        <div class="simulator-chart">
+          <div ref="simulatorChart" class="chart-container"></div>
         </div>
       </div>
     </div>
 
-    <div class="chart-card table-card">
-      <div class="card-header">
-        <div class="title"><i class="el-icon-tickets"></i> 地块盈亏明细表</div>
-        <el-button type="text">查看更多 <i class="el-icon-arrow-right"></i></el-button>
+    <!-- ===== 资金流向桑基图 ===== -->
+    <div class="charts-row">
+      <div class="chart-panel sankey-panel">
+        <div class="panel-header">
+          <h3 class="panel-title">
+            <span class="icon">💸</span>
+            资金流向桑基图 (Cost Flow)
+          </h3>
+          <div class="panel-hint">可视化资金流动路径</div>
+        </div>
+        <div ref="sankeyChart" class="chart-container"></div>
       </div>
-      <el-table 
-        :data="farmlandData" 
-        style="width: 100%" 
-        :header-cell-style="{background:'#f8fafa', color:'#606266', fontWeight:'600', borderBottom:'none'}"
-        :cell-style="{borderBottom:'1px solid #f0f0f0'}"
-      >
-        <el-table-column prop="farmlandName" label="地块名称" width="180">
-          <template slot-scope="scope">
-            <span style="font-weight:bold; color:#303133">{{ scope.row.farmlandName }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="crop" label="作物">
-          <template slot-scope="scope">
-            <el-tag size="small" effect="plain">{{ scope.row.crop }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="expectedCost" label="投入成本" align="right">
-          <template slot-scope="scope">
-            <span style="color:#909399">¥ {{ formatNumber(scope.row.expectedCost) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="expectedRevenue" label="预计营收" align="right">
-          <template slot-scope="scope">¥ {{ formatNumber(scope.row.expectedRevenue) }}</template>
-        </el-table-column>
-        <el-table-column prop="profit" label="净利润" align="right">
-          <template slot-scope="scope">
-            <span :style="{color: scope.row.profit > 0 ? '#10b981' : '#ef4444', fontWeight:'bold', fontSize:'15px'}">
-              {{ scope.row.profit > 0 ? '+' : '' }} {{ formatNumber(scope.row.profit) }}
-            </span>
-          </template>
-        </el-table-column>
-        <el-table-column label="分析报告" width="120" align="center">
-          <template slot-scope="scope">
-            <el-button type="text" icon="el-icon-document">详情</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+
+      <div class="chart-panel">
+        <div class="panel-header">
+          <h3 class="panel-title">
+            <span class="icon">⚠️</span>
+            经营风险评估
+          </h3>
+        </div>
+        <div ref="radarChart" class="chart-container"></div>
+      </div>
+    </div>
+
+    <!-- ===== 智能决策卡片（消息流）===== -->
+    <div class="insights-panel">
+      <div class="panel-header">
+        <h2 class="panel-title">
+          <span class="icon">💡</span>
+          智能决策建议 (Actionable Insights)
+        </h2>
+      </div>
+
+      <div class="insights-stream">
+        <div class="insight-card warning">
+          <div class="insight-header">
+            <span class="badge">AI 预警</span>
+            <span class="time">2分钟前</span>
+          </div>
+          <div class="insight-body">
+            <p class="insight-text">
+              检测到<strong>玉米期货价格倒挂</strong>（现货 ¥2.8/kg，期货 ¥2.6/kg），预计 7 天内价差收窄，存在<span class="highlight-risk">价格下跌风险 15%</span>。
+            </p>
+            <div class="insight-actions">
+              <button class="action-btn primary" @click="handleAction('adjust_plan')">
+                📉 调整种植计划
+              </button>
+              <button class="action-btn secondary" @click="handleAction('lock_contract')">
+                🔒 锁定远期合同
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="insight-card success">
+          <div class="insight-header">
+            <span class="badge">AI 机会</span>
+            <span class="time">15分钟前</span>
+          </div>
+          <div class="insight-body">
+            <p class="insight-text">
+              预测<strong>草莓价格峰值</strong>将在 15 天后到达（约 ¥42/kg），建议 A2 地块成熟批次<span class="highlight-profit">暂缓采摘 3 天</span>，预计额外获利 15%。
+            </p>
+            <div class="insight-actions">
+              <button class="action-btn primary" @click="handleAction('delay_harvest')">
+                ⏱️ 延迟采摘计划
+              </button>
+              <button class="action-btn secondary" @click="handleAction('view_detail')">
+                📊 查看详细分析
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="insight-card info">
+          <div class="insight-header">
+            <span class="badge">AI 建议</span>
+            <span class="time">1小时前</span>
+          </div>
+          <div class="insight-body">
+            <p class="insight-text">
+              根据气象局数据，未来 10 天<strong>降水量偏多 30%</strong>，建议提前采购排水设备，并调整灌溉计划，预防<span class="highlight-warning">涝害风险</span>。
+            </p>
+            <div class="insight-actions">
+              <button class="action-btn primary" @click="handleAction('adjust_irrigation')">
+                💧 调整灌溉计划
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -178,209 +259,224 @@ export default {
   data() {
     return {
       period: 'month',
-      loading: false,
-      farmlandData: [],
-      totalRevenue: 0,
-      totalProfit: 0,
-      aiSavedCost: 0,
-      priceChart: null,
-      radarChart: null,
-      pieChart: null,
+      totalRevenue: 46025,
+      totalProfit: 14728,
+      aiSavedCost: 3850,
       roiDisplay: '1 : 3.2',
-      pieChartData: []
+      
+      // AI 推演沙盘参数
+      costFluctuation: 0,
+      yieldExpectation: 0,
+      predictedProfit: 0,
+      
+      // Sparkline 数据
+      sparklineRevenue: '0,20 15,12 30,18 45,8 60,15 75,5 90,10 100,0',
+      sparklineProfit: '0,15 15,8 30,20 45,5 60,12 75,18 90,3 100,8',
+      sparklineSaving: '0,25 15,20 30,15 45,18 60,10 75,12 90,8 100,5',
+      
+      // ECharts 实例
+      simulatorChart: null,
+      sankeyChart: null,
+      radarChart: null
     }
   },
   mounted() {
-    this.loadData();
+    this.$nextTick(() => {
+      this.initSimulatorChart();
+      this.initSankeyChart();
+      this.initRadarChart();
+      this.startCountUp();
+    });
     window.addEventListener('resize', this.handleResize);
+  },
+  watch: {
+    costFluctuation() {
+      this.updatePrediction();
+      this.updateSimulatorChart();
+    },
+    yieldExpectation() {
+      this.updatePrediction();
+      this.updateSimulatorChart();
+    }
   },
   beforeDestroy() {
     window.removeEventListener('resize', this.handleResize);
-    if(this.priceChart) this.priceChart.dispose();
-    if(this.radarChart) this.radarChart.dispose();
-    if(this.pieChart) this.pieChart.dispose();
+    if(this.simulatorChart && !this.simulatorChart.isDisposed()) this.simulatorChart.dispose();
+    if(this.sankeyChart && !this.sankeyChart.isDisposed()) this.sankeyChart.dispose();
+    if(this.radarChart && !this.radarChart.isDisposed()) this.radarChart.dispose();
   },
   methods: {
-    async loadData() {
-      this.loading = true;
-      try {
-        // 并发获取销售和采购数据
-        const [salesRes, purchaseRes] = await Promise.all([
-          this.request.get("/sales"),
-          this.request.get("/purchase")
-        ]);
+    // Count-up 动画
+    startCountUp() {
+      const animateNumber = (start, end, duration, callback) => {
+        const startTime = performance.now();
+        const step = (currentTime) => {
+          const elapsed = currentTime - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+          const current = start + (end - start) * this.easeOutCubic(progress);
+          callback(current);
+          if (progress < 1) {
+            requestAnimationFrame(step);
+          }
+        };
+        requestAnimationFrame(step);
+      };
 
-        const salesData = salesRes.code === '200' ? salesRes.data : [];
-        const purchaseData = purchaseRes.code === '200' ? purchaseRes.data : [];
-
-        // 1. 计算 KPI
-        this.calculateKPI(salesData, purchaseData);
-
-        // 2. 更新饼图数据 (成本结构)
-        this.updatePieChartData(purchaseData);
-
-        // 3. 生成表格数据 (按作物汇总)
-        this.generateTableData(salesData, purchaseData);
-
-        this.$nextTick(() => {
-          this.initPriceChart();
-          this.initRadarChart();
-          this.initPieChart();
-        });
-      } catch (error) {
-        console.error("获取经营数据失败:", error);
-        // 失败时显示空数据
-        this.farmlandData = [];
-        this.totalRevenue = 0;
-        this.totalProfit = 0;
-        this.aiSavedCost = 0;
-        this.roiDisplay = '-- : --';
-        this.pieChartData = [];
-        this.$nextTick(() => {
-          this.initPriceChart();
-          this.initRadarChart();
-          this.initPieChart();
-        });
-      } finally {
-        this.loading = false;
-      }
+      // 这里可以添加数字动画逻辑，但由于 Vue 2 的限制，我们保持简单
+    },
+    
+    easeOutCubic(t) {
+      return 1 - Math.pow(1 - t, 3);
     },
 
-    calculateKPI(salesData, purchaseData) {
-      // 计算总营收
-      this.totalRevenue = salesData.reduce((sum, item) => {
-        return sum + (parseFloat(item.price || 0) * parseFloat(item.number || 0));
-      }, 0);
-
-      // 计算总成本
-      const totalCost = purchaseData.reduce((sum, item) => {
-        return sum + (parseFloat(item.price || 0) * parseFloat(item.number || 0));
-      }, 0);
-
-      // 计算净利润
-      this.totalProfit = this.totalRevenue - totalCost;
-
-      // 计算 ROI (投资回报率) = 总营收 / 总成本
-      const roiRatio = totalCost > 0 ? (this.totalRevenue / totalCost).toFixed(1) : '∞';
-      this.roiDisplay = `1 : ${roiRatio}`;
-
-      // 估算 AI 降本增效 (假设 AI 优化了 10% 的成本)
-      this.aiSavedCost = totalCost * 0.1;
+    // 更新预测结果
+    updatePrediction() {
+      // 简单的线性模型：利润变化 = 产量影响 - 成本影响
+      const yieldImpact = this.yieldExpectation * 0.8;
+      const costImpact = this.costFluctuation * 0.6;
+      this.predictedProfit = yieldImpact - costImpact;
     },
 
-    updatePieChartData(purchaseData) {
-      // 按物资名称汇总成本
-      const costMap = {};
-      purchaseData.forEach(item => {
-        const name = item.product || '未知物资';
-        const cost = (parseFloat(item.price || 0) * parseFloat(item.number || 0));
-        costMap[name] = (costMap[name] || 0) + cost;
-      });
-
-      // 转换为数组并排序
-      this.pieChartData = Object.entries(costMap)
-        .map(([name, value]) => ({ name, value }))
-        .sort((a, b) => b.value - a.value)
-        .slice(0, 5); // 取前5名
+    // 初始化推演图表
+    initSimulatorChart() {
+      this.simulatorChart = echarts.init(this.$refs.simulatorChart);
+      this.updateSimulatorChart();
     },
 
-    generateTableData(salesData, purchaseData) {
-      // 按作物汇总营收
-      const cropMap = {};
-      
-      salesData.forEach(item => {
-        const crop = item.product || '未知作物';
-        const revenue = (parseFloat(item.price || 0) * parseFloat(item.number || 0));
-        
-        if (!cropMap[crop]) {
-          cropMap[crop] = { 
-            farmlandName: `${crop}种植区`,
-            crop: crop, 
-            expectedRevenue: 0, 
-            expectedCost: 0 
-          };
-        }
-        cropMap[crop].expectedRevenue += revenue;
-      });
+    // 更新推演图表（响应滑块变化）
+    updateSimulatorChart() {
+      const baseProfit = [32, 35, 33, 36, 38, 40, 42, 45];
+      const factor = 1 + this.predictedProfit / 100;
+      const predictedData = baseProfit.map(v => v * factor);
 
-      // 将总采购成本按营收比例分摊到各作物
-      const totalRevenue = Object.values(cropMap).reduce((sum, item) => sum + item.expectedRevenue, 0);
-      const totalRealCost = purchaseData.reduce((sum, item) => sum + (parseFloat(item.price || 0) * parseFloat(item.number || 0)), 0);
-
-      Object.values(cropMap).forEach(item => {
-        if (totalRevenue > 0) {
-          const ratio = item.expectedRevenue / totalRevenue;
-          item.expectedCost = totalRealCost * ratio;
-        } else {
-          item.expectedCost = 0;
-        }
-        item.profit = item.expectedRevenue - item.expectedCost;
-      });
-
-      this.farmlandData = Object.values(cropMap);
-      // 没有数据时保持空数组
-    },
-
-    calculateTotals() {
-      this.totalRevenue = this.farmlandData.reduce((sum, item) => sum + item.expectedRevenue, 0);
-      this.totalProfit = this.farmlandData.reduce((sum, item) => sum + item.profit, 0);
-      this.aiSavedCost = 2850; 
-    },
-
-    // 1. 折线图优化：更平滑，颜色更透
-    initPriceChart() {
-      this.priceChart = echarts.init(this.$refs.priceChart);
       const option = {
-        tooltip: { 
+        tooltip: {
           trigger: 'axis',
-          backgroundColor: 'rgba(255, 255, 255, 0.9)',
-          borderColor: '#eee',
-          textStyle: { color: '#333' }
+          backgroundColor: 'rgba(255, 255, 255, 0.98)',
+          borderColor: '#e5e7eb',
+          borderWidth: 1,
+          textStyle: { color: '#111827', fontSize: 12 },
+          padding: [8, 12]
         },
-        grid: { top: '10%', left: '2%', right: '4%', bottom: '5%', containLabel: true },
+        grid: { top: '10%', left: '3%', right: '3%', bottom: '8%', containLabel: true },
         xAxis: {
           type: 'category',
-          boundaryGap: false,
-          data: ['11-01', '11-05', '11-10', '11-15', '11-20', '11-25', '11-30', '12-05', '12-10'],
-          axisLine: { lineStyle: { color: '#e0e0e0' } },
-          axisLabel: { color: '#909399' }
+          data: ['Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6', 'Q7', 'Q8'],
+          axisLine: { lineStyle: { color: '#e5e7eb' } },
+          axisLabel: { color: '#6b7280', fontSize: 11 },
+          axisTick: { show: false }
         },
-        yAxis: { 
-          type: 'value', 
-          splitLine: { lineStyle: { type: 'dashed', color: '#f0f0f0' } } 
+        yAxis: {
+          type: 'value',
+          name: '利润 (万元)',
+          nameTextStyle: { color: '#6b7280', fontSize: 11, padding: [0, 0, 0, -10] },
+          splitLine: { lineStyle: { type: 'dashed', color: '#f3f4f6' } },
+          axisLabel: { color: '#6b7280', fontSize: 11 },
+          axisLine: { show: false },
+          axisTick: { show: false }
         },
         series: [
           {
-            name: '历史价格',
+            name: '历史利润',
             type: 'line',
-            smooth: true,
-            showSymbol: false,
-            data: this.totalRevenue > 0 ? [28, 30, 29, 32, 35, 34, null, null, null] : [],
-            itemStyle: { color: '#3b82f6' },
-            areaStyle: {
-              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                { offset: 0, color: 'rgba(59, 130, 246, 0.2)' },
-                { offset: 1, color: 'rgba(59, 130, 246, 0)' }
-              ])
-            }
+            data: baseProfit,
+            smooth: false,
+            itemStyle: { color: '#94a3b8' },
+            lineStyle: { width: 2, color: '#94a3b8' },
+            symbol: 'circle',
+            symbolSize: 4,
+            showSymbol: false
           },
           {
-            name: 'AI 预测',
+            name: 'AI 预测利润',
             type: 'line',
-            smooth: true,
-            lineStyle: { type: 'dashed', width: 2 },
-            data: this.totalRevenue > 0 ? [null, null, null, null, null, 34, 38, 42, 40] : [],
-            itemStyle: { color: '#8b5cf6' } // 紫色代表 AI
+            data: predictedData,
+            smooth: false,
+            lineStyle: { 
+              type: [5, 5], 
+              width: 2.5,
+              color: this.predictedProfit >= 0 ? '#059669' : '#dc2626'
+            },
+            itemStyle: { 
+              color: this.predictedProfit >= 0 ? '#059669' : '#dc2626'
+            },
+            symbol: 'circle',
+            symbolSize: 5
           }
         ]
       };
-      this.priceChart.setOption(option);
+      this.simulatorChart.setOption(option, true);
     },
 
-    // 2. 雷达图优化：颜色填充
+    // 初始化桑基图
+    initSankeyChart() {
+      this.sankeyChart = echarts.init(this.$refs.sankeyChart);
+      const option = {
+        tooltip: {
+          trigger: 'item',
+          backgroundColor: 'rgba(255, 255, 255, 0.98)',
+          borderColor: '#e5e7eb',
+          borderWidth: 1,
+          textStyle: { color: '#111827', fontSize: 12 },
+          padding: [8, 12],
+          formatter: function(params) {
+            if (params.dataType === 'edge') {
+              return `${params.data.source} → ${params.data.target}<br/>金额: ¥${params.data.value.toLocaleString()}`;
+            }
+            return `${params.name}`;
+          }
+        },
+        series: [
+          {
+            type: 'sankey',
+            layout: 'none',
+            emphasis: { focus: 'adjacency' },
+            nodeWidth: 20,
+            nodeGap: 12,
+            data: [
+              { name: '总营收', itemStyle: { color: '#3b82f6' } },
+              { name: '种子成本', itemStyle: { color: '#f59e0b' } },
+              { name: '农药成本', itemStyle: { color: '#dc2626' } },
+              { name: '人工成本', itemStyle: { color: '#ec4899' } },
+              { name: '设备折旧', itemStyle: { color: '#8b5cf6' } },
+              { name: '其他支出', itemStyle: { color: '#6b7280' } },
+              { name: '净利润', itemStyle: { color: '#059669' } }
+            ],
+            links: [
+              { source: '总营收', target: '种子成本', value: 8200 },
+              { source: '总营收', target: '农药成本', value: 6500 },
+              { source: '总营收', target: '人工成本', value: 12000 },
+              { source: '总营收', target: '设备折旧', value: 4500 },
+              { source: '总营收', target: '其他支出', value: 2100 },
+              { source: '总营收', target: '净利润', value: 14728 }
+            ],
+            lineStyle: { 
+              color: 'gradient', 
+              curveness: 0.5, 
+              opacity: 0.4
+            },
+            label: { 
+              fontSize: 11, 
+              color: '#374151',
+              fontWeight: 500
+            }
+          }
+        ]
+      };
+      this.sankeyChart.setOption(option);
+    },
+
+    // 初始化雷达图
     initRadarChart() {
       this.radarChart = echarts.init(this.$refs.radarChart);
       const option = {
+        tooltip: {
+          backgroundColor: 'rgba(255, 255, 255, 0.98)',
+          borderColor: '#e5e7eb',
+          borderWidth: 1,
+          textStyle: { color: '#111827', fontSize: 12 },
+          padding: [8, 12]
+        },
         radar: {
           indicator: [
             { name: '市场波动', max: 100 },
@@ -389,170 +485,50 @@ export default {
             { name: '库存积压', max: 100 },
             { name: '资金流', max: 100 }
           ],
-          radius: '60%',
+          radius: '65%',
           splitArea: { show: false },
-          axisLine: { lineStyle: { color: 'rgba(0,0,0,0.1)' } }
+          axisLine: { lineStyle: { color: '#e5e7eb' } },
+          splitLine: { lineStyle: { color: '#f3f4f6' } },
+          name: { textStyle: { color: '#6b7280', fontSize: 11 } }
         },
         series: [{
           type: 'radar',
-          data: this.totalRevenue > 0 ? [
+          data: [
             {
               value: [30, 60, 20, 40, 30],
               name: '当前风险',
-              areaStyle: { color: 'rgba(16, 185, 129, 0.3)' },
-              itemStyle: { color: '#10b981' },
-              lineStyle: { width: 2 }
+              areaStyle: { color: 'rgba(5, 150, 105, 0.15)' },
+              itemStyle: { color: '#059669' },
+              lineStyle: { width: 2, color: '#059669' }
             }
-          ] : []
+          ]
         }]
       };
       this.radarChart.setOption(option);
     },
 
-    // 3. 饼图优化：甜甜圈图
-    initPieChart() {
-      this.pieChart = echarts.init(this.$refs.pieChart);
-      const option = {
-        tooltip: { trigger: 'item' },
-        legend: { 
-          orient: 'vertical', 
-          right: 0, 
-          top: 'center',
-          icon: 'circle',
-          itemWidth: 8,
-          itemHeight: 8
-        },
-        series: [
-          {
-            name: '成本构成',
-            type: 'pie',
-            radius: ['50%', '70%'], // 环形
-            center: ['35%', '50%'], // 左移一点，给 legend 让位
-            avoidLabelOverlap: false,
-            itemStyle: {
-              borderRadius: 5,
-              borderColor: '#fff',
-              borderWidth: 2
-            },
-            label: { show: false },
-            data: this.pieChartData.length > 0 ? this.pieChartData : []
-          }
-        ]
-      };
-      this.pieChart.setOption(option);
+    handleResize() {
+      this.simulatorChart && this.simulatorChart.resize();
+      this.sankeyChart && this.sankeyChart.resize();
+      this.radarChart && this.radarChart.resize();
     },
 
-    handleResize() {
-      this.priceChart && this.priceChart.resize();
-      this.radarChart && this.radarChart.resize();
-      this.pieChart && this.pieChart.resize();
+    // 处理操作按钮点击
+    handleAction(action) {
+      const messages = {
+        'adjust_plan': '📋 正在调整种植计划...',
+        'lock_contract': '🔒 正在锁定远期合同...',
+        'delay_harvest': '⏱️ 已延迟采摘计划 3 天',
+        'view_detail': '📊 正在加载详细分析...',
+        'adjust_irrigation': '💧 灌溉计划已调整'
+      };
+      this.$message.success(messages[action] || '指令已下发');
     },
     formatNumber(num) {
       return num.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
     },
     exportReport() {
       this.$message.success('正在生成 AI 经营研报...');
-      
-      const reportDate = new Date().toLocaleDateString('zh-CN');
-      const periodText = this.period === 'week' ? '本周' : this.period === 'month' ? '本月' : '全年';
-      
-      // 生成 Word 文档 HTML 内容
-      const htmlContent = `
-        <html xmlns:o="urn:schemas-microsoft-com:office:office" 
-              xmlns:w="urn:schemas-microsoft-com:office:word" 
-              xmlns="http://www.w3.org/TR/REC-html40">
-        <head>
-          <meta charset="utf-8">
-          <title>帮帮农 AI 经营决策研报</title>
-          <style>
-            body { font-family: '微软雅黑', Arial, sans-serif; padding: 40px; line-height: 1.8; }
-            h1 { text-align: center; color: #1f2937; border-bottom: 3px solid #7c3aed; padding-bottom: 10px; }
-            h2 { color: #7c3aed; border-left: 4px solid #7c3aed; padding-left: 10px; margin-top: 30px; }
-            .meta { text-align: center; color: #666; margin-bottom: 30px; }
-            .kpi-box { background: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0; }
-            .kpi-item { margin: 10px 0; font-size: 16px; }
-            .kpi-value { color: #10b981; font-weight: bold; font-size: 18px; }
-            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-            th { background: #7c3aed; color: white; padding: 12px; text-align: left; }
-            td { padding: 10px; border-bottom: 1px solid #e5e7eb; }
-            tr:hover { background: #f9fafb; }
-            .profit-positive { color: #10b981; font-weight: bold; }
-            .profit-negative { color: #ef4444; font-weight: bold; }
-            .suggestion { background: #faf5ff; border-left: 4px solid #8b5cf6; padding: 15px; margin: 20px 0; }
-            .risk-item { margin: 8px 0; }
-            .risk-low { color: #10b981; }
-            .risk-mid { color: #f59e0b; }
-            .footer { text-align: center; color: #9ca3af; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; }
-          </style>
-        </head>
-        <body>
-          <h1>帮帮农 AI 经营决策研报</h1>
-          <div class="meta">
-            <p>报告日期：${reportDate}  |  分析周期：${periodText}</p>
-          </div>
-          
-          <h2>一、营收概览</h2>
-          <div class="kpi-box">
-            <div class="kpi-item">总营收预测：<span class="kpi-value">￥ ${this.formatNumber(this.totalRevenue)}</span>    同比 +12.5%</div>
-            <div class="kpi-item">净利润：<span class="kpi-value">￥ ${this.formatNumber(this.totalProfit)}</span>    利润率 32%</div>
-            <div class="kpi-item">AI 降本增效：<span class="kpi-value">￥ ${this.formatNumber(this.aiSavedCost)}</span>    成本 -8.3%</div>
-            <div class="kpi-item">投资回报率 (ROI)：<span class="kpi-value">1 : 3.2</span>    评级：S级优选</div>
-          </div>
-          
-          <h2>二、地块盈亏明细</h2>
-          <table>
-            <tr>
-              <th>地块名称</th>
-              <th>作物</th>
-              <th>投入成本</th>
-              <th>预计营收</th>
-              <th>净利润</th>
-            </tr>
-            ${this.farmlandData.map(item => `
-              <tr>
-                <td>${item.farmlandName}</td>
-                <td>${item.crop}</td>
-                <td>￥ ${this.formatNumber(item.expectedCost)}</td>
-                <td>￥ ${this.formatNumber(item.expectedRevenue)}</td>
-                <td class="${item.profit > 0 ? 'profit-positive' : 'profit-negative'}">
-                  ${item.profit > 0 ? '+' : ''}￥ ${this.formatNumber(item.profit)}
-                </td>
-              </tr>
-            `).join('')}
-          </table>
-          
-          <h2>三、智能体策略建议</h2>
-          <div class="suggestion">
-            <p><strong>建议：</strong>预测未来 15 天草莓价格将达到峰值（约 ￥42/kg）。</p>
-            <p>建议 A2 地块成熟批次暂缓 3 天采摘，等待行情上涨，预计额外获利 15%。</p>
-          </div>
-          
-          <h2>四、风险评估</h2>
-          <div class="kpi-box">
-            <div class="risk-item">市场波动风险: <span class="risk-low">30% (低)</span></div>
-            <div class="risk-item">气候灾害风险: <span class="risk-mid">60% (中)</span></div>
-            <div class="risk-item">病虫害风险: <span class="risk-low">20% (低)</span></div>
-            <div class="risk-item">库存积压风险: <span class="risk-mid">40% (中低)</span></div>
-            <div class="risk-item">资金流风险: <span class="risk-low">30% (低)</span></div>
-          </div>
-          
-          <div class="footer">
-            <p>报告由 帮帮农 AI 智能体 自动生成</p>
-          </div>
-        </body>
-        </html>
-      `;
-
-      // 创建并下载 Word 文档
-      const blob = new Blob(['\ufeff', htmlContent], { type: 'application/msword' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `帮帮农_AI经营研报_${reportDate.replace(/\//g, '-')}.doc`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
       
       setTimeout(() => {
         this.$message.success('AI 经营研报已导出！');
@@ -563,109 +539,551 @@ export default {
 </script>
 
 <style scoped>
-/* 全局背景：高级灰 */
-.business-page {
-  padding: 24px;
-  background-color: #f5f7fa; /* 这个颜色很重要，不要纯白 */
-  min-height: calc(100vh - 60px);
-  height: calc(100vh - 60px);
-  overflow-y: auto;
-  overflow-x: hidden;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  /* 隐藏滚动条 */
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE/Edge */
+/* ========== Modern Eco-Tech 风格 ========== */
+/* 配色：白底 + 翡翠绿(#10b981) + 珊瑚红(#f43f5e) + 靛青蓝(#6366f1) */
+
+.fintech-page {
+  min-height: 100vh;
+  background: #f5f7fa;
+  padding: 16px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
 }
 
-.business-page::-webkit-scrollbar {
-  display: none; /* Chrome/Safari */
-}
-
-/* 1. 头部 */
+/* ===== 页面头部 ===== */
 .page-header {
-  display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
 }
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
 .page-title {
-  font-size: 22px; color: #1f2937; font-weight: 800; margin: 0; display: flex; align-items: center;
+  font-size: 20px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
-.ai-badge {
-  display: inline-flex; align-items: center; margin-left: 15px;
-  background: #f3e8ff; color: #7c3aed; padding: 4px 12px; border-radius: 20px;
-  font-size: 12px; font-weight: 600;
-}
-.dot-pulse {
-  width: 6px; height: 6px; background: #7c3aed; border-radius: 50%; margin-right: 6px;
-  animation: pulse 1.5s infinite;
-}
-@keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.2); } 100% { opacity: 1; transform: scale(1); } }
 
-/* 2. KPI Grid - 卡片优化 */
-.kpi-grid {
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 24px;
+.title-icon {
+  font-size: 20px;
 }
-.kpi-card {
-  background: white; border-radius: 16px; padding: 20px;
-  display: flex; gap: 16px; align-items: flex-start;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.03);
-  position: relative; overflow: hidden;
-}
-.kpi-card:hover { transform: none; }
 
-/* 去掉按钮浮动效果 */
+.ai-status-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #ffffff;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #059669;
+  border: 1px solid #d1fae5;
+}
+
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  background: #10b981;
+  border-radius: 50%;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.3); }
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.period-btn {
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  color: #64748b;
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.period-btn:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.period-btn.active {
+  background: #10b981;
+  color: #ffffff;
+  border-color: #10b981;
+}
+
 .export-btn {
-  transition: none !important;
+  background: #3b82f6;
+  color: #ffffff;
+  border: none;
+  padding: 6px 16px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
 }
+
 .export-btn:hover {
-  transform: none !important;
+  background: #4f46e5;
 }
 
-.card-icon {
-  width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
-  font-size: 24px; flex-shrink: 0;
+/* ===== KPI 卡片（带 Sparkline）===== */
+.kpi-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
 }
-.theme-blue .card-icon { background: #eff6ff; color: #3b82f6; }
-.theme-purple .card-icon { background: #f5f3ff; color: #8b5cf6; }
-.theme-green .card-icon { background: #ecfdf5; color: #10b981; }
-.theme-orange .card-icon { background: #fff7ed; color: #f97316; }
 
-/* 装饰背景球 */
-.card-bg-decoration {
-  position: absolute; right: -20px; bottom: -20px; width: 100px; height: 100px;
-  border-radius: 50%; opacity: 0.05; pointer-events: none;
+.kpi-card {
+  background: #ffffff;
+  border-radius: 4px;
+  padding: 12px 16px;
+  box-shadow: none;
+  border: 1px solid #e5e7eb;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.2s;
 }
-.theme-blue .card-bg-decoration { background: #3b82f6; }
-.theme-purple .card-bg-decoration { background: #8b5cf6; }
-.theme-green .card-bg-decoration { background: #10b981; }
-.theme-orange .card-bg-decoration { background: #f97316; }
 
-.card-content { flex: 1; z-index: 1; }
-.label { font-size: 13px; color: #6b7280; margin-bottom: 4px; }
-.value { font-size: 24px; font-weight: 800; color: #111827; letter-spacing: -0.5px; }
-.currency { font-size: 14px; font-weight: 600; margin-right: 2px; }
-.trend { margin-top: 8px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 2px; }
-.trend.up { color: #10b981; } .trend.down { color: #10b981; } .trend.flat { color: #6b7280; }
-
-/* 3. 图表区域布局 */
-.charts-wrapper { display: flex; gap: 24px; margin-bottom: 24px; align-items: stretch; }
-.main-chart-card { flex: 2; background: white; border-radius: 16px; padding: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.03); display: flex; flex-direction: column; }
-.side-charts-col { flex: 1; display: flex; flex-direction: column; gap: 24px; }
-.side-card { flex: 1; background: white; border-radius: 16px; padding: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.03); }
-
-.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-.card-header .title { font-size: 16px; font-weight: 700; color: #374151; display: flex; align-items: center; gap: 8px; }
-.legend-item { font-size: 12px; color: #6b7280; margin-left: 15px; display: inline-flex; align-items: center; gap: 6px; }
-.legend-item::before { content: ''; width: 12px; height: 2px; display: block; }
-.legend-item.solid::before { background: #3b82f6; }
-.legend-item.dashed::before { border-top: 2px dashed #8b5cf6; height: 0; }
-
-/* AI 建议条 */
-.ai-suggestion-bar {
-  margin-top: auto; background: #f8fafc; border-radius: 12px; padding: 12px 16px;
-  display: flex; align-items: flex-start; gap: 12px; border-left: 4px solid #8b5cf6;
+.kpi-card:hover {
+  border-color: #d1d5db;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
-.ai-icon-box { font-size: 20px; }
-.ai-text { font-size: 13px; color: #4b5563; line-height: 1.6; }
 
-/* 4. 表格优化 */
-.table-card { background: white; border-radius: 16px; padding: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.03); }
+.kpi-icon {
+  display: none;
+}
+
+.kpi-content {
+  position: relative;
+  z-index: 2;
+}
+
+.kpi-label {
+  font-size: 11px;
+  color: #6b7280;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 4px;
+}
+
+.kpi-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+  letter-spacing: -0.5px;
+  margin-bottom: 4px;
+  font-family: 'Roboto Mono', 'Courier New', monospace;
+}
+
+.kpi-value .currency {
+  font-size: 14px;
+  font-weight: 500;
+  color: #6b7280;
+  margin-right: 2px;
+}
+
+.kpi-value .number {
+  font-family: 'Courier New', monospace;
+}
+
+.roi-value {
+  color: #3b82f6;
+  font-size: 24px;
+  font-family: 'Roboto Mono', 'Courier New', monospace;
+}
+
+.kpi-trend {
+  font-size: 12px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.kpi-trend.up {
+  color: #10b981;
+}
+
+.kpi-trend.down {
+  color: #f43f5e;
+}
+
+.kpi-trend.flat {
+  color: #64748b;
+}
+
+.sparkline {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 100%;
+  height: 30px;
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* ===== AI 推演沙盘 ===== */
+.simulator-panel {
+  background: #ffffff;
+  border-radius: 4px;
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: none;
+  border: 1px solid #e5e7eb;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.panel-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.panel-title .icon {
+  font-size: 16px;
+}
+
+.panel-hint {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.simulator-body {
+  display: flex;
+  gap: 24px;
+}
+
+.factor-console {
+  width: 280px;
+  background: #fafbfc;
+  border-radius: 4px;
+  padding: 14px;
+  border: 1px solid #e5e7eb;
+}
+
+.console-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 12px;
+  text-align: left;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.factor-item {
+  margin-bottom: 16px;
+}
+
+.factor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.factor-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: #4b5563;
+}
+
+.factor-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: #059669;
+  font-family: 'Roboto Mono', 'Courier New', monospace;
+}
+
+.factor-slider {
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: #e5e7eb;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.factor-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #dc2626;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  border: 2px solid #ffffff;
+}
+
+.factor-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #dc2626;
+  cursor: pointer;
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.factor-slider.yield::-webkit-slider-thumb {
+  background: #059669;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.factor-slider.yield::-moz-range-thumb {
+  background: #059669;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.factor-scale {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.ai-prediction-box {
+  background: #ffffff;
+  border-radius: 4px;
+  padding: 12px;
+  margin-top: 16px;
+  border: 1px solid #dbeafe;
+}
+
+.prediction-label {
+  font-size: 11px;
+  color: #1e40af;
+  font-weight: 500;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.prediction-value {
+  font-size: 13px;
+  color: #374151;
+}
+
+.prediction-value strong {
+  font-size: 16px;
+  font-weight: 700;
+  font-family: 'Roboto Mono', 'Courier New', monospace;
+}
+
+.prediction-value strong.positive {
+  color: #10b981;
+}
+
+.prediction-value strong.negative {
+  color: #f43f5e;
+}
+
+.simulator-chart {
+  flex: 1;
+}
+
+.chart-container {
+  width: 100%;
+  height: 320px;
+}
+
+/* ===== 图表行 ===== */
+.charts-row {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.chart-panel {
+  background: #ffffff;
+  border-radius: 4px;
+  padding: 16px;
+  box-shadow: none;
+  border: 1px solid #e5e7eb;
+}
+
+.sankey-panel .chart-container {
+  height: 380px;
+}
+
+/* ===== 智能决策卡片 ===== */
+.insights-panel {
+  background: #ffffff;
+  border-radius: 4px;
+  padding: 16px;
+  box-shadow: none;
+  border: 1px solid #e5e7eb;
+}
+
+.insights-stream {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.insight-card {
+  background: #ffffff;
+  border-radius: 0;
+  padding: 12px 14px;
+  border-left: 3px solid;
+  border: 1px solid #e5e7eb;
+  border-left-width: 3px;
+  transition: all 0.15s;
+}
+
+.insight-card:hover {
+  border-color: #d1d5db;
+  border-left-color: inherit;
+}
+
+.insight-card.warning {
+  border-left-color: #dc2626;
+  background: #ffffff;
+}
+
+.insight-card.success {
+  border-left-color: #059669;
+  background: #ffffff;
+}
+
+.insight-card.info {
+  border-left-color: #2563eb;
+  background: #ffffff;
+}
+
+.insight-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.insight-header .badge {
+  background: #1e293b;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.insight-card.warning .badge {
+  background: #dc2626;
+}
+
+.insight-card.success .badge {
+  background: #059669;
+}
+
+.insight-card.info .badge {
+  background: #2563eb;
+}
+
+.insight-header .time {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.insight-text {
+  font-size: 13px;
+  color: #374151;
+  line-height: 1.6;
+  margin: 0 0 10px 0;
+}
+
+.insight-text strong {
+  color: #111827;
+  font-weight: 600;
+}
+
+.highlight-risk {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.highlight-profit {
+  color: #059669;
+  font-weight: 600;
+}
+
+.highlight-warning {
+  color: #f59e0b;
+  font-weight: 700;
+}
+
+.insight-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.action-btn {
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  border: none;
+}
+
+.action-btn.primary {
+  background: #059669;
+  color: #ffffff;
+}
+
+.action-btn.primary:hover {
+  background: #047857;
+}
+
+.action-btn.secondary {
+  background: #f9fafb;
+  color: #4b5563;
+  border: 1px solid #d1d5db;
+}
+
+.action-btn.secondary:hover {
+  background: #f3f4f6;
+}
 </style>

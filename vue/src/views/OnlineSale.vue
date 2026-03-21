@@ -217,8 +217,12 @@ export default {
         }
       }).then(res => {
         this.loading = false;
-        this.tableData = res.data.records;
-        this.total = res.data.total;
+        if (res && res.data) {
+          this.tableData = res.data.records || [];
+          this.total = res.data.total || 0;
+        }
+      }).catch(() => {
+        this.loading = false;
       });
     },
     // 加载库存列表
@@ -226,8 +230,10 @@ export default {
       this.request.get("/inventory/page", {
         params: { pageNum: 1, pageSize: 1000, produce: "" }
       }).then(res => {
-        this.inventoryList = res.data.records.filter(item => item.number > 0);
-      });
+        if (res && res.data && res.data.records) {
+          this.inventoryList = res.data.records.filter(item => item.number > 0);
+        }
+      }).catch(() => {});
     },
     // 选择库存商品时
     onInventoryChange(inventoryId) {

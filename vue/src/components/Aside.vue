@@ -38,9 +38,6 @@
         <el-menu-item index="/farmmap3d">
           <i class="el-icon-office-building"></i> 农场 3D 沙盘
         </el-menu-item>
-        <el-menu-item index="/farmmap3d-real">
-          <i class="el-icon-location-information"></i> 真实地图3D农场
-        </el-menu-item>
         <el-menu-item index="/farm-map-gaode">
           <i class="el-icon-map-location"></i> GIS 指挥地图
         </el-menu-item>
@@ -107,9 +104,6 @@
         </el-menu-item>
         <el-menu-item index="/role">
           <i class="el-icon-lock"></i> 角色管理
-        </el-menu-item>
-        <el-menu-item index="/menu">
-          <i class="el-icon-menu"></i> 菜单配置
         </el-menu-item>
         <el-menu-item index="/notice">
           <i class="el-icon-bell"></i> 系统公告

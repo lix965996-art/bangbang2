@@ -23,8 +23,8 @@ public class InterceptorConfig implements WebMvcConfigurer {
                 .excludePathPatterns("/swagger**/**", "/webjars/**", "/v3/**", "/doc.html")
                 // 物联网和天气服务
                 .excludePathPatterns("/aether/**", "/amap/**")
-                // AI聊天和果蔬检测
-                .excludePathPatterns("/api/chat/**", "/fruit-detect/**")
+                // AI聊天、Agent和果蔬检测
+                .excludePathPatterns("/api/chat/**", "/api/agent/**", "/fruit-detect/**")
                 // 健康检查和农情日报
                 .excludePathPatterns("/health", "/actuator/**", "/agri-report/**");
     }

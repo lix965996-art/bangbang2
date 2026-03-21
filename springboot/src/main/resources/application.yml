@@ -11,9 +11,10 @@ spring:
     name: smart-agriculture
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/smart-agriculture?characterEncoding=utf8&useSSL=false&serverTimezone=UTC&rewriteBatchedStatements=true&allowPublicKeyRetrieval=true
-    username: root
-    password: 123456
+    # 云端部署时修改为实际数据库地址
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:smart-agriculture}?characterEncoding=utf8&useSSL=false&serverTimezone=UTC&rewriteBatchedStatements=true&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:123456}
     hikari:
       maximum-pool-size: 10
       minimum-idle: 5
@@ -63,7 +64,8 @@ logging:
 # 文件上传配置
 files:
   upload:
-    path: D:\test\smart-agriculture\springboot
+    # 云端部署时使用环境变量 UPLOAD_PATH 或默认相对路径
+    path: ${UPLOAD_PATH:./uploads}
     allowed-types: jpg,jpeg,png,gif,pdf,doc,docx,xls,xlsx
     max-size: 100MB
 
@@ -72,6 +74,12 @@ amap:
   js-key: a0dc4534ab26be714e94cef345e480aa  # JavaScript API Key（前端地图使用）
   web-key: ad1347855b35e84080018cf5c811d3e7  # Web服务API Key（后端REST API使用）
   city: 430800  # 张家界市的adcode
+
+# 通义千问AI配置（智能Agent）
+qwen:
+  api-key: sk-ac55e3c1bff04024ab56bd6066ba5662
+  api-url: https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation
+  model: qwen-max
 
 # OneNET物联网平台配置（STM32硬件）
 onenet:

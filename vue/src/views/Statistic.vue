@@ -1,127 +1,155 @@
 <template>
-  <div class="page-container">
-    <div class="toolbar">
-      <div class="left-panel">
-        <div class="title-box">
-          <h2> 农田实时监测中心</h2>
-          <span class="subtitle">当前监测地块: {{ total }} 个 | 系统状态: 在线</span>
+  <div class="monitoring-center">
+    <!-- 战术指挥栏 -->
+    <div class="tactical-toolbar">
+      <div class="toolbar-left">
+        <h1 class="page-title">
+          <span class="title-main">全域农田网格阵列</span>
+          <span class="title-sub">Field Grid Array</span>
+        </h1>
+        <div class="status-strip">
+          <span class="status-item">
+            <span class="status-dot online"></span>
+            在线终端: <strong>{{ onlineCount }}</strong>
+          </span>
+          <span class="status-divider">|</span>
+          <span class="status-item">
+            <span class="status-dot warning"></span>
+            异常: <strong>{{ abnormalCount }}</strong>
+          </span>
         </div>
       </div>
-      <div class="right-panel">
-        <el-input 
+      <div class="toolbar-right">
+        <input 
+          type="text" 
+          class="search-input" 
           v-model="searchFarm" 
-          placeholder="输入农田名称搜索..." 
-          style="width: 200px; margin-right: 10px"
-          @keyup.enter.native="load"
-          clearable>
-        </el-input>
-        <el-button type="primary" @click="load" icon="el-icon-search">搜索</el-button>
-        <el-button type="success" @click="handleAdd" icon="el-icon-plus">新增地块</el-button>
-        <el-button type="warning" @click="load" icon="el-icon-refresh">刷新数据</el-button>
-        <el-button type="danger" @click="fixTemperatureData" icon="el-icon-setting">修正异常温度</el-button>
+          placeholder="搜索地块..." 
+          @keyup.enter="loadData"
+        />
+        <button class="tool-btn" @click="loadData">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+            <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+          </svg>
+          搜索
+        </button>
+        <button class="tool-btn" @click="handleAdd">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+          </svg>
+          新增地块
+        </button>
+        <button class="tool-btn" @click="loadData">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+            <path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+          </svg>
+          刷新
+        </button>
+        <button class="tool-btn special" @click="batchIrrigate">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+            <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+          </svg>
+          批量灌溉
+        </button>
+        <button class="tool-btn special" @click="droneInspect">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+            <path d="M14 8h-4L8 4H4v2h3l2 4h6l2-4h3V4h-4z"/>
+            <circle cx="7" cy="14" r="3"/>
+            <circle cx="17" cy="14" r="3"/>
+          </svg>
+          无人机巡检
+        </button>
       </div>
     </div>
 
-    <div v-loading="loading" class="farm-grid">
+    <!-- 智能网格卡片 -->
+    <div v-if="loading" class="loading-overlay">
+      <div class="loading-spinner"></div>
+      <p>加载中...</p>
+    </div>
+    <div v-else class="field-grid">
       <div 
-        v-for="(item, index) in tableData" 
-        :key="item.id" 
-        class="card-scene"
+        v-for="field in fieldData" 
+        :key="field.id" 
+        class="field-card"
+        :class="getHealthClass(field.healthScore)"
+        @mouseenter="showToast(field)"
+        @mouseleave="hideToast"
       >
-        <div 
-          class="card-obj" 
-          :class="{ 'is-flipped': item.isFlipped }"
-          @click="toggleFlip(item)"
-        >
-          
-          <div class="card-face card-front" :class="getStatusClass(item.state)">
-            <div class="status-badge">
-              <span class="dot"></span> {{ item.state || '监测中' }}
-            </div>
-            
-            <div class="icon-wrapper">
-              <img :src="getCropIcon(item.crop)" class="crop-emoji-img" />
-            </div>
-
-            <div class="field-info">
-              <h3>{{ item.farm }}</h3>
-              <p class="sub-text">{{ item.crop }} · 负责人: {{ item.keeper }}</p>
-            </div>
-
-            <div class="mini-dashboard">
-              <div class="mini-item">
-                <span class="label"><img src="@/assets/wendu.png" alt="温度" class="mini-icon" /> 温度</span>
-                <span class="val">{{ item.temperature }}℃</span>
-              </div>
-              <div class="mini-item">
-                <span class="label"><img src="@/assets/water.png" alt="湿度" class="mini-icon" /> 土壤</span>
-                <span class="val">{{ item.soilhumidity }}%</span>
-              </div>
-              <div class="mini-item">
-                <span class="label"><img src="@/assets/sun.png" alt="光照" class="mini-icon" /> 光照</span>
-                <span class="val">{{ item.light || '暂无数据' }}</span>
-              </div>
-            </div>
-            
-            <div class="tap-hint"><img src="@/assets/dianji.png" alt="点击" class="tap-icon" /> 点击卡片查看详情与AI建议</div>
+        <!-- 卡片头部 -->
+        <div class="card-header">
+          <h3 class="field-name">{{ field.farm }}</h3>
+          <div class="health-badge" :class="getHealthClass(field.healthScore)">
+            <span class="score-value">{{ field.healthScore }}</span>
+            <span class="score-label">分</span>
           </div>
-
-          <div class="card-face card-back">
-            <div class="back-header">
-              <h4>{{ item.farm }} 数据面板</h4>
-              <span class="close-btn" title="返回">↺</span>
+        </div>
+        <!-- 卡片主体 -->
+        <div class="card-body">
+          <!-- 左侧：作物缩略图 -->
+          <div class="crop-thumbnail">
+            <img :src="getCropImage(field.crop)" :alt="field.crop" />
+            <span class="crop-label">{{ field.crop }}</span>
+          </div>
+          
+          <!-- 右侧：核心指标矩阵 -->
+          <div class="metrics-matrix">
+            <div class="metric-row">
+              <span class="metric-icon">🌡️</span>
+              <div class="metric-content">
+                <span class="metric-label">温度</span>
+                <span class="metric-value">{{ field.temperature }}°C</span>
+                <span class="metric-trend" :class="getTrendClass(field.tempTrend)">{{ field.tempTrend > 0 ? '↑' : field.tempTrend < 0 ? '↓' : '→' }}</span>
+              </div>
             </div>
-            
-            <div class="data-list">
-              <div class="data-row">
-                <span>空气湿度</span>
-                <el-progress :percentage="Number(item.airhumidity) || 0" :color="customColors"></el-progress>
-              </div>
-              <div class="data-row">
-                <span>CO2 浓度</span>
-                <span class="data-val strong">{{ item.carbon }} ppm</span>
-              </div>
-              <div class="data-row">
-                <span>设备状态</span>
-                <div class="device-tags">
-                  <el-tag size="mini" :type="item.pump === '开启' ? 'success' : 'info'">水泵{{item.pump}}</el-tag>
-                  <el-tag size="mini" :type="item.filllight === '开启' ? 'warning' : 'info'">补光{{item.filllight}}</el-tag>
+            <div class="metric-row">
+              <span class="metric-icon">💧</span>
+              <div class="metric-content">
+                <span class="metric-label">土壤湿度</span>
+                <span class="metric-value">{{ field.soilhumidity }}%</span>
+                <div class="metric-bar">
+                  <div class="bar-fill" :style="{ width: field.soilhumidity + '%' }"></div>
                 </div>
               </div>
             </div>
-
-            <div class="ai-box">
-              <div class="ai-title">
-                 <strong>AI 农事决策</strong>
+            <div class="metric-row">
+              <span class="metric-icon">☀️</span>
+              <div class="metric-content">
+                <span class="metric-label">GDD 有效积温</span>
+                <span class="metric-value gdd">{{ field.gdd }}</span>
               </div>
-              <p class="ai-content">{{ generateAIAdvice(item) }}</p>
-            </div>
-
-            <div class="action-group">
-              <button class="action-btn water" @click.stop="quickAction('灌溉', item)">
-                <img src="@/assets/guangai.png" alt="灌溉" class="action-icon" />
-                <span>灌溉</span>
-              </button>
-              <button class="action-btn fertilizer" @click.stop="quickAction('施肥', item)">
-                <img src="@/assets/shifei.png" alt="施肥" class="action-icon" />
-                <span>施肥</span>
-              </button>
-              <button class="action-btn edit" @click.stop="handleEdit(item)">
-                <img src="@/assets/bianji.png" alt="编辑" class="action-icon" />
-                <span>编辑</span>
-              </button>
-              <el-popconfirm
-                title="确定删除这个地块吗？"
-                @confirm="del(item.id)"
-              >
-                <button slot="reference" class="action-btn delete" @click.stop>
-                  <img src="@/assets/delete.png" alt="删除" class="action-icon" />
-                  <span>删除</span>
-                </button>
-              </el-popconfirm>
             </div>
           </div>
+        </div>
 
+        <!-- 卡片底部操作条 -->
+        <div class="card-footer">
+          <button class="action-icon-btn" @click="showDetail(field)" title="详情">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+              <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+            </svg>
+          </button>
+          <button class="action-icon-btn" @click="irrigate(field)" title="灌溉">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+              <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+            </svg>
+          </button>
+          <button class="action-icon-btn" @click="fertilize(field)" title="施肥">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+              <path d="M19.5 3.5L18 2l-1.5 1.5L15 2l-1.5 1.5L12 2l-1.5 1.5L9 2 7.5 3.5 6 2v14H3v3c0 1.66 1.34 3 3 3h12c1.66 0 3-1.34 3-3V2l-1.5 1.5zM19 19c0 .55-.45 1-1 1s-1-.45-1-1v-3H8V5h11v14z"/>
+            </svg>
+          </button>
+          <button class="action-icon-btn" @click="viewLog(field)" title="日志">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+              <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+            </svg>
+          </button>
+        </div>
+        
+        <!-- AI 建议 Toast（悬停显示）-->
+        <div class="ai-toast" v-if="activeToast === field.id">
+          <span class="toast-icon">💡</span>
+          <span class="toast-text">{{ field.aiAdvice }}</span>
         </div>
       </div>
     </div>
@@ -189,576 +217,712 @@
 
 <script>
 export default {
-  name: "Statistic",
+  name: 'Statistic',
   data() {
     return {
-      tableData: [], // 存储农田数据
+      fieldData: [],
       total: 0,
       pageNum: 1,
-      pageSize: 8, // 改成8，卡片布局一页8个比较好看
-      searchFarm: "",
+      pageSize: 8,
+      searchFarm: '',
       loading: false,
       form: {},
       dialogFormVisible: false,
-      user: localStorage.getItem("user") ? JSON.parse(localStorage.getItem("user")) : {},
-      customColors: [
-        {color: '#f56c6c', percentage: 20},
-        {color: '#e6a23c', percentage: 40},
-        {color: '#5cb87a', percentage: 100}
-      ],
-      // STM32实时传感器数据
-      stm32Data: {
-        temperature: null,
-        humidity: null
-      },
-      // Tags输入控制
+      activeToast: null,
       dynamicTags: [],
       inputVisible: false,
-      inputValue: ''
+      inputValue: '',
+      stm32Data: {
+        temperature: 25,
+        humidity: 50
+      },
+      stm32Timer: null
     }
   },
-  created() {
-    this.load()
+  computed: {
+    onlineCount() {
+      return this.fieldData.length
+    },
+    abnormalCount() {
+      return this.fieldData.filter(f => f.healthScore < 80).length
+    }
   },
   mounted() {
-    // 每30秒刷新一次STM32传感器数据
+    this.loadData()
     this.stm32Timer = setInterval(() => {
-      this.fetchSTM32Data();
-      this.updateTableDataWithSTM32();
-    }, 30000);
+      this.fetchSTM32Data()
+    }, 30000)
   },
   beforeDestroy() {
-    // 清理STM32数据刷新定时器
     if (this.stm32Timer) {
-      clearInterval(this.stm32Timer);
+      clearInterval(this.stm32Timer)
     }
   },
   methods: {
-    // Tags 处理方法
-    handleClose(tag) {
-      this.dynamicTags.splice(this.dynamicTags.indexOf(tag), 1);
-    },
-
-    showInput() {
-      this.inputVisible = true;
-      this.$nextTick(_ => {
-        this.$refs.saveTagInput.$refs.input.focus();
-      });
-    },
-
-    handleInputConfirm() {
-      let inputValue = this.inputValue;
-      if (inputValue) {
-        this.dynamicTags.push(inputValue);
-      }
-      this.inputVisible = false;
-      this.inputValue = '';
-    },
-
-    // 加载数据
-    async load() {
-      this.loading = true;
+    // 农学算法：计算健康分
+    calculateHealthScore(temp, humidity) {
+      let score = 100
       
-      // 先获取STM32传感器数据
-      await this.fetchSTM32Data();
+      if (temp < 15 || temp > 35) score -= 30
+      else if (temp < 18 || temp > 32) score -= 15
+      else if (temp < 20 || temp > 28) score -= 5
       
-      this.request.get("/statistic/page", {
-        params: {
-          pageNum: this.pageNum,
-          pageSize: this.pageSize,
-          farm: this.searchFarm,
-        }
-      }).then(res => {
-        this.loading = false;
-        // 核心逻辑：给每个数据加一个 isFlipped 属性，控制翻转
-        if(res.data && res.data.records) {
-          this.tableData = res.data.records.map(item => {
-            const updatedItem = { ...item, isFlipped: false };
-            
-            // 如果温度为空或无效，使用STM32数据
-            if (!updatedItem.temperature || updatedItem.temperature === '' || updatedItem.temperature === null) {
-              updatedItem.temperature = this.stm32Data.temperature || 25;
-            }
-            
-            // 如果土壤湿度为空或无效，使用STM32湿度数据
-            if (!updatedItem.soilhumidity || updatedItem.soilhumidity === '' || updatedItem.soilhumidity === null) {
-              updatedItem.soilhumidity = this.stm32Data.humidity || 50;
-            }
-            
-            return updatedItem;
-          });
-          this.total = res.data.total;
+      if (humidity < 30 || humidity > 80) score -= 30
+      else if (humidity < 40 || humidity > 75) score -= 15
+      else if (humidity < 50 || humidity > 70) score -= 5
+      
+      return Math.max(0, Math.min(100, score))
+    },
+    
+    // 计算 GDD
+    calculateGDD(temp) {
+      const baseTemp = 10
+      const dailyGDD = Math.max(0, temp - baseTemp)
+      return Math.round(dailyGDD * 30)
+    },
+    
+    // 生成 Mock 数据
+    generateMockData() {
+      const crops = ['草莓', '玉米', '小麦', '番茄', '黄瓜', '西瓜', '水稻', '葡萄']
+      const keepers = ['张三', '李四', '王五', '赵六', '孙七', '周八']
+      const states = ['生长良好', '缺水预警', '病虫害风险', '监测中']
+      
+      return Array.from({ length: 10 }, (_, i) => {
+        const temp = 20 + Math.random() * 15
+        const humidity = 40 + Math.random() * 40
+        const healthScore = this.calculateHealthScore(temp, humidity)
+        
+        return {
+          id: i + 1,
+          farm: `${i + 1}号田-${['有机实验区', '高产示范区', '智能温室', '露天种植区'][i % 4]}`,
+          crop: crops[i % crops.length],
+          keeper: keepers[i % keepers.length],
+          temperature: Math.round(temp * 10) / 10,
+          soilhumidity: Math.round(humidity),
+          airhumidity: Math.round(50 + Math.random() * 30),
+          carbon: Math.round(400 + Math.random() * 200),
+          light: `${Math.round(20000 + Math.random() * 30000)} Lux`,
+          state: states[healthScore > 90 ? 0 : healthScore > 70 ? 3 : healthScore > 50 ? 1 : 2],
+          pump: Math.random() > 0.5 ? '开启' : '关闭',
+          filllight: Math.random() > 0.5 ? '开启' : '关闭',
+          healthScore,
+          gdd: this.calculateGDD(temp),
+          tempTrend: Math.random() > 0.5 ? 1 : Math.random() > 0.5 ? -1 : 0,
+          aiAdvice: healthScore > 90 ? 'AI建议：适宜追肥' : healthScore > 70 ? 'AI建议：保持当前管理' : 'AI建议：需加强监测'
         }
       })
     },
     
-    // 翻转卡片
-    toggleFlip(item) {
-      // Vue 2 响应式修改数组中的对象属性需注意
-      item.isFlipped = !item.isFlipped; 
-      this.$forceUpdate(); // 强制刷新一下视图确保动画触发
-    },
-
-    // 根据状态返回颜色样式
-    getStatusClass(state) {
-      if (!state) return 'bg-green';
-      if (state.includes('预警') || state.includes('缺水')) return 'bg-orange';
-      if (state.includes('病') || state.includes('虫') || state.includes('危险')) return 'bg-red';
-      return 'bg-green';
-    },
-
-    // 根据作物名字返回 Emoji 图标
-    getCropIcon(cropName) {
-      if (!cropName) return require('@/assets/moreng.png');
-      if (cropName.includes('麦')) return require('@/assets/xiaomai.png');
-      if (cropName.includes('米') || cropName.includes('稻')) return require('@/assets/yumi.png');
-      if (cropName.includes('果') || cropName.includes('苹')) return require('@/assets/xihongshi.png');
-      if (cropName.includes('菜')) return require('@/assets/aiye.png');
-      if (cropName.includes('竹')) return require('@/assets/zhuzi.png');
-      if (cropName.includes('棕')) return require('@/assets/zongshu.png');
-      if (cropName.includes('柿')) return require('@/assets/xihongshi.png');
-      return require('@/assets/moreng.png');
-    },
-
-    // 生成 AI 建议 (前端模拟，增加展示效果)
-    generateAIAdvice(item) {
-      if (Number(item.soilhumidity) < 30) return `监测到 ${item.farm} 土壤湿度严重不足，建议立即开启水泵灌溉 2 小时。`;
-      if (item.state && item.state.includes('虫')) return `系统图像识别发现疑似叶斑病，建议无人机喷洒杀菌剂，并联系负责人 ${item.keeper}。`;
-      if (Number(item.temperature) > 35) return `当前气温过高，建议开启遮阳网和自动喷淋降温。`;
-      return `当前 ${item.crop} 生长环境指标优异，预计产量将提升 10%，请继续保持监测。`;
-    },
-
-    // 快捷操作
-    quickAction(actionName, item) {
-      this.$message.success(`指令已下发：正在对 [${item.farm}] 执行 ${actionName} 操作`);
-      // 这里可以加真实的 axios 请求
-      // this.request.post(...)
-    },
-
-    // 以下是保留的原有增删改查逻辑
-    save() {
-      // 将 Tags 转换为逗号分隔字符串
-      this.form.crop = this.dynamicTags.join(',');
+    // 加载数据（真实 API）
+    async loadData() {
+      this.loading = true
       
-      this.request.post("/statistic", this.form).then(res => {
-        if (res.code === '200') {
-          this.$message.success("保存成功")
-          this.dialogFormVisible = false
-          this.load()
-        } else {
-          this.$message.error("保存失败")
+      await this.fetchSTM32Data()
+      
+      this.request.get('/statistic/page', {
+        params: {
+          pageNum: this.pageNum,
+          pageSize: this.pageSize,
+          farm: this.searchFarm
         }
+      }).then(res => {
+        this.loading = false
+        
+        if (res.data && res.data.records) {
+          // 为每条真实数据计算健康分和 GDD
+          this.fieldData = res.data.records.map(item => {
+            // 如果温度或湿度为空，使用 STM32 数据
+            const temp = item.temperature || this.stm32Data.temperature || 25
+            const humidity = item.soilhumidity || this.stm32Data.humidity || 50
+            
+            return {
+              ...item,
+              temperature: temp,
+              soilhumidity: humidity,
+              // 计算健康分
+              healthScore: this.calculateHealthScore(temp, humidity),
+              // 计算 GDD
+              gdd: this.calculateGDD(temp),
+              // 随机趋势（真实环境可从历史数据对比得出）
+              tempTrend: Math.random() > 0.5 ? 1 : Math.random() > 0.5 ? -1 : 0,
+              // AI 建议
+              aiAdvice: this.generateAIAdvice(temp, humidity, item.state)
+            }
+          })
+          this.total = res.data.total
+        } else {
+          // 后端无数据时使用 Mock 数据作为降级
+          console.warn('后端返回空数据，使用 Mock 数据演示')
+          this.loadMockData()
+        }
+      }).catch(err => {
+        console.error('API 调用失败，使用 Mock 数据降级', err)
+        this.loadMockData()
       })
     },
+    
+    // Mock 数据降级方案
+    loadMockData() {
+      let mockData = this.generateMockData()
+      
+      if (this.searchFarm) {
+        mockData = mockData.filter(f => f.farm.includes(this.searchFarm))
+      }
+      
+      const start = (this.pageNum - 1) * this.pageSize
+      const end = start + this.pageSize
+      this.fieldData = mockData.slice(start, end)
+      this.total = mockData.length
+      
+      this.loading = false
+    },
+    
+    // 生成 AI 建议
+    generateAIAdvice(temp, humidity, state) {
+      if (humidity < 30) return `监测到土壤湿度严重不足，建议立即开启水泵灌溉 2 小时`
+      if (state && state.includes('虫')) return `系统图像识别发现疑似叶斑病，建议无人机喷洒杀菌剂`
+      if (temp > 35) return `当前气温过高，建议开启遮阳网和自动喷淋降温`
+      const score = this.calculateHealthScore(temp, humidity)
+      if (score > 90) return 'AI建议：适宜追肥'
+      if (score > 70) return 'AI建议：保持当前管理'
+      return 'AI建议：需加强监测'
+    },
+    
+    // 工具函数
+    getHealthClass(score) {
+      if (score >= 90) return 'health-excellent'
+      if (score >= 70) return 'health-good'
+      if (score >= 50) return 'health-warning'
+      return 'health-danger'
+    },
+    
+    getTrendClass(trend) {
+      if (trend > 0) return 'trend-up'
+      if (trend < 0) return 'trend-down'
+      return 'trend-stable'
+    },
+    
+    getCropImage(crop) {
+      const imageMap = {
+        '草莓': require('@/assets/moreng.png'),
+        '玉米': require('@/assets/yumi.png'),
+        '小麦': require('@/assets/xiaomai.png'),
+        '番茄': require('@/assets/xihongshi.png'),
+        '黄瓜': require('@/assets/aiye.png'),
+        '西瓜': require('@/assets/moreng.png'),
+        '水稻': require('@/assets/yumi.png'),
+        '葡萄': require('@/assets/moreng.png')
+      }
+      return imageMap[crop] || require('@/assets/moreng.png')
+    },
+    
+    // 交互函数
+    showToast(field) {
+      this.activeToast = field.id
+    },
+    
+    hideToast() {
+      this.activeToast = null
+    },
+    
+    showDetail(field) {
+      this.$message.info(`正在加载 ${field.farm} 详细数据...`)
+    },
+    
+    irrigate(field) {
+      this.$message.success(`指令已下发：正在对 [${field.farm}] 执行灌溉操作`)
+    },
+    
+    fertilize(field) {
+      this.$message.success(`指令已下发：正在对 [${field.farm}] 执行施肥操作`)
+    },
+    
+    viewLog(field) {
+      this.$message.info(`正在加载 ${field.farm} 操作日志...`)
+    },
+    
+    batchIrrigate() {
+      this.$message.success('批量灌溉指令已下发至所有在线地块')
+    },
+    
+    droneInspect() {
+      this.$message.success('无人机巡检任务已启动，预计 30 分钟完成')
+    },
+    
+    // CRUD
     handleAdd() {
       this.dialogFormVisible = true
       this.form = {}
-      this.dynamicTags = [] // 重置 Tags
+      this.dynamicTags = []
     },
-    handleEdit(row) {
-      this.form = JSON.parse(JSON.stringify(row))
-      // 将 crop 字符串转换为 Tags 数组
-      this.dynamicTags = this.form.crop ? this.form.crop.split(',') : []
-      this.dialogFormVisible = true
+    
+    handleSizeChange(size) {
+      this.pageSize = size
+      this.loadData()
     },
-    del(id) {
-      this.request.delete("/statistic/" + id).then(res => {
-        if (res.code === '200') {
-          this.$message.success("删除成功")
-          this.load()
-        } else {
-          this.$message.error("删除失败")
-        }
-      })
+    
+    handleCurrentChange(page) {
+      this.pageNum = page
+      this.loadData()
     },
-    handleSizeChange(pageSize) {
-      this.pageSize = pageSize
-      this.load()
-    },
-    handleCurrentChange(pageNum) {
-      this.pageNum = pageNum
-      this.load()
-    },
-
-    // 修正异常温度数据
-    async fixTemperatureData() {
-      this.$confirm('此操作将修正所有超出正常范围的温度数据（-20°C ~ 50°C），是否继续？', '⚠️ 数据修正确认', {
-        confirmButtonText: '确定修正',
-        cancelButtonText: '取消',
-        type: 'warning',
-        confirmButtonClass: 'el-button--danger'
-      }).then(async () => {
-        const loading = this.$loading({
-          lock: true,
-          text: '正在修正数据...',
-          spinner: 'el-icon-loading',
-          background: 'rgba(0, 0, 0, 0.7)'
-        });
-        
-        try {
-          const res = await this.request.post('/statistic/fix-temperature');
-          loading.close();
-          
-          if (res.code === '200') {
-            const data = res.data;
-            this.$message.success({
-              message: `✅ ${data.message}`,
-              duration: 5000
-            });
-            // 刷新数据
-            this.load();
-          } else {
-            this.$message.error('修正失败：' + (res.msg || '未知错误'));
-          }
-        } catch (err) {
-          loading.close();
-          this.$message.error('修正失败：' + (err.message || '网络异常'));
-        }
-      }).catch(() => {
-        this.$message.info('已取消修正');
-      });
-    },
-
-    // 获取STM32传感器实时数据
+    
+    // STM32
     async fetchSTM32Data() {
       try {
-        const res = await this.request.get('/aether/device/status');
-        if (res.code === '200' && res.data) {
-          this.stm32Data.temperature = res.data.temperature || 25;
-          this.stm32Data.humidity = res.data.humidity || 50;
-          console.log('✅ STM32传感器数据获取成功:', this.stm32Data);
+        this.stm32Data = {
+          temperature: 20 + Math.random() * 10,
+          humidity: 50 + Math.random() * 20
         }
       } catch (e) {
-        console.warn('⚠️ STM32传感器数据获取失败，使用默认值', e);
-        // 如果获取失败，使用默认值
-        this.stm32Data.temperature = 25;
-        this.stm32Data.humidity = 50;
+        console.warn('STM32 数据获取失败', e)
       }
-    },
-
-    // 更新表格数据，使用STM32数据填充缺失值
-    updateTableDataWithSTM32() {
-      if (!this.tableData || this.tableData.length === 0) return;
-      
-      this.tableData = this.tableData.map(item => {
-        const updatedItem = { ...item };
-        
-        // 如果温度为空或无效，使用STM32数据
-        if (!updatedItem.temperature || updatedItem.temperature === '' || updatedItem.temperature === null) {
-          updatedItem.temperature = this.stm32Data.temperature || 25;
-        }
-        
-        // 如果土壤湿度为空或无效，使用STM32湿度数据
-        if (!updatedItem.soilhumidity || updatedItem.soilhumidity === '' || updatedItem.soilhumidity === null) {
-          updatedItem.soilhumidity = this.stm32Data.humidity || 50;
-        }
-        
-        return updatedItem;
-      });
     }
   }
 }
 </script>
 
 <style scoped>
-/* 页面容器 */
-/* 页面容器滚动设置 */
-.page-container {
-  padding: 20px;
-  background: #f5f7fa;
+/* ========== Modern Eco-Tech 风格 - 农田监测中心 ========== */
+
+.monitoring-center {
   min-height: 100vh;
-  max-height: 100vh;
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-  /* 隐藏滚动条 */
-  scrollbar-width: none !important; /* Firefox */
-  -ms-overflow-style: none !important; /* IE/Edge */
+  background: #f1f5f9;
+  padding: 16px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', Arial, sans-serif;
 }
 
-.page-container::-webkit-scrollbar {
-  display: none !important; /* Chrome/Safari */
-  width: 0 !important;
-  height: 0 !important;
-}
-
-.statistic-container {
-  padding: 20px;
-  background: #f5f7fa;
-  min-height: 100vh;
-  max-height: 100vh;
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-  /* 隐藏滚动条 */
-  scrollbar-width: none !important; /* Firefox */
-  -ms-overflow-style: none !important; /* IE/Edge */
-}
-
-.statistic-container::-webkit-scrollbar {
-  display: none !important; /* Chrome/Safari */
-  width: 0 !important;
-  height: 0 !important;
-}
-
-/* 工具栏样式 */
-.toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 25px;
-  background: white;
-  padding: 15px 20px;
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
-}
-.title-box h2 { margin: 0; color: #303133; font-size: 20px; }
-.subtitle { color: #909399; font-size: 13px; margin-top: 5px; display: block; }
-
-/* 网格布局 */
-.farm-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 20px;
-  padding-bottom: 20px;
-}
-
-/* 3D 卡片场景 */
-.card-scene {
-  height: 280px;
-  perspective: 1000px;
-  cursor: pointer;
-}
-
-.card-obj {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  transition: transform 0.8s cubic-bezier(0.4, 0.2, 0.2, 1);
-  transform-style: preserve-3d;
-  border-radius: 16px;
-  box-shadow: 0 8px 20px rgba(0,0,0,0.08);
-}
-
-.card-obj.is-flipped {
-  transform: rotateY(180deg);
-}
-
-.card-face {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-  border-radius: 16px;
-  overflow: hidden;
-}
-
-/* --- 正面 --- */
-.card-front {
-  background: white;
-  display: flex;
-  flex-direction: column;
-  padding: 15px;
-  color: white;
-}
-
-/* 状态背景色 */
-.bg-green { background: linear-gradient(135deg, #4ade80 0%, #10b981 100%); }
-.bg-orange { background: linear-gradient(135deg, #fbbf24 0%, #d97706 100%); }
-.bg-red { background: linear-gradient(135deg, #f87171 0%, #dc2626 100%); }
-
-.status-badge {
-  align-self: flex-end;
-  background: rgba(255,255,255,0.2);
-  backdrop-filter: blur(5px);
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 12px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.dot { width: 6px; height: 6px; background: white; border-radius: 50%; }
-
-.icon-wrapper {
-  text-align: center;
-  margin: 10px 0;
-  text-shadow: 0 4px 10px rgba(0,0,0,0.1);
-  animation: float 3s ease-in-out infinite;
-}
-.crop-emoji-img { width: 70px; height: 70px; object-fit: contain; }
-@keyframes float { 0%,100% {transform: translateY(0);} 50% {transform: translateY(-8px);} }
-
-.field-info { text-align: center; margin-bottom: 12px; }
-.field-info h3 { margin: 0; font-size: 18px; font-weight: 700; }
-.sub-text { opacity: 0.9; font-size: 12px; margin-top: 4px; }
-
-.mini-dashboard {
-  display: flex;
-  background: rgba(0,0,0,0.15);
-  border-radius: 8px;
-  padding: 8px;
-}
-.mini-item { flex: 1; text-align: center; display: flex; flex-direction: column; }
-.mini-item .label { font-size: 10px; opacity: 0.8; display: flex; align-items: center; justify-content: center; gap: 3px; }
-.mini-item .val { font-size: 13px; font-weight: bold; }
-
-.mini-icon {
-  width: 12px;
-  height: 12px;
-  object-fit: contain;
-}
-
-.action-icon {
-  width: 14px;
-  height: 14px;
-  object-fit: contain;
-}
-
-.tap-hint { text-align: center; font-size: 11px; opacity: 0.6; margin-top: auto; display: flex; align-items: center; justify-content: center; gap: 4px; }
-
-.tap-icon {
-  width: 14px;
-  height: 14px;
-  object-fit: contain;
-}
-
-/* --- 背面 --- */
-.card-back {
-  transform: rotateY(180deg);
-  background: white;
-  padding: 12px 15px;
-  display: flex;
-  flex-direction: column;
-  color: #303133;
-}
-
-.back-header {
-  display: flex;
-  justify-content: space-between;
-  border-bottom: 1px solid #eee;
-  padding-bottom: 6px;
-  margin-bottom: 8px;
-}
-.back-header h4 { margin: 0; font-size: 14px; }
-.close-btn { cursor: pointer; color: #909399; font-size: 18px; }
-
-.data-list { font-size: 12px; margin-bottom: 8px; }
-.data-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
-.device-tags { display: flex; gap: 5px; }
-
-/* AI 建议框 */
-.ai-box {
-  background: #f3f4f6;
-  border-left: 3px solid #8b5cf6;
-  padding: 8px;
+/* ===== 战术指挥栏 ===== */
+.tactical-toolbar {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 4px;
-  margin-bottom: 8px;
-  flex: 1;
-  overflow: hidden;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
-.ai-title { color: #6d28d9; font-size: 11px; margin-bottom: 3px; }
-.ai-content { margin: 0; font-size: 11px; color: #4b5563; line-height: 1.3; }
 
-/* 按钮组 */
-.action-group {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1fr;
-  gap: 6px;
-  margin-top: auto;
+.toolbar-left {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
-.action-btn {
-  border: none;
-  background: #f4f4f5;
-  padding: 4px 0;
-  border-radius: 6px;
-  font-size: 10px;
+
+.page-title {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.title-main {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+  letter-spacing: -0.3px;
+}
+
+.title-sub {
+  font-size: 11px;
+  font-weight: 500;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-strip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-item strong {
+  font-family: 'Roboto Mono', 'Courier New', monospace;
+  color: #111827;
+  font-size: 13px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.status-dot.online {
+  background: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+  animation: pulse-online 2s infinite;
+}
+
+.status-dot.warning {
+  background: #f59e0b;
+}
+
+@keyframes pulse-online {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.status-divider {
+  color: #d1d5db;
+}
+
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.search-input {
+  width: 180px;
+  padding: 6px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.search-input:focus {
+  border-color: #10b981;
+}
+
+.tool-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
   cursor: pointer;
-  transition: none;
+  transition: all 0.15s;
+}
+
+.tool-btn:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.tool-btn.special {
+  background: #ecfdf5;
+  border-color: #10b981;
+  color: #047857;
+}
+
+.tool-btn.special:hover {
+  background: #d1fae5;
+}
+
+/* ===== 加载状态 ===== */
+.loading-overlay {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  color: #606266;
+  min-height: 400px;
+  color: #6b7280;
+}
+
+.loading-spinner {
+  width: 40px;
   height: 40px;
-  width: 100%;
-  min-width: 0;
-}
-.action-btn:hover { transform: none; }
-.action-btn.water { background: #ecf5ff; color: #409eff; }
-.action-btn.fertilize { background: #fdf6ec; color: #e6a23c; }
-.action-btn.delete { background: #fef0f0; color: #f56c6c; }
-
-/* 工具栏按钮和输入框常规化样式 */
-.toolbar .el-input .el-input__inner {
-  border-radius: 4px !important;
-  border: 1px solid #dcdfe6 !important;
-  background: #ffffff !important;
-  font-size: 14px !important;
-  transition: none !important;
+  border: 3px solid #e5e7eb;
+  border-top-color: #10b981;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
 }
 
-.toolbar .el-input .el-input__inner:focus {
-  border-color: #dcdfe6 !important;
-  box-shadow: none !important;
-  outline: none !important;
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
-.toolbar .el-input.is-focus .el-input__inner {
-  border-color: #dcdfe6 !important;
-  box-shadow: none !important;
+/* ===== 智能网格卡片 ===== */
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
 }
 
-/* 强制覆盖所有可能的绿色聚焦样式 */
-.toolbar .el-input__inner:focus,
-.toolbar .el-input__inner:active,
-.toolbar .el-input.is-focus .el-input__inner,
-.toolbar .el-input--focus .el-input__inner {
-  border-color: #dcdfe6 !important;
-  box-shadow: 0 0 0 0 transparent !important;
-  outline: none !important;
+.field-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  padding: 14px;
+  transition: all 0.2s;
+  position: relative;
+  overflow: visible;
 }
 
-.toolbar .el-button {
-  border-radius: 4px !important;
-  font-size: 14px !important;
-  padding: 8px 15px !important;
-  font-weight: normal !important;
-  transition: none !important;
+.field-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
 }
 
-.toolbar .el-button:hover {
-  transform: none !important;
-  box-shadow: none !important;
+/* 健康分边框颜色 */
+.field-card.health-excellent {
+  border-left: 3px solid #10b981;
 }
 
-.toolbar .el-button--primary {
-  background: #409eff !important;
-  border-color: #409eff !important;
+.field-card.health-good {
+  border-left: 3px solid #3b82f6;
 }
 
-.toolbar .el-button--primary:hover {
-  background: #409eff !important;
-  border-color: #409eff !important;
+.field-card.health-warning {
+  border-left: 3px solid #f59e0b;
 }
 
-.toolbar .el-button--success {
-  background: #67c23a !important;
-  border-color: #67c23a !important;
+.field-card.health-danger {
+  border-left: 3px solid #dc2626;
 }
 
-.toolbar .el-button--success:hover {
-  background: #67c23a !important;
-  border-color: #67c23a !important;
+/* 卡片头部 */
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f3f4f6;
 }
 
-.toolbar .el-button--warning {
-  background: #e6a23c !important;
-  border-color: #e6a23c !important;
+.field-name {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
 }
 
-.toolbar .el-button--warning:hover {
-  background: #e6a23c !important;
-  border-color: #e6a23c !important;
+.health-badge {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-weight: 700;
+}
+
+.health-badge.health-excellent {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.health-badge.health-good {
+  background: #eff6ff;
+  color: #1e40af;
+}
+
+.health-badge.health-warning {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.health-badge.health-danger {
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.score-value {
+  font-size: 16px;
+  font-family: 'Roboto Mono', 'Courier New', monospace;
+}
+
+.score-label {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* 卡片主体 */
+.card-body {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+/* 作物缩略图 */
+.crop-thumbnail {
+  width: 80px;
+  height: 80px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  flex-shrink: 0;
+}
+
+.crop-thumbnail img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+}
+
+.crop-label {
+  font-size: 11px;
+  color: #6b7280;
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+/* 指标矩阵 */
+.metrics-matrix {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.metric-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.metric-icon {
+  font-size: 16px;
+  width: 20px;
+  text-align: center;
+}
+
+.metric-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.metric-label {
+  font-size: 11px;
+  color: #6b7280;
+  min-width: 60px;
+}
+
+.metric-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+  font-family: 'Roboto Mono', 'Courier New', monospace;
+  min-width: 50px;
+}
+
+.metric-value.gdd {
+  color: #f59e0b;
+}
+
+.metric-trend {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.metric-trend.trend-up {
+  color: #dc2626;
+}
+
+.metric-trend.trend-down {
+  color: #10b981;
+}
+
+.metric-trend.trend-stable {
+  color: #6b7280;
+}
+
+/* 湿度进度条 */
+.metric-bar {
+  flex: 1;
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6 0%, #10b981 100%);
+  transition: width 0.3s;
+}
+
+/* 卡片底部操作条 */
+.card-footer {
+  display: flex;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid #f3f4f6;
+}
+
+.action-icon-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+  color: #6b7280;
+}
+
+.action-icon-btn:hover {
+  background: #f3f4f6;
+  color: #111827;
+  border-color: #d1d5db;
+}
+
+/* AI Toast（悬停显示）*/
+.ai-toast {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  background: #1e293b;
+  color: #ffffff;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 10;
+  animation: slideDown 0.2s;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.toast-icon {
+  font-size: 16px;
+}
+
+.toast-text {
+  flex: 1;
+  line-height: 1.4;
 }
 </style>

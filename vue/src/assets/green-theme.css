@@ -257,24 +257,23 @@ body {
   color: #4caf50 !important;
 }
 
-/* 隐藏滚动条 */
+/* 滚动条样式 - 保留滚动功能 */
 ::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-  display: none;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  display: none;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  display: none;
+  background: rgba(76, 175, 80, 0.2);
+  border-radius: 3px;
 }
 
-* {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(76, 175, 80, 0.4);
 }
 
 /* 特殊页面样式 */

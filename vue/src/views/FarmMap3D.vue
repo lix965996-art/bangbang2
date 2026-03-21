@@ -195,6 +195,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 // ✨ 引入 RGBELoader 用于加载 HDR
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader';
 import gsap from 'gsap';
+import { eventBus, EVENTS } from '@/utils/eventBus';
 
 export default {
   name: 'FarmMapNature',
@@ -214,6 +215,10 @@ export default {
       lightningBolts: [],
       lightningMesh: null,
       
+      // 当前活跃的动画模型（用于开关关闭时移除）
+      activeDrone: null,
+      activeWaterValve: null,
+      
       // STM32实时传感器数据（两个设备）
       stm32Data: {
         // 旧设备 CzL61ga8FI (STM32-001)
@@ -225,7 +230,7 @@ export default {
       farmDeviceMap: {},
       
       cropConfig: {
-        '小麦': { model: '/models/wheat.glb', scale: 3.0, color: 0xe6c658, fallback: 'spike' },
+        '小麦': { model: '/models/wheat.glb', scale: 3.0, color: 0xe6c658, fallback: 'spike', yOffset: 8.0 }, // 小麦超大幅抬高
         '艾叶': { model: '/models/rhy.glb', scale: 6, color: 0x8BC34A, fallback: 'spike' },
         '竹子': { model: '/models/bamboo.glb', scale: 0.1, color: 0x4CAF50, fallback: 'spike' },
         '玉米': { model: '/models/maize.glb', scale: 6, color: 0xFFC107, fallback: 'column' },
@@ -289,6 +294,10 @@ export default {
     this.mouse = new THREE.Vector2();
     this.gltfLoader = new GLTFLoader();
     
+    // 用于区分拖拽和点击
+    this.mouseDownPos = { x: 0, y: 0 };
+    this.mouseDownTime = 0;
+    
     this.farmBlocks = [];
     this.labels = [];
     this.lightningBolts = [];
@@ -308,11 +317,35 @@ export default {
     }, 30000);
     
     window.addEventListener('resize', this.onWindowResize);
+    
+    // 监听 AI 动作执行事件，同步更新开关状态
+    eventBus.$on(EVENTS.IRRIGATION_ON, () => {
+      console.log('📡 收到 AI 灌溉开启事件');
+      this.switchState.water = true;
+      this.$message.success('AI 已开启智能灌溉');
+    });
+    eventBus.$on(EVENTS.IRRIGATION_OFF, () => {
+      console.log('📡 收到 AI 灌溉关闭事件');
+      this.switchState.water = false;
+      this.$message.info('AI 已关闭智能灌溉');
+    });
+    eventBus.$on('DRONE_SPRAY_ON', () => {
+      console.log('📡 收到 AI 飞防消杀事件');
+      this.switchState.pest = true;
+      if (this.selectedFarm) {
+        this.handleAction('pest');
+      }
+    });
   },
   
   beforeDestroy() {
     cancelAnimationFrame(this.requestId);
     window.removeEventListener('resize', this.onWindowResize);
+    
+    // 清理事件总线监听
+    eventBus.$off(EVENTS.IRRIGATION_ON);
+    eventBus.$off(EVENTS.IRRIGATION_OFF);
+    eventBus.$off('DRONE_SPRAY_ON');
     
     // 清理STM32数据刷新定时器
     if (this.stm32Timer) {
@@ -381,7 +414,7 @@ export default {
         if (res.code === '200') {
             this.farms = res.data;
             
-            // 使用真实传感器数据更新所有农田
+            // 优先使用数据库数据，传感器数据作为备用
             this.farms = this.farms.map(farm => {
               const updatedFarm = { ...farm };
               
@@ -389,10 +422,17 @@ export default {
               const deviceKey = this.assignDeviceToFarm(farm.id);
               const deviceData = this.getDeviceData(deviceKey);
               
-              // 直接使用传感器实时数据，不添加波动
-              updatedFarm.temperature = deviceData.temperature;
-              updatedFarm.soilhumidity = deviceData.humidity;
-              updatedFarm.dataSource = deviceKey === 'device1' ? 'STM32-001' : 'STM32-PUMP';
+              // 优先使用数据库数据，如果数据库没有数据或数据异常，才使用传感器数据
+              if (!updatedFarm.temperature || updatedFarm.temperature <= 0) {
+                updatedFarm.temperature = deviceData.temperature;
+                updatedFarm.dataSource = deviceKey === 'device1' ? 'STM32-001' : 'STM32-PUMP';
+              } else {
+                updatedFarm.dataSource = '数据库';
+              }
+              
+              if (!updatedFarm.soilhumidity || updatedFarm.soilhumidity <= 0) {
+                updatedFarm.soilhumidity = deviceData.humidity;
+              }
               
               return updatedFarm;
             });
@@ -400,7 +440,12 @@ export default {
             this.summary.farmCount = this.farms.length;
             this.summary.totalArea = this.farms.reduce((acc, cur) => acc + (Number(cur.area) || 0), 0);
             if (this.farms.length > 0) this.selectedFarm = this.farms[0];
-            this.$nextTick(() => { this.initThreeJS(); });
+            // 关键修复：确保DOM加载完成后再初始化，并防止重复初始化
+            this.$nextTick(() => { 
+              if (!this.scene && this.$refs.threeContainer) {
+                this.initThreeJS(); 
+              }
+            });
         }
       } catch (e) { console.error(e); }
     },
@@ -456,10 +501,16 @@ export default {
       };
     },
     
-    // 使用真实传感器数据更新所有农田
+    // 使用真实传感器数据更新所有农田（定时刷新时不覆盖数据库数据）
     updateFarmsWithSTM32Data() {
       if (!this.farms || this.farms.length === 0) return;
       
+      // 注释掉自动更新功能，保持数据库数据不变
+      // 只在初次加载时使用传感器数据作为备用
+      console.log('🌡️ 保持数据库数据，不使用传感器覆盖');
+      return;
+      
+      /* 原有的传感器数据覆盖逻辑已禁用
       this.farms = this.farms.map(farm => {
         const updatedFarm = { ...farm };
         
@@ -489,6 +540,7 @@ export default {
       this.updateAllLabels();
       
       console.log('🌡️ 农田数据已使用传感器实时数据更新');
+      */
     },
     
     // 更新所有3D标签
@@ -525,23 +577,31 @@ export default {
             color: 0xdddddd 
         });
 
-        // 2. 泥土材质 (PBR)
+        // 2. 泥土材质 (PBR) - 修复像素跳动
         const soilCol = loader.load('/textures/soil_color.jpg');
         soilCol.colorSpace = THREE.SRGBColorSpace;
         const soilNor = loader.load('/textures/soil_normal.jpg');
         const soilRgh = loader.load('/textures/soil_rough.jpg');
         
+        // 关键修复：高质量纹理过滤，防止像素跳动
         [soilCol, soilNor, soilRgh].forEach(t => {
             t.wrapS = THREE.RepeatWrapping; 
             t.wrapT = THREE.RepeatWrapping; 
-            t.repeat.set(2, 2);
+            t.repeat.set(1, 1); // 降低重复次数从2到1，减少纹理采样频率变化
+            // 启用最高级别各向异性过滤
+            t.anisotropy = 16;
+            // 使用三线性过滤，最平滑的过渡
+            t.minFilter = THREE.LinearMipmapLinearFilter;
+            t.magFilter = THREE.LinearFilter;
+            // 启用 mipmap 但使用最平滑的过滤
+            t.generateMipmaps = true;
         });
         
         this.matSoil = new THREE.MeshStandardMaterial({
             map: soilCol, 
             normalMap: soilNor, 
             roughnessMap: soilRgh,
-            normalScale: new THREE.Vector2(4, 4), 
+            normalScale: new THREE.Vector2(2, 2), // 降低法线强度，减少视角变化时的抖动
             roughness: 1.0
         });
 
@@ -552,12 +612,20 @@ export default {
         this.textureMap.smoke = loader.load('/textures/smoke.jpg');
         this.textureMap.lightning = loader.load('/textures/lightning.jpg');
 
-        // 4. 加载 HDR 天空盒
-        new RGBELoader().setPath('/textures/').load('sky.hdr', (texture) => {
-            texture.mapping = THREE.EquirectangularReflectionMapping;
-            this.scene.background = texture;
-            this.scene.environment = texture;
-        });
+        // 4. 加载 HDR 天空盒（延迟加载，避免scene为null）
+        setTimeout(() => {
+          if (this.scene) {
+            new RGBELoader().setPath('/textures/').load('sky.hdr', (texture) => {
+                texture.mapping = THREE.EquirectangularReflectionMapping;
+                if (this.scene) {  // 再次检查
+                  this.scene.background = texture;
+                  this.scene.environment = texture;
+                }
+            }, undefined, (err) => {
+                console.warn('HDR天空盒加载失败，使用默认背景', err);
+            });
+          }
+        }, 500);
     },
 
     // 🎮 开关切换处理
@@ -577,6 +645,20 @@ export default {
           // 关闭
           if (type === 'water') {
             this.controlWaterPump(false);
+            // 移除水阀模型
+            if (this.activeWaterValve) {
+              this.scene.remove(this.activeWaterValve);
+              this.activeWaterValve = null;
+              console.log('🗑️ 水阀已关闭并移除');
+            }
+          }
+          if (type === 'pest') {
+            // 移除无人机模型
+            if (this.activeDrone) {
+              this.scene.remove(this.activeDrone);
+              this.activeDrone = null;
+              console.log('🗑️ 无人机已召回并移除');
+            }
           }
           this.$message.info(`[${this.selectedFarm.farm}] ${actionNames[type]}已关闭`);
         }
@@ -678,58 +760,185 @@ export default {
         }
     },
 
-    // 💦 喷灌特效 (增强版)
+    // 💦 喷灌特效 (极速版 - 高密度)
     spawnSprinklerEffect(x, z) {
-        console.log("💦 触发浇水特效");
-        const particleCount = 1500; 
+        // 🚀 粒子数量：300个（密度提升，性能仍优秀）
+        const particleCount = 300;
         const geo = new THREE.BufferGeometry();
-        const positions = [];
-        const velocities = [];
+        const positions = new Float32Array(particleCount * 3);
+        const velocities = new Float32Array(particleCount * 3);
 
+        // 预计算所有粒子初始状态 - 增加密度
         for (let i = 0; i < particleCount; i++) {
-            positions.push(x, 1, z);
+            const i3 = i * 3;
+            // 从中心点稍微分散起始位置，增加密度感
+            const offsetX = (Math.random() - 0.5) * 3;
+            const offsetZ = (Math.random() - 0.5) * 3;
+            positions[i3] = x + offsetX;
+            positions[i3 + 1] = 8 + Math.random() * 2; // 高度稍有差异
+            positions[i3 + 2] = z + offsetZ;
+            
             const angle = Math.random() * Math.PI * 2;
-            const speed = 0.2 + Math.random() * 1.5;
-            velocities.push(Math.cos(angle) * speed, 3.0 + Math.random() * 2.0, Math.sin(angle) * speed);
+            const speed = 0.8 + Math.random() * 2.0;
+            velocities[i3] = Math.cos(angle) * speed;
+            velocities[i3 + 1] = 5.0 + Math.random() * 3.0;
+            velocities[i3 + 2] = Math.sin(angle) * speed;
         }
-        geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 
         const mat = new THREE.PointsMaterial({
-            color: 0x00FFFF, size: 2.5, map: this.textureMap.rain, 
-            transparent: true, opacity: 1.0, depthWrite: false, 
-            blending: THREE.AdditiveBlending
+            color: 0x00FFFF,
+            size: 3.5, // 稍小粒子，但数量多，密度高
+            map: this.textureMap.rain,
+            transparent: true,
+            opacity: 0.9, // 提高不透明度
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+            sizeAttenuation: true
         });
 
         const particles = new THREE.Points(geo, mat);
         this.scene.add(particles);
 
+        // 🚀 60fps全速运行（最流畅）
         const animate = () => {
             if (!particles.parent) return;
-            const pos = particles.geometry.attributes.position.array;
+            
+            const pos = positions;
             let activeCount = 0;
+            
+            // 极速更新
             for (let i = 0; i < particleCount; i++) {
-                if (pos[i * 3 + 1] < 0) continue;
-                pos[i * 3] += velocities[i * 3];
-                pos[i * 3 + 1] += velocities[i * 3 + 1];
-                pos[i * 3 + 2] += velocities[i * 3 + 2];
-                velocities[i * 3 + 1] -= 0.1; 
+                const i3 = i * 3;
+                const y = pos[i3 + 1];
+                
+                if (y < -2) continue;
+                
+                pos[i3] += velocities[i3];
+                pos[i3 + 1] += velocities[i3 + 1];
+                pos[i3 + 2] += velocities[i3 + 2];
+                
+                velocities[i3 + 1] -= 0.25;
+                
                 activeCount++;
             }
+            
             particles.geometry.attributes.position.needsUpdate = true;
-            if (activeCount > 0) requestAnimationFrame(animate);
-            else { this.scene.remove(particles); geo.dispose(); mat.dispose(); }
+            
+            if (activeCount > 0) {
+                requestAnimationFrame(animate);
+            } else {
+                this.scene.remove(particles);
+                geo.dispose();
+                mat.dispose();
+            }
         };
         animate();
     },
 
-    // ☁️ 杀虫特效 (增强版)
+    // ☁️ 杀虫特效 (增强版 - 加入无人机模型)
     spawnDroneFog(x, z) {
-        console.log("🛸 触发杀虫特效");
-        const particleCount = 100;
+        console.log("🛸 触发杀虫特效", `位置: (${x}, ${z})`);
+        
+        // 加载无人机模型
+        console.log("🔧 开始加载无人机模型: /models/drone.glb");
+        this.gltfLoader.load(
+            '/models/drone.glb',
+            (gltf) => {
+                console.log("✅ 无人机模型加载成功");
+                const drone = gltf.scene;
+                const size = 17.5; // 地块半径（baseSize=35，半径=17.5）
+                const startX = x - size;
+                const startZ = z - size;
+                
+                drone.position.set(startX, 25, startZ); // 提高飞行高度
+                drone.scale.set(20, 20, 20); // 适中大小
+                this.activeDrone = drone; // 跟踪当前无人机
+                
+                // 性能优化：禁用阴影 + 简化材质
+                drone.traverse((node) => {
+                    if (node.isMesh) {
+                        node.castShadow = false;
+                        node.receiveShadow = false;
+                        node.frustumCulled = true; // 启用视锥剔除
+                        if (node.material) {
+                            node.material.flatShading = true; // 简化着色
+                        }
+                    }
+                });
+                this.scene.add(drone);
+                console.log("🚁 无人机已添加到场景");
+                // 移除灯光以提升性能
+                
+                // 飞行路径（绕地块飞行）
+                const path = [
+                    { x: startX, z: startZ },
+                    { x: x + size, z: startZ },
+                    { x: x + size, z: z + size },
+                    { x: startX, z: z + size },
+                    { x: startX, z: startZ }
+                ];
+                
+                let pathIndex = 0;
+                let progress = 0;
+                const flySpeed = 0.005; // 稍快一点的飞行速度
+                let lastUpdate = Date.now();
+                
+                const flyDrone = () => {
+                    // 性能优化：限制帧率为20fps
+                    const now = Date.now();
+                    if (now - lastUpdate < 50) {
+                        requestAnimationFrame(flyDrone);
+                        return;
+                    }
+                    lastUpdate = now;
+                    
+                    if (!drone.parent || pathIndex >= path.length - 1) {
+                        if (drone.parent) {
+                            this.scene.remove(drone);
+                            console.log("🗑️ 无人机模型已移除");
+                        }
+                        return;
+                    }
+                    
+                    progress += flySpeed;
+                    const current = path[pathIndex];
+                    const next = path[pathIndex + 1];
+                    
+                    // 插值飞行
+                    drone.position.x = current.x + (next.x - current.x) * progress;
+                    drone.position.z = current.z + (next.z - current.z) * progress;
+                    
+                    // 朝向飞行方向
+                    const angle = Math.atan2(next.z - current.z, next.x - current.x);
+                    drone.rotation.y = angle - Math.PI / 2;
+                    
+                    // 螺旋桨旋转效果
+                    drone.rotation.z += 0.2;
+                    
+                    if (progress >= 1.0) {
+                        progress = 0;
+                        pathIndex++;
+                        console.log(`📍 无人机到达路径点 ${pathIndex}`);
+                    }
+                    
+                    requestAnimationFrame(flyDrone);
+                };
+                flyDrone();
+            },
+            (progress) => {
+                console.log(`🔄 无人机加载中: ${Math.round(progress.loaded / progress.total * 100)}%`);
+            },
+            (error) => {
+                console.error("❌ 无人机模型加载失败:", error);
+            }
+        );
+        // 喷雾粒子效果
+        const particleCount = 80; // 性能优化：减少粒子数量
         const geo = new THREE.BufferGeometry();
         const positions = [];
         for (let i = 0; i < particleCount; i++) {
-            positions.push(x + (Math.random()-0.5)*10, 5 + Math.random()*8, z + (Math.random()-0.5)*10);
+            positions.push(x + (Math.random()-0.5)*30, 15 + Math.random()*8, z + (Math.random()-0.5)*30);
         }
         geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
 
@@ -797,6 +1006,10 @@ export default {
 
     initThreeJS() {
       const container = this.$refs.threeContainer;
+      if (!container) {
+        console.error('❌ threeContainer DOM元素未找到，无法初始化3D场景');
+        return;
+      }
       const width = container.clientWidth;
       const height = container.clientHeight;
 
@@ -845,7 +1058,9 @@ export default {
       this.initRainSystem();
       this.initSnowSystem();
 
-      container.addEventListener('click', this.onMouseClick, false);
+      // 使用 pointerdown/pointerup 区分拖拽和点击
+      container.addEventListener('pointerdown', this.onPointerDown, false);
+      container.addEventListener('pointerup', this.onPointerUp, false);
       this.animate();
       this.resetCamera();
       
@@ -857,38 +1072,55 @@ export default {
       const planeGeo = new THREE.PlaneGeometry(1000, 1000);
       const plane = new THREE.Mesh(planeGeo, this.matGrass);
       plane.rotation.x = -Math.PI / 2;
-      plane.position.y = -0.1;
+      plane.position.y = -1.0; // 大幅降低地面高度，避免与土地块冲突
       plane.receiveShadow = true;
       this.scene.add(plane);
     },
 
     createFarmBlocks() {
-      const spacing = 20;
+      // 整齐的网格布局：每块农田一个独立的土地板子
       const cols = Math.ceil(Math.sqrt(this.farms.length));
+      const baseSize = 35; // 基础尺寸（大板子）
+      const spacing = 48; // 板子间距（适中的间隙）
       
       this.farms.forEach((farm, index) => {
         const row = Math.floor(index / cols);
         const col = index % cols;
-        const x = (col - cols/2) * spacing;
-        const z = (row - cols/2) * spacing;
+        
+        // 简洁的网格位置计算
+        const x = (col - cols/2 + 0.5) * spacing;
+        const z = (row - cols/2 + 0.5) * spacing;
 
-        const size = Math.sqrt(Number(farm.area)) * 1.5 || 10;
+        // 根据面积略微调整大小，但保持整体一致性
+        const areaFactor = Math.sqrt(Number(farm.area) / 10) || 1;
+        const size = baseSize * Math.max(0.8, Math.min(1.2, areaFactor));
         const geo = new THREE.BoxGeometry(size, 0.8, size);
         
         const currentMat = this.matSoil.clone();
+        // 修复闪烁：使用FrontSide，禁用polygonOffset
+        currentMat.side = THREE.FrontSide;
+        currentMat.polygonOffset = false;
         if (this.calculateHealthScore(farm) < 60) {
             currentMat.color.setHex(0xdddddd); 
         }
         
         const mesh = new THREE.Mesh(geo, currentMat);
-        mesh.position.set(x, 0.4, z);
+        mesh.position.set(x, 1.0, z); // 抬高土地块，远离地面
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         mesh.userData = { farm: farm };
         
         const edgeGeo = new THREE.EdgesGeometry(geo);
-        const edgeMat = new THREE.LineBasicMaterial({ color: 0xFFFFFF, opacity: 0.4, transparent: true });
+        const edgeMat = new THREE.LineBasicMaterial({ 
+            color: 0xFFFFFF, 
+            opacity: 0.6, 
+            transparent: true,
+            depthTest: true, // 启用深度测试，避免渲染顺序混乱
+            depthWrite: false // 不写入深度，避免影响其他对象
+        });
         const edge = new THREE.LineSegments(edgeGeo, edgeMat);
+        edge.position.y = 0.41; // 稍微抬高边框，避免与土地表面完全重合
+        edge.renderOrder = 1; // 适度的渲染顺序
         mesh.add(edge);
         mesh.userData.edge = edge;
         mesh.userData.edgeMat = edgeMat;
@@ -898,14 +1130,20 @@ export default {
 
         this.createSimpleLabel(farm, x, size, z);
         
-        // 支持多种作物混种
-        const crops = (farm.crop || '').split(',').filter(c => c.trim());
-        const cropCount = crops.length || 1;
-        const cropList = crops.length > 0 ? crops : ['default'];
-        
-        cropList.forEach((cropName, i) => {
-           this.loadCropsWithFallback(mesh, cropName, size, i, cropCount);
-        });
+        // 支持多种作物混种（严格过滤，只加载已配置的作物）
+        if (farm.crop && typeof farm.crop === 'string' && farm.crop.trim()) {
+          const crops = farm.crop.split(',')
+            .map(c => c.trim())
+            .filter(c => c && this.cropConfig[c]); // 只保留已明确配置的作物
+          
+          if (crops.length > 0) {
+            const cropCount = crops.length;
+            crops.forEach((cropName, i) => {
+               this.loadCropsWithFallback(mesh, cropName, size, i, cropCount);
+            });
+          }
+        }
+        // 如果没有设置作物或作物未配置，土地保持空白
       });
     },
     
@@ -1004,21 +1242,26 @@ export default {
     },
 
     loadCropsWithFallback(parentMesh, cropType, size, index = 0, totalCount = 1) {
-      const config = this.cropConfig[cropType] || this.cropConfig['default'];
+      const config = this.cropConfig[cropType];
+      if (!config) {
+          console.warn(`⚠️ 作物 "${cropType}" 未配置，跳过加载`);
+          return;  // 不使用 default，直接跳过
+      }
       if (!config.model) {
           this.addGeometricCrops(parentMesh, config, size, index, totalCount);
           return;
       }
       this.gltfLoader.load(config.model, (gltf) => {
           const model = gltf.scene;
-          this.scatterModels(parentMesh, model, size, config.scale, index, totalCount);
+          this.scatterModels(parentMesh, model, size, config.scale, index, totalCount, config.yOffset || 0);
         }, undefined, (error) => {
+          console.warn(`⚠️ 作物模型 ${config.model} 加载失败，使用几何体代替`);
           this.addGeometricCrops(parentMesh, config, size, index, totalCount);
         }
       );
     },
 
-    scatterModels(parentMesh, modelTemplate, size, scaleFactor, index = 0, totalCount = 1) {
+    scatterModels(parentMesh, modelTemplate, size, scaleFactor, index = 0, totalCount = 1, yOffset = 0) {
       let density = Math.ceil(size / 4); 
       if(density < 2) density = 2; if(density > 4) density = 4;
       for(let i=0; i<density; i++) {
@@ -1033,7 +1276,7 @@ export default {
             const z = (j / density) * size - size/2 + (size/density/2) + offsetZ;
             if(Math.abs(x) > size/2) continue;
             if(Math.abs(z) > size/2) continue;
-            clone.position.set(x, 0.8, z); 
+            clone.position.set(x, 0.8 + yOffset, z); // 应用作物特定Y偏移 
             clone.rotation.y = Math.random() * Math.PI * 2;
             const s = scaleFactor * (0.8 + Math.random() * 0.4);
             clone.scale.set(s, s, s);
@@ -1197,7 +1440,22 @@ export default {
            this.highlightBlock(targetMesh); 
        }
     },
-    onMouseClick(event) {
+    onPointerDown(event) {
+        this.mouseDownPos = { x: event.clientX, y: event.clientY };
+        this.mouseDownTime = Date.now();
+    },
+    onPointerUp(event) {
+        // 计算移动距离和按下时间
+        const dx = event.clientX - this.mouseDownPos.x;
+        const dy = event.clientY - this.mouseDownPos.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        const duration = Date.now() - this.mouseDownTime;
+        
+        // 移动距离 > 10像素 或 按下时间 > 300ms 则视为拖拽
+        if (distance > 10 || duration > 300) {
+            return;
+        }
+        
         const rect = this.$refs.threeContainer.getBoundingClientRect();
         this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
         this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;

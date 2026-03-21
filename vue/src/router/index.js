@@ -55,7 +55,6 @@ export const setRoutes = () => {
         { path: 'dashbordnew', name: '农场环境监测', component: () => import('../views/DashbordNew.vue')},
         { path: 'bigscreen', name: '全局可视化大屏', component: () => import('../views/BigScreen.vue')},
         { path: 'farmmap3d', name: '农场3D地图', component: () => import('../views/FarmMap3D.vue')},
-        { path: 'farmmap3d-real', name: '真实地图3D农场', component: () => import('../views/FarmMap3DReal.vue')},
         { path: 'farm-map-gaode', name: '农场地理地图', component: () => import('../views/FarmMapGaode.vue')},
         { path: 'statistic', name: '农田信息', component: () => import('../views/Statistic.vue')},
         { path: 'business-analysis', name: '经营分析', component: () => import('../views/BusinessAnalysis.vue')},
@@ -67,7 +66,6 @@ export const setRoutes = () => {
         { path: 'notice', name: '系统公告管理', component: () => import('../views/Notice.vue')},
         { path: 'user', name: '农场员工管理', component: () => import('../views/User.vue')},
         { path: 'role', name: '系统角色管理', component: () => import('../views/Role.vue')},
-        { path: 'menu', name: '系统菜单管理', component: () => import('../views/Menu.vue')},
         { path: 'fruit-detect', name: '果蔬双检分析', component: () => import('../views/FruitDetect.vue')},
       ] 
     }
@@ -80,23 +78,39 @@ export const setRoutes = () => {
       return;
     }
 
+    // 获取已存在的路由路径和名称，避免重复添加
+    const existingPaths = manageRoute.children.map(c => c.path);
+    const existingNames = manageRoute.children.map(c => c.name);
+    
     menus.forEach(item => {
       if (item.path) {
-        let itemMenu = { 
-          path: item.path.replace("/", ""), 
-          name: item.name, 
-          component: () => import('../views/' + item.pagePath + '.vue') 
+        const routePath = item.path.replace("/", "");
+        // 检查路由的 path 和 name 是否已存在
+        if (!existingPaths.includes(routePath) && !existingNames.includes(item.name)) {
+          let itemMenu = { 
+            path: routePath, 
+            name: item.name, 
+            component: () => import('../views/' + item.pagePath + '.vue') 
+          }
+          manageRoute.children.push(itemMenu)
+          existingPaths.push(routePath)
+          existingNames.push(item.name)
         }
-        manageRoute.children.push(itemMenu)
-      } else if(item.children.length) {
-        item.children.forEach(item => {
-          if (item.path) {
-            let itemMenu = { 
-              path: item.path.replace("/", ""), 
-              name: item.name, 
-              component: () => import('../views/' + item.pagePath + '.vue') 
+      } else if(item.children && item.children.length) {
+        item.children.forEach(subItem => {
+          if (subItem.path) {
+            const routePath = subItem.path.replace("/", "");
+            // 检查路由的 path 和 name 是否已存在
+            if (!existingPaths.includes(routePath) && !existingNames.includes(subItem.name)) {
+              let itemMenu = { 
+                path: routePath, 
+                name: subItem.name, 
+                component: () => import('../views/' + subItem.pagePath + '.vue') 
+              }
+              manageRoute.children.push(itemMenu)
+              existingPaths.push(routePath)
+              existingNames.push(subItem.name)
             }
-            manageRoute.children.push(itemMenu)
           }
         })
       }

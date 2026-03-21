@@ -13,6 +13,7 @@
           prefix-icon="el-icon-search"
           clearable 
           @clear="load"
+          @input="debouncedSearch"
           @keyup.enter.native="load">
         </el-input>
         <el-button type="primary" icon="el-icon-search" @click="load">查询</el-button>
@@ -31,6 +32,7 @@
         :header-cell-style="{background:'#f8fafa', color:'#606266', fontWeight:'bold'}"
         :empty-text="farm ? '未找到匹配的农田信息' : '暂无农田数据，请点击【新建地块】开始添加'"
         :default-sort="{prop: 'id', order: 'ascending'}"
+        row-key="id"
       >
         <el-table-column prop="id" label="ID" width="60" align="center" sortable></el-table-column>
         
@@ -111,7 +113,7 @@
     <!-- 适量的底部空间 -->
     <div style="height: 50px; opacity: 0; pointer-events: none;"></div>
 
-    <el-dialog title="农田信息录入" :visible.sync="dialogFormVisible" width="500px" :close-on-click-modal="false">
+    <el-dialog title="农田信息录入" :visible.sync="dialogFormVisible" width="500px" :close-on-click-modal="false" append-to-body :lock-scroll="false">
       <el-form label-width="100px" size="medium" :model="form" :rules="rules" ref="farmForm" class="custom-form">
         <el-form-item label="农田名称" prop="farm">
           <el-input v-model="form.farm" placeholder="例如：A1号有机示范田"></el-input>
@@ -122,7 +124,7 @@
               :key="tag"
               v-for="tag in dynamicTags"
               closable
-              :disable-transitions="false"
+              :disable-transitions="true"
               @close="handleClose(tag)">
               {{tag}}
             </el-tag>
@@ -144,7 +146,7 @@
           <el-input-number v-model="form.area" :min="0.1" :max="10000" :precision="1" placeholder="通过绘制区域自动计算" readonly></el-input-number>
         </el-form-item>
         <el-form-item label="具体地址">
-          <el-input v-model="form.address" type="textarea" :rows="2" placeholder="地址可通过地图自动获取" @blur="extractDistrictFromAddress"></el-input>
+          <el-input v-model="form.address" type="textarea" :rows="2" placeholder="地址可通过地图自动获取" readonly></el-input>
         </el-form-item>
         <el-form-item label="所属区县">
           <el-input v-model="form.district" placeholder="将从地址自动识别" readonly></el-input>
@@ -154,15 +156,35 @@
         </el-form-item>
         
         <el-form-item label="地理位置">
-          <el-button 
-            type="success" 
-            plain
-            icon="el-icon-map-location" 
-            @click="openLocationSelector"
-            size="small"
-          >
-            {{ form.centerLng ? '已定位 (点击修改)' : '在地图上标记' }}
-          </el-button>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <el-button 
+              type="success" 
+              plain
+              icon="el-icon-map-location" 
+              @click="openLocationSelector"
+              size="small"
+            >
+              {{ form.centerLng ? '已定位 (点击修改)' : '在地图上标记' }}
+            </el-button>
+            <el-button 
+              v-if="form.coordinates && !showPreviewMap"
+              type="text" 
+              icon="el-icon-view" 
+              @click="showPreviewMap = true; $nextTick(() => renderPreviewMap())"
+              size="small"
+            >
+              查看区域预览
+            </el-button>
+          </div>
+          
+          <!-- 紧凑型预览地图 -->
+          <div v-if="form.coordinates && showPreviewMap" class="preview-map-container">
+            <div class="preview-map-header">
+              <span><i class="el-icon-map-location"></i> 区域预览</span>
+              <el-button type="text" icon="el-icon-close" @click="showPreviewMap = false" size="mini"></el-button>
+            </div>
+            <div id="preview-map" class="preview-map"></div>
+          </div>
         </el-form-item>
       </el-form>
       <div slot="footer" class="dialog-footer">
@@ -184,6 +206,7 @@
       :show-close="false"
       top="2vh"
       append-to-body
+      :lock-scroll="false"
     >
       <div class="mobile-shell" v-if="currentTraceRow">
         <div class="mobile-notch"></div>
@@ -302,8 +325,9 @@ export default {
       form: {},
       dialogFormVisible: false,
       locationSelectorVisible: false,
-      loading: false, // 加载状态
+      loading: false,
       user: localStorage.getItem("user") ? JSON.parse(localStorage.getItem("user")) : {},
+      searchTimer: null,
       
       // 表单验证规则
       rules: {
@@ -338,11 +362,54 @@ export default {
       // Tags输入控制
       dynamicTags: [],
       inputVisible: false,
-      inputValue: ''
+      inputValue: '',
+      
+      // 预览地图
+      showPreviewMap: false,
+      previewMap: null,
+      previewPolygon: null,
+      
+      // 图标缓存
+      cropIconCache: {}
+    }
+  },
+  computed: {
+    // 缓存图标映射，减少require调用
+    cropIconMap() {
+      return {
+        default: require('@/assets/moreng.png'),
+        wheat: require('@/assets/xiaomai.png'),
+        ai: require('@/assets/aiye.png'),
+        bamboo: require('@/assets/zhuzi.png'),
+        corn: require('@/assets/yumi.png'),
+        palm: require('@/assets/zongshu.png'),
+        tomato: require('@/assets/xihongshi.png')
+      }
     }
   },
   created() {
     this.load();
+  },
+  
+  beforeDestroy() {
+    // 清理防抖定时器
+    if (this.searchTimer) {
+      clearTimeout(this.searchTimer)
+      this.searchTimer = null
+    }
+    
+    // 清理预览地图
+    if (this.previewMap) {
+      try {
+        this.previewMap.destroy();
+        this.previewMap = null;
+      } catch (e) {
+        console.warn('销毁预览地图失败:', e);
+      }
+    }
+    
+    // 清理缓存
+    this.cropIconCache = null
   },
   methods: {
     // Tags 处理方法
@@ -434,18 +501,47 @@ export default {
       }
     },
 
+    // 防抖搜索
+    debouncedSearch() {
+      if (this.searchTimer) {
+        clearTimeout(this.searchTimer)
+      }
+      this.searchTimer = setTimeout(() => {
+        this.load()
+      }, 500)
+    },
+    
     getFakeScore(id) {
       return 3 + (id % 20) / 10;
     },
+    
     getCropIcon(crop) {
-      if (!crop) return require('@/assets/moreng.png');
-      if (crop.includes('麦')) return require('@/assets/xiaomai.png');
-      if (crop.includes('艾')) return require('@/assets/aiye.png');
-      if (crop.includes('竹')) return require('@/assets/zhuzi.png');
-      if (crop.includes('玉') || crop.includes('米')) return require('@/assets/yumi.png');
-      if (crop.includes('棕')) return require('@/assets/zongshu.png');
-      if (crop.includes('柿') || crop.includes('红')) return require('@/assets/xihongshi.png');
-      return require('@/assets/moreng.png');
+      // 使用缓存减少重复计算
+      if (this.cropIconCache[crop]) {
+        return this.cropIconCache[crop]
+      }
+      
+      let icon
+      if (!crop) {
+        icon = this.cropIconMap.default
+      } else if (crop.includes('麦')) {
+        icon = this.cropIconMap.wheat
+      } else if (crop.includes('艾')) {
+        icon = this.cropIconMap.ai
+      } else if (crop.includes('竹')) {
+        icon = this.cropIconMap.bamboo
+      } else if (crop.includes('玉') || crop.includes('米')) {
+        icon = this.cropIconMap.corn
+      } else if (crop.includes('棕')) {
+        icon = this.cropIconMap.palm
+      } else if (crop.includes('柿') || crop.includes('红')) {
+        icon = this.cropIconMap.tomato
+      } else {
+        icon = this.cropIconMap.default
+      }
+      
+      this.cropIconCache[crop] = icon
+      return icon
     },
 
     save() {
@@ -477,6 +573,18 @@ export default {
       this.dialogFormVisible = true
       this.form = {}
       this.dynamicTags = [] // 重置 Tags
+      this.showPreviewMap = false // 隐藏预览地图
+      
+      // 清理预览地图
+      if (this.previewMap) {
+        try {
+          this.previewMap.destroy()
+          this.previewMap = null
+        } catch (e) {
+          console.warn('清理预览地图失败:', e)
+        }
+      }
+      
       // 重置表单验证状态
       this.$nextTick(() => {
         if (this.$refs.farmForm) {
@@ -489,6 +597,17 @@ export default {
       // 将 crop 字符串转换为 Tags 数组
       this.dynamicTags = this.form.crop ? this.form.crop.split(',') : []
       this.dialogFormVisible = true
+      
+      // 如果有坐标数据，显示预览地图
+      if (this.form.coordinates) {
+        this.showPreviewMap = true
+        this.$nextTick(() => {
+          this.renderPreviewMap()
+        })
+      } else {
+        this.showPreviewMap = false
+      }
+      
       // 重置表单验证状态
       this.$nextTick(() => {
         if (this.$refs.farmForm) {
@@ -536,32 +655,111 @@ export default {
       this.locationSelectorVisible = true
     },
     handleLocationConfirm(locationData) {
+      console.log('📍 接收到地图数据:', locationData)
+      
+      // 更新坐标和面积
       this.form.centerLng = locationData.centerLng
       this.form.centerLat = locationData.centerLat
       this.form.coordinates = locationData.coordinates
-      this.form.address = locationData.address || ''  // 自动填充地址
       
       // 自动填充面积
       if (locationData.area && locationData.area > 0) {
         this.form.area = parseFloat(locationData.area)
       }
       
+      // 关键：使用 $set 确保响应式更新地址和区县
+      if (locationData.address) {
+        this.$set(this.form, 'address', locationData.address)
+        console.log('✅ 地址已更新:', locationData.address)
+      }
+      
       // 自动填充区县信息（优先使用地图组件计算的结果）
       if (locationData.district) {
         this.$set(this.form, 'district', locationData.district)
-        console.log('✅ 使用地图组件计算的区县:', locationData.district)
+        console.log('✅ 区县已更新:', locationData.district)
       } else if (locationData.address) {
         // 如果地图组件没有计算出区县，则手动提取
+        console.log('⚠️ 地图组件未返回区县，尝试从地址提取')
         this.extractDistrictFromAddress()
       }
       
       // 显示成功消息
-      if (locationData.address) {
-        const areaText = locationData.area ? `，面积约 ${locationData.area} 亩` : ''
-        const districtText = this.form.district ? `，区县：${this.form.district}` : ''
-        this.$message.success(`位置已设置：${locationData.address}${areaText}${districtText}`)
-      } else {
-        this.$message.success('地理位置设置成功')
+      const areaText = locationData.area ? `，面积约 ${locationData.area} 亩` : ''
+      const districtText = this.form.district ? `，区县：${this.form.district}` : ''
+      const addressText = this.form.address || '已设置位置'
+      this.$message.success(`${addressText}${areaText}${districtText}`)
+      
+      // 默认不显示预览，用户可以点击按钮查看
+      this.showPreviewMap = false
+    },
+    
+    // 渲染预览地图
+    renderPreviewMap() {
+      if (!this.form.coordinates) return
+      
+      try {
+        // 解析坐标
+        const path = JSON.parse(this.form.coordinates)
+        if (!Array.isArray(path) || path.length === 0) return
+        
+        // 检查AMap是否存在
+        if (!window.AMap) {
+          console.warn('高德地图未加载，无法显示预览')
+          return
+        }
+        
+        // 销毁旧地图
+        if (this.previewMap) {
+          this.previewMap.destroy()
+        }
+        
+        // 创建预览地图
+        this.$nextTick(() => {
+          const container = document.getElementById('preview-map')
+          if (!container) {
+            console.warn('预览地图容器不存在')
+            return
+          }
+          
+          this.previewMap = new window.AMap.Map('preview-map', {
+            zoom: 15,
+            center: [this.form.centerLng, this.form.centerLat],
+            viewMode: '2D',
+            resizeEnable: true
+          })
+          
+          // 绘制多边形
+          const polygonPath = path.map(p => [p.lng, p.lat])
+          this.previewPolygon = new window.AMap.Polygon({
+            path: polygonPath,
+            strokeColor: '#67C23A',
+            strokeWeight: 3,
+            strokeOpacity: 0.9,
+            fillOpacity: 0.3,
+            fillColor: '#67C23A',
+            zIndex: 50
+          })
+          
+          this.previewMap.add(this.previewPolygon)
+          
+          // 添加中心点标记
+          const marker = new window.AMap.Marker({
+            position: [this.form.centerLng, this.form.centerLat],
+            icon: new window.AMap.Icon({
+              size: new window.AMap.Size(25, 34),
+              image: '//a.amap.com/jsapi_demos/static/demo-center/icons/poi-marker-default.png',
+              imageSize: new window.AMap.Size(25, 34)
+            })
+          })
+          this.previewMap.add(marker)
+          
+          // 自动缩放到合适视野
+          this.previewMap.setFitView([this.previewPolygon])
+          
+          console.log('✅ 预览地图渲染成功')
+        })
+      } catch (error) {
+        console.error('渲染预览地图失败:', error)
       }
     },
     
@@ -675,44 +873,12 @@ export default {
 </script>
 
 <style scoped>
-/* 农田管理页面滚动设置 */
+/* 农田管理页面 - 由父容器 .green-main 处理滚动 */
 .farmland-manage {
   padding: 20px;
   padding-bottom: 30px;
   background: #f0f2f5;
-  min-height: 100vh;
-  height: auto;
-  max-height: none;
-  overflow-y: scroll !important;
-  overflow-x: hidden !important;
-  position: relative;
-  /* 隐藏滚动条 */
-  scrollbar-width: none !important; /* Firefox */
-  -ms-overflow-style: none !important; /* IE/Edge */
-}
-
-.farmland-manage::-webkit-scrollbar {
-  display: none !important; /* Chrome/Safari */
-  width: 0 !important;
-  height: 0 !important;
-}
-
-.farmland-page {
-  padding: 20px;
-  background: #f5f7fa;
-  min-height: 100vh;
-  max-height: 100vh;
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-  /* 隐藏滚动条 */
-  scrollbar-width: none !important; /* Firefox */
-  -ms-overflow-style: none !important; /* IE/Edge */
-}
-
-.farmland-page::-webkit-scrollbar {
-  display: none !important; /* Chrome/Safari */
-  width: 0 !important;
-  height: 0 !important;
+  min-height: 100%;
 }
 
 /* 重复样式已删除，使用上面的主要样式 */
@@ -727,21 +893,38 @@ export default {
   align-items: center;
   margin-bottom: 20px;
   box-shadow: 0 2px 12px rgba(0,0,0,0.02);
+  flex-wrap: wrap;
+  gap: 15px;
 }
 .main-title { font-size: 20px; font-weight: 800; color: #303133; margin-bottom: 5px; }
 .sub-title { font-size: 13px; color: #909399; }
-.action-area { display: flex; gap: 10px; }
+.action-area { display: flex; gap: 10px; flex-wrap: wrap; }
 
 /* 表格卡片 */
-.table-card { border-radius: 12px; border: none; }
+.table-card { 
+  border-radius: 12px; 
+  border: none;
+}
 ::v-deep .table-card .el-card__body { padding: 0; }
-.farm-info-cell { display: flex; align-items: center; gap: 10px; }
+.farm-info-cell { 
+  display: flex; 
+  align-items: center; 
+  gap: 10px;
+}
 .farm-icon {
   width: 40px; height: 40px; background: #ecfdf5; border-radius: 8px;
   display: flex; align-items: center; justify-content: center; font-size: 24px;
 }
-.farm-icon-img { width: 32px; height: 32px; object-fit: contain; }
-.crop-emoji-img { width: 60px; height: 60px; object-fit: contain; }
+.farm-icon-img { 
+  width: 32px; 
+  height: 32px; 
+  object-fit: contain;
+}
+.crop-emoji-img { 
+  width: 60px; 
+  height: 60px; 
+  object-fit: contain;
+}
 
 .farm-name { font-weight: bold; font-size: 14px; color: #303133; }
 .farm-addr { font-size: 12px; color: #909399; margin-top: 2px; }
@@ -853,6 +1036,32 @@ export default {
   box-shadow: none !important;
 }
 
+/* 预览地图样式 */
+.preview-map-container {
+  margin-top: 15px;
+  border: 1px solid #dcdfe6;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.preview-map-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 15px;
+  background: #f5f7fa;
+  border-bottom: 1px solid #dcdfe6;
+  font-size: 14px;
+  font-weight: bold;
+  color: #606266;
+}
+
+.preview-map {
+  width: 100%;
+  height: 200px;
+}
+
 /* --- 手机仿真外壳 --- */
 ::v-deep .mobile-preview-dialog {
   border-radius: 40px; /* 更圆润的边角，像 iPhone */
@@ -888,10 +1097,9 @@ export default {
 
 .h5-content {
   flex: 1; overflow-y: auto; padding-bottom: 20px;
-  /* 隐藏滚动条 */
-  scrollbar-width: none; 
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
 }
-.h5-content::-webkit-scrollbar { display: none; }
 
 /* --- 头部 Hero --- */
 .h5-hero {
@@ -963,4 +1171,156 @@ export default {
 .tab-btn { flex: 1; height: 40px; border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; cursor: pointer; }
 .tab-btn:first-child { background: #f3f4f6; color: #333; }
 .tab-btn.primary { background: #10b981; color: white; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3); }
+
+/* =================== 响应式布局 =================== */
+
+/* 平板设备 (768px - 1024px) */
+@media screen and (max-width: 1024px) {
+  .farmland-manage {
+    padding: 15px;
+  }
+  
+  .toolbar-card {
+    padding: 15px;
+  }
+  
+  .action-area {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+/* 移动设备 (< 768px) */
+@media screen and (max-width: 768px) {
+  .farmland-manage {
+    padding: 10px;
+  }
+  
+  /* 工具栏垂直堆叠 */
+  .toolbar-card {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 15px;
+  }
+  
+  .title-area {
+    width: 100%;
+    margin-bottom: 10px;
+  }
+  
+  .main-title {
+    font-size: 18px;
+  }
+  
+  .sub-title {
+    font-size: 12px;
+  }
+  
+  .action-area {
+    width: 100%;
+    flex-direction: column;
+  }
+  
+  .action-area .el-input {
+    width: 100% !important;
+  }
+  
+  .action-area .el-button {
+    width: 100%;
+    margin: 0;
+  }
+  
+  /* 表格卡片 */
+  .table-card {
+    margin: 0;
+    border-radius: 8px;
+  }
+  
+  /* 表格横向滚动 */
+  ::v-deep .el-table {
+    font-size: 12px;
+  }
+  
+  ::v-deep .el-table__header-wrapper,
+  ::v-deep .el-table__body-wrapper {
+    overflow-x: auto;
+  }
+  
+  ::v-deep .el-table th,
+  ::v-deep .el-table td {
+    padding: 8px 5px;
+  }
+  
+  /* 分页器简化 */
+  ::v-deep .el-pagination {
+    text-align: center;
+    padding: 10px 0;
+  }
+  
+  ::v-deep .el-pagination .el-pagination__sizes {
+    display: none;
+  }
+  
+  /* 对话框宽度 */
+  ::v-deep .el-dialog {
+    width: 95% !important;
+    margin-top: 5vh !important;
+  }
+  
+  /* 移动端预览弹窗 */
+  ::v-deep .mobile-preview-dialog {
+    width: 100% !important;
+    margin: 0 !important;
+    max-height: 100vh;
+  }
+  
+  .mobile-shell {
+    height: 90vh;
+    border-radius: 20px;
+  }
+}
+
+/* 小屏手机 (< 480px) */
+@media screen and (max-width: 480px) {
+  .farmland-manage {
+    padding: 8px;
+  }
+  
+  .toolbar-card {
+    padding: 12px;
+  }
+  
+  .main-title {
+    font-size: 16px;
+  }
+  
+  .sub-title {
+    font-size: 11px;
+  }
+  
+  .action-area .el-button {
+    padding: 10px 15px;
+    font-size: 13px;
+  }
+  
+  /* 表格更紧凑 */
+  ::v-deep .el-table {
+    font-size: 11px;
+  }
+  
+  ::v-deep .el-table th,
+  ::v-deep .el-table td {
+    padding: 6px 3px;
+  }
+  
+  /* 按钮组简化 */
+  ::v-deep .el-table .el-button--text {
+    padding: 0;
+    font-size: 12px;
+  }
+  
+  ::v-deep .el-divider--vertical {
+    margin: 0 5px;
+  }
+}
 </style>

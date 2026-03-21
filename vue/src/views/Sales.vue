@@ -217,8 +217,12 @@ export default {
         }
       }).then(res => {
         this.loading = false;
-        this.tableData = res.data.records
-        this.total = res.data.total
+        if (res && res.data) {
+          this.tableData = res.data.records || [];
+          this.total = res.data.total || 0;
+        }
+      }).catch(() => {
+        this.loading = false;
       })
     },
     save() {

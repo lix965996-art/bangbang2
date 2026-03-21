@@ -16,7 +16,7 @@
     <el-dropdown class="user-dropdown">
       <div class="user-info">
         <img src="@/assets/mo.png" alt="" class="user-avatar">
-        <span class="user-name">{{ user.nickname }}</span>
+        <span class="user-name">{{ user ? user.nickname : '用户' }}</span>
         <i class="el-icon-arrow-down"></i>
       </div>
       <el-dropdown-menu slot="dropdown" class="user-menu">

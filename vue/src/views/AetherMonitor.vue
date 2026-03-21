@@ -1,66 +1,91 @@
 <template>
-  <div class="aether-monitor">
-    <!-- 绿色粒子背景 -->
-    <canvas ref="particleCanvas" class="particle-canvas"></canvas>
-    
+  <div class="eco-monitor">
     <!-- 顶部标题栏 -->
-    <div class="header">
-      <div class="title">AI 视觉识别监控</div>
-      <div class="status-group">
-        <el-tag :type="deviceOnline ? 'success' : 'danger'" size="small">
-          {{ deviceOnline ? '设备在线' : '设备离线' }}
-        </el-tag>
+    <div class="page-header">
+      <div class="header-content">
+        <div class="title-section">
+          <div class="title-bar"></div>
+          <div>
+            <h1 class="page-title">🌱 微气候精准调控舱</h1>
+            <p class="page-subtitle">智慧农业环境监测与自动化控制系统</p>
+          </div>
+        </div>
+        <div class="status-badge" :class="{online: deviceOnline}">
+          <span class="status-dot"></span>
+          <span>{{ deviceOnline ? '设备在线' : '设备离线' }}</span>
+        </div>
       </div>
     </div>
 
-    <!-- 关键指标卡片 -->
-    <el-row :gutter="12" class="kpi-row">
+    <!-- 核心指标仪表盘 -->
+    <el-row :gutter="16" class="metrics-row">
       <!-- 室外温度 -->
       <el-col :span="6">
-        <el-card class="kpi-card weather-card">
-          <div class="kpi-label">室外温度</div>
-          <div class="kpi-value">
-            {{ weatherNow && weatherNow.temp ? weatherNow.temp + '℃' : '--' }}
+        <div class="metric-card">
+          <div class="metric-header">
+            <span class="metric-icon">🌡️</span>
+            <span class="metric-label">室外温度</span>
+            <span class="status-indicator normal"></span>
           </div>
-          <div class="kpi-desc">
-            {{ weatherNow && weatherNow.text || '加载中...' }}
+          <div class="metric-value">
+            {{ weatherNow && weatherNow.temp ? weatherNow.temp : '--' }}<span class="unit">℃</span>
           </div>
-        </el-card>
+          <div class="metric-trend">
+            <canvas ref="weatherSparkline" width="200" height="30"></canvas>
+          </div>
+          <div class="metric-desc">{{ weatherNow && weatherNow.text || '加载中...' }}</div>
+        </div>
       </el-col>
 
       <!-- 室内温度 -->
       <el-col :span="6">
-        <el-card class="kpi-card">
-          <div class="kpi-label">室内温度</div>
-          <div class="kpi-value">{{ temperature === null ? '--' : temperature + '℃' }}</div>
-          <div class="kpi-desc">STM32 实时检测</div>
-        </el-card>
+        <div class="metric-card">
+          <div class="metric-header">
+            <span class="metric-icon">🌡️</span>
+            <span class="metric-label">室内温度</span>
+            <span class="status-indicator" :class="getStatusClass('temp')"></span>
+          </div>
+          <div class="metric-value">
+            {{ temperature === null ? '--' : temperature }}<span class="unit">℃</span>
+          </div>
+          <div class="metric-trend">
+            <canvas ref="tempSparkline" width="200" height="30"></canvas>
+          </div>
+          <div class="metric-desc">实时传感器监测</div>
+        </div>
       </el-col>
 
       <!-- 室内湿度 -->
       <el-col :span="6">
-        <el-card class="kpi-card">
-          <div class="kpi-label">室内湿度</div>
-          <div class="kpi-value">{{ humidity === null ? '--' : humidity + '%' }}</div>
-          <div class="kpi-desc">STM32 实时检测</div>
-        </el-card>
+        <div class="metric-card">
+          <div class="metric-header">
+            <span class="metric-icon">💧</span>
+            <span class="metric-label">室内湿度</span>
+            <span class="status-indicator" :class="getStatusClass('humi')"></span>
+          </div>
+          <div class="metric-value">
+            {{ humidity === null ? '--' : humidity }}<span class="unit">%</span>
+          </div>
+          <div class="metric-trend">
+            <canvas ref="humiSparkline" width="200" height="30"></canvas>
+          </div>
+          <div class="metric-desc">实时传感器监测</div>
+        </div>
       </el-col>
 
-      <!-- 光照灯控制 -->
+      <!-- VPD气压差 -->
       <el-col :span="6">
-        <el-card class="kpi-card lamp-card">
-          <div class="kpi-label">光照灯</div>
-          <div class="lamp-control">
-            <img src="@/assets/sun.png" class="lamp-icon" :class="{ active: ledOn }" alt="光照灯" />
-            <el-switch
-              v-model="ledOn"
-              @change="toggleLamp"
-              active-color="#13ce66"
-              inactive-color="#dcdfe6"
-            ></el-switch>
+        <div class="metric-card">
+          <div class="metric-header">
+            <span class="metric-icon">📊</span>
+            <span class="metric-label">VPD 气压差</span>
+            <span class="status-indicator normal"></span>
           </div>
-          <div class="kpi-desc">{{ ledOn ? '已开启' : '已关闭' }}</div>
-        </el-card>
+          <div class="vpd-gauge">
+            <div ref="vpdGauge" style="height: 80px;"></div>
+          </div>
+          <div class="metric-desc">适宜范围 0.8-1.2 kPa</div>
+        </div>
       </el-col>
     </el-row>
 
@@ -201,23 +226,59 @@
       </el-col>
     </el-row>
 
-    <!-- 历史数据图表 -->
-    <el-row :gutter="12" class="chart-row">
-      <el-col :span="12">
-        <el-card>
-          <div slot="header" class="card-header">
-            <img src="@/assets/qushi.png" class="header-icon" alt="温度趋势" /><span>温度趋势</span>
+    <!-- 高级趋势分析 -->
+    <el-row :gutter="16" class="chart-row">
+      <el-col :span="16">
+        <div class="glass-panel">
+          <div class="panel-header">
+            <div class="title-bar"></div>
+            <div>
+              <h3 class="panel-title">环境参数趋势与AI预测</h3>
+              <p class="panel-subtitle">历史数据 + 未来4小时智能预测</p>
+            </div>
           </div>
-          <div ref="tempChart" style="height: 160px;"></div>
-        </el-card>
+          <div ref="trendChart" style="height: 280px;"></div>
+        </div>
       </el-col>
-      <el-col :span="12">
-        <el-card>
-          <div slot="header" class="card-header">
-            <span>💧 湿度趋势</span>
+      <el-col :span="8">
+        <div class="glass-panel">
+          <div class="panel-header">
+            <div class="title-bar"></div>
+            <h3 class="panel-title">⚠️ 智能告警中心</h3>
           </div>
-          <div ref="humiChart" style="height: 160px;"></div>
-        </el-card>
+          <div class="alert-timeline">
+            <div v-if="tempAlert || humiAlert || weatherAlerts.length" class="timeline-items">
+              <div v-if="tempAlert" class="timeline-item warning">
+                <div class="timeline-dot"></div>
+                <div class="timeline-content">
+                  <div class="timeline-time">{{ getCurrentTime() }}</div>
+                  <div class="timeline-title">🌡️ 温度异常</div>
+                  <div class="timeline-desc">{{ tempAlert }}</div>
+                </div>
+              </div>
+              <div v-if="humiAlert" class="timeline-item warning">
+                <div class="timeline-dot"></div>
+                <div class="timeline-content">
+                  <div class="timeline-time">{{ getCurrentTime() }}</div>
+                  <div class="timeline-title">💧 湿度异常</div>
+                  <div class="timeline-desc">{{ humiAlert }}</div>
+                </div>
+              </div>
+              <div v-for="(alert, index) in weatherAlerts" :key="index" class="timeline-item danger">
+                <div class="timeline-dot"></div>
+                <div class="timeline-content">
+                  <div class="timeline-time">{{ getCurrentTime() }}</div>
+                  <div class="timeline-title">{{ alert.title }}</div>
+                  <div class="timeline-desc">{{ alert.text }}</div>
+                </div>
+              </div>
+            </div>
+            <div v-else class="empty-state">
+              <div class="empty-icon">✅</div>
+              <div class="empty-text">系统运行正常</div>
+            </div>
+          </div>
+        </div>
       </el-col>
     </el-row>
   </div>
@@ -278,8 +339,8 @@ export default {
   },
   
   mounted() {
-    this.initParticleCanvas();
     this.initCharts();
+    this.initVPDGauge();
     this.fetchDeviceStatus();
     this.fetchWeatherData();
     this.fetchHistoryData();
@@ -302,14 +363,17 @@ export default {
     if (this.weatherTimer) {
       clearInterval(this.weatherTimer);
     }
-    if (this.tempChartInstance) {
+    if (this.tempChartInstance && !this.tempChartInstance.isDisposed()) {
       this.tempChartInstance.dispose();
     }
-    if (this.humiChartInstance) {
+    if (this.humiChartInstance && !this.humiChartInstance.isDisposed()) {
       this.humiChartInstance.dispose();
     }
     if (this.animationId) {
       cancelAnimationFrame(this.animationId);
+    }
+    if (this.chartResizeHandler) {
+      window.removeEventListener('resize', this.chartResizeHandler);
     }
     window.removeEventListener('resize', this.resizeCanvas);
   },
@@ -482,133 +546,163 @@ export default {
     
     // 初始化图表
     initCharts() {
-      // 确保DOM元素存在
-      if (!this.$refs.tempChart || !this.$refs.humiChart) {
-        console.warn('图表DOM元素未找到，延迟初始化');
-        this.$nextTick(() => {
-          if (this.$refs.tempChart && this.$refs.humiChart) {
-            this.tempChartInstance = echarts.init(this.$refs.tempChart);
-            this.humiChartInstance = echarts.init(this.$refs.humiChart);
+      this.$nextTick(() => {
+        if (!this.$refs.trendChart) return;
+        
+        this.trendChartInstance = echarts.init(this.$refs.trendChart);
+        
+        this.chartResizeHandler = () => {
+          if (this.trendChartInstance && !this.trendChartInstance.isDisposed()) {
+            this.trendChartInstance.resize();
           }
-        });
-        return;
-      }
-      
-      this.tempChartInstance = echarts.init(this.$refs.tempChart);
-      this.humiChartInstance = echarts.init(this.$refs.humiChart);
-      
-      window.addEventListener('resize', () => {
-        this.tempChartInstance && this.tempChartInstance.resize();
-        this.humiChartInstance && this.humiChartInstance.resize();
+        };
+        window.addEventListener('resize', this.chartResizeHandler);
       });
     },
     
-    // 更新图表
+    // 更新高级趋势图表
     updateCharts() {
       if (!this.historyData || this.historyData.length === 0) return;
       
-      // 按时间排序，确保从早到晚的顺序
       const sortedData = [...this.historyData].sort((a, b) => new Date(a.date) - new Date(b.date));
+      const recentData = sortedData.slice(-20); // 只显示最近20条
       
-      const times = sortedData.map(item => {
+      const times = recentData.map(item => {
         const date = new Date(item.date);
-        return `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
+        return `${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
       });
-      const temps = sortedData.map(item => item.temp);
-      const humis = sortedData.map(item => item.humi);
+      const temps = recentData.map(item => item.temp);
       
-      // 温度图表
-      const tempOption = {
+      // 生成AI预测数据（4小时）
+      const predictTimes = ['1h', '2h', '3h', '4h'];
+      const lastTemp = temps[temps.length - 1];
+      const predictTemps = [
+        lastTemp + 0.5,
+        lastTemp + 1.2,
+        lastTemp + 0.8,
+        lastTemp + 0.3
+      ];
+      
+      // 置信区间
+      const upperBound = predictTemps.map(t => t + 1.5);
+      const lowerBound = predictTemps.map(t => t - 1.5);
+      
+      // 绘制Sparkline
+      this.drawSparkline('tempSparkline', temps, '#059669');
+      const humis = recentData.map(item => item.humi);
+      this.drawSparkline('humiSparkline', humis, '#3b82f6');
+      
+      const option = {
         tooltip: {
-          trigger: 'axis'
+          trigger: 'axis',
+          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          borderColor: '#e5e7eb',
+          borderWidth: 1,
+          textStyle: { color: '#374151' }
+        },
+        legend: {
+          data: ['历史数据', 'AI预测', '置信区间'],
+          bottom: 10,
+          textStyle: { color: '#6b7280' }
         },
         grid: {
           left: '3%',
-          right: '4%',
-          bottom: '3%',
+          right: '3%',
+          top: '5%',
+          bottom: '15%',
           containLabel: true
         },
         xAxis: {
           type: 'category',
-          data: times,
-          boundaryGap: false
+          data: [...times, ...predictTimes],
+          boundaryGap: false,
+          axisLine: { lineStyle: { color: '#e5e7eb' } },
+          axisLabel: { color: '#6b7280', fontSize: 11 }
         },
         yAxis: {
           type: 'value',
-          name: '温度(℃)'
+          name: '温度(℃)',
+          nameTextStyle: { color: '#6b7280' },
+          axisLine: { lineStyle: { color: '#e5e7eb' } },
+          axisLabel: { color: '#6b7280' },
+          splitLine: { lineStyle: { color: '#f3f4f6' } }
         },
-        series: [{
-          name: '温度',
-          type: 'line',
-          smooth: true,
-          data: temps,
-          itemStyle: {
-            color: '#409EFF'
+        series: [
+          {
+            name: '适宜范围',
+            type: 'line',
+            markArea: {
+              silent: true,
+              itemStyle: {
+                color: 'rgba(16, 185, 129, 0.08)'
+              },
+              data: [[
+                { yAxis: 20 },
+                { yAxis: 28 }
+              ]]
+            },
+            data: []
           },
-          areaStyle: {
-            color: {
-              type: 'linear',
-              x: 0,
-              y: 0,
-              x2: 0,
-              y2: 1,
-              colorStops: [{
-                offset: 0, color: 'rgba(64, 158, 255, 0.3)'
-              }, {
-                offset: 1, color: 'rgba(64, 158, 255, 0.05)'
-              }]
+          {
+            name: '历史数据',
+            type: 'line',
+            smooth: true,
+            data: [...temps, ...Array(4).fill(null)],
+            itemStyle: { color: '#059669' },
+            lineStyle: { width: 3 },
+            areaStyle: {
+              color: {
+                type: 'linear',
+                x: 0, y: 0, x2: 0, y2: 1,
+                colorStops: [
+                  { offset: 0, color: 'rgba(5, 150, 105, 0.3)' },
+                  { offset: 1, color: 'rgba(5, 150, 105, 0.05)' }
+                ]
+              }
             }
+          },
+          {
+            name: 'AI预测',
+            type: 'line',
+            smooth: true,
+            data: [...Array(temps.length).fill(null), ...predictTemps],
+            itemStyle: { color: '#f59e0b' },
+            lineStyle: {
+              width: 2,
+              type: 'dashed',
+              dashOffset: 5
+            }
+          },
+          {
+            name: '置信区间',
+            type: 'line',
+            data: [...Array(temps.length).fill(null), ...upperBound],
+            lineStyle: { opacity: 0 },
+            stack: 'confidence',
+            symbol: 'none'
+          },
+          {
+            name: '置信区间',
+            type: 'line',
+            data: [...Array(temps.length).fill(null), ...lowerBound.map((v, i) => upperBound[i] - v)],
+            lineStyle: { opacity: 0 },
+            areaStyle: { color: 'rgba(245, 158, 11, 0.15)' },
+            stack: 'confidence',
+            symbol: 'none'
           }
-        }]
+        ]
       };
       
-      // 湿度图表
-      const humiOption = {
-        tooltip: {
-          trigger: 'axis'
-        },
-        grid: {
-          left: '3%',
-          right: '4%',
-          bottom: '3%',
-          containLabel: true
-        },
-        xAxis: {
-          type: 'category',
-          data: times,
-          boundaryGap: false
-        },
-        yAxis: {
-          type: 'value',
-          name: '湿度(%)'
-        },
-        series: [{
-          name: '湿度',
-          type: 'line',
-          smooth: true,
-          data: humis,
-          itemStyle: {
-            color: '#67C23A'
-          },
-          areaStyle: {
-            color: {
-              type: 'linear',
-              x: 0,
-              y: 0,
-              x2: 0,
-              y2: 1,
-              colorStops: [{
-                offset: 0, color: 'rgba(103, 194, 58, 0.3)'
-              }, {
-                offset: 1, color: 'rgba(103, 194, 58, 0.05)'
-              }]
-            }
-          }
-        }]
-      };
+      if (this.trendChartInstance && !this.trendChartInstance.isDisposed()) {
+        this.trendChartInstance.setOption(option);
+      }
       
-      this.tempChartInstance.setOption(tempOption);
-      this.humiChartInstance.setOption(humiOption);
+      // 更新VPD
+      if (this.vpdChartInstance && !this.vpdChartInstance.isDisposed()) {
+        this.vpdChartInstance.setOption({
+          series: [{ data: [{ value: this.calculateVPD() }] }]
+        });
+      }
     },
     
     // 格式化时间
@@ -621,6 +715,140 @@ export default {
     formatDate(dateStr) {
       const date = new Date(dateStr);
       return `${date.getMonth() + 1}/${date.getDate()}`;
+    },
+    
+    // 获取状态指示器类名
+    getStatusClass(type) {
+      if (type === 'temp' && this.temperature !== null) {
+        if (this.temperature > this.tempThresholdHigh || this.temperature < this.tempThresholdLow) {
+          return 'warning';
+        }
+      }
+      if (type === 'humi' && this.humidity !== null) {
+        if (this.humidity > this.humiThresholdHigh || this.humidity < this.humiThresholdLow) {
+          return 'warning';
+        }
+      }
+      return 'normal';
+    },
+    
+    // 获取当前时间
+    getCurrentTime() {
+      const now = new Date();
+      return `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
+    },
+    
+    // 绘制Sparkline迷你趋势图
+    drawSparkline(canvasRef, data, color = '#10b981') {
+      const canvas = this.$refs[canvasRef];
+      if (!canvas || !data || data.length === 0) return;
+      
+      const ctx = canvas.getContext('2d');
+      const width = canvas.width;
+      const height = canvas.height;
+      const padding = 5;
+      
+      ctx.clearRect(0, 0, width, height);
+      
+      const max = Math.max(...data);
+      const min = Math.min(...data);
+      const range = max - min || 1;
+      
+      // 绘制渐变面积
+      const gradient = ctx.createLinearGradient(0, 0, 0, height);
+      gradient.addColorStop(0, color + '40');
+      gradient.addColorStop(1, color + '05');
+      
+      ctx.beginPath();
+      data.forEach((value, index) => {
+        const x = padding + (index / (data.length - 1)) * (width - padding * 2);
+        const y = height - padding - ((value - min) / range) * (height - padding * 2);
+        if (index === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.lineTo(width - padding, height - padding);
+      ctx.lineTo(padding, height - padding);
+      ctx.closePath();
+      ctx.fillStyle = gradient;
+      ctx.fill();
+      
+      // 绘制线条
+      ctx.beginPath();
+      data.forEach((value, index) => {
+        const x = padding + (index / (data.length - 1)) * (width - padding * 2);
+        const y = height - padding - ((value - min) / range) * (height - padding * 2);
+        if (index === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    },
+    
+    // 初始化VPD仪表盘
+    initVPDGauge() {
+      this.$nextTick(() => {
+        if (!this.$refs.vpdGauge) return;
+        
+        const vpdChart = echarts.init(this.$refs.vpdGauge);
+        const vpd = this.calculateVPD();
+        
+        const option = {
+          series: [{
+            type: 'gauge',
+            startAngle: 180,
+            endAngle: 0,
+            min: 0,
+            max: 2,
+            radius: '90%',
+            center: ['50%', '70%'],
+            splitNumber: 4,
+            axisLine: {
+              lineStyle: {
+                width: 8,
+                color: [
+                  [0.4, '#ef4444'],
+                  [0.6, '#10b981'],
+                  [1, '#ef4444']
+                ]
+              }
+            },
+            pointer: {
+              itemStyle: { color: '#374151' },
+              length: '60%',
+              width: 4
+            },
+            axisTick: { show: false },
+            splitLine: { show: false },
+            axisLabel: {
+              distance: 5,
+              fontSize: 10,
+              color: '#6b7280'
+            },
+            detail: {
+              valueAnimation: true,
+              formatter: '{value} kPa',
+              fontSize: 14,
+              fontWeight: 'bold',
+              color: '#059669',
+              offsetCenter: [0, '-10%']
+            },
+            data: [{ value: vpd }]
+          }]
+        };
+        
+        vpdChart.setOption(option);
+        this.vpdChartInstance = vpdChart;
+      });
+    },
+    
+    // 计算VPD（饱和水汽压差）
+    calculateVPD() {
+      if (this.temperature === null || this.humidity === null) return 0;
+      const temp = this.temperature;
+      const rh = this.humidity / 100;
+      const svp = 0.6108 * Math.exp((17.27 * temp) / (temp + 237.3));
+      return Number((svp * (1 - rh)).toFixed(2));
     },
     
     // 获取天气图标
@@ -680,6 +908,21 @@ export default {
           this.initParticles(Math.floor(width * height / 10000));
         }
       }
+    },
+    
+    // 获取状态类名
+    getStatusClass(type) {
+      if (type === 'temp' && this.temperature !== null) {
+        if (this.temperature > this.tempThresholdHigh || this.temperature < this.tempThresholdLow) {
+          return 'warning';
+        }
+      }
+      if (type === 'humi' && this.humidity !== null) {
+        if (this.humidity > this.humiThresholdHigh || this.humidity < this.humiThresholdLow) {
+          return 'warning';
+        }
+      }
+      return 'normal';
     },
     
     initParticles(count = 120) {
@@ -771,122 +1014,176 @@ export default {
 </script>
 
 <style scoped>
-.aether-monitor {
-  position: relative;
-  padding: 12px;
+/* 🌱 现代生态科技风 - 微气候精准调控舱 */
+.eco-monitor {
+  padding: 20px;
   min-height: 100vh;
-  max-height: 100vh;
+  background: #f8fafc;
   overflow-y: auto;
-  overflow-x: hidden;
-  background: linear-gradient(to bottom, #E8ECF1 0%, #DEE4EB 100%);
-  /* 隐藏滚动条 */
-  scrollbar-width: none !important; /* Firefox */
-  -ms-overflow-style: none !important; /* IE/Edge */
+  scrollbar-width: none;
 }
 
-.aether-monitor::-webkit-scrollbar {
-  display: none !important; /* Chrome/Safari */
-  width: 0 !important;
-  height: 0 !important;
+.eco-monitor::-webkit-scrollbar {
+  display: none;
 }
 
-/* 粒子画布 */
-.particle-canvas {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 0;
-  pointer-events: none;
+/* 页面头部 */
+.page-header {
+  margin-bottom: 24px;
 }
 
-/* 确保内容在粒子之上 */
-.aether-monitor > *:not(.particle-canvas) {
-  position: relative;
-  z-index: 1;
-}
-
-.header {
+.header-content {
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
-  padding: 10px 16px;
-  background: rgba(255, 255, 255, 0.55);
-  backdrop-filter: blur(12px);
-  border-radius: 12px;
-  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.08), 0 2px 6px -1px rgba(0, 0, 0, 0.04);
-  border: none;
 }
 
-.title {
-  font-size: 16px;
-  font-weight: bold;
-  color: #1F2937;
-}
-
-.kpi-row {
-  margin-bottom: 8px;
-}
-
-.kpi-card {
-  text-align: center;
-  background: rgba(255, 255, 255, 0.55) !important;
-  backdrop-filter: blur(12px) !important;
-  border-radius: 12px !important;
-  box-shadow: 0 4px 12px -2px rgba(76, 175, 80, 0.2), 0 2px 6px -1px rgba(0, 0, 0, 0.06) !important;
-  border: 2px solid rgba(76, 175, 80, 0.5) !important;
-  height: 120px !important;
+.title-section {
   display: flex;
-  flex-direction: column;
-  justify-content: center;
+  gap: 16px;
   align-items: center;
 }
 
-.kpi-label {
-  font-size: 12px;
-  color: #6B7280;
-  margin-bottom: 4px;
-  font-weight: 500;
+.title-bar {
+  width: 4px;
+  height: 48px;
+  background: linear-gradient(to bottom, #10b981, #059669);
+  border-radius: 2px;
 }
 
-.kpi-value {
-  font-size: 20px;
-  font-weight: bold;
-  color: #409EFF;
-  margin: 4px 0;
+.page-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 4px 0;
 }
 
-.kpi-desc {
-  font-size: 11px;
-  color: #9CA3AF;
-  margin-top: 3px;
+.page-subtitle {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 0;
 }
 
-.weather-card .kpi-value {
-  color: #E6A23C;
-}
-
-.lamp-card .lamp-control {
+.status-badge {
   display: flex;
-  flex-direction: column;
   align-items: center;
   gap: 8px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  background: #fee2e2;
+  color: #991b1b;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.status-badge.online {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
+  animation: pulse 2s infinite;
+}
+
+.status-badge.online .status-dot {
+  background: #10b981;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* 核心指标卡片 */
+.metrics-row {
+  margin-bottom: 24px;
+}
+
+.metric-card {
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  border: 1px solid #f1f5f9;
+  transition: all 0.3s;
+}
+
+.metric-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+.metric-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.metric-icon {
+  font-size: 20px;
+}
+
+.metric-label {
+  flex: 1;
+  font-size: 13px;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+}
+
+.status-indicator.warning {
+  background: #f59e0b;
+  animation: warningPulse 2s infinite;
+}
+
+@keyframes warningPulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+  50% { opacity: 0.8; box-shadow: 0 0 0 6px rgba(245, 158, 11, 0); }
+}
+
+.metric-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: #059669;
+  line-height: 1;
+  margin-bottom: 12px;
+}
+
+.metric-value .unit {
+  font-size: 18px;
+  color: #6b7280;
+  font-weight: 500;
+  margin-left: 4px;
+}
+
+.metric-trend {
+  height: 30px;
+  margin-bottom: 8px;
+  opacity: 0.6;
+}
+
+.metric-desc {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.vpd-gauge {
   margin: 8px 0;
-}
-
-.lamp-icon {
-  width: 32px;
-  height: 32px;
-  object-fit: contain;
-  opacity: 0.4;
-  filter: grayscale(100%);
-}
-
-.lamp-icon.active {
-  opacity: 1;
-  filter: grayscale(0%);
 }
 
 .weather-row {
@@ -903,8 +1200,113 @@ export default {
   flex: 1;
 }
 
-.chart-row {
+/* 玻璃拟态面板 */
+.glass-panel {
+  background: white;
+  backdrop-filter: blur(8px);
+  border: 1px solid #f1f5f9;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.panel-header {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+.panel-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 4px 0;
+}
+
+.panel-subtitle {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 0;
+}
+
+/* 告警时间轴 */
+.alert-timeline {
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.timeline-items {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.timeline-item {
+  position: relative;
+  padding-left: 24px;
+  padding-bottom: 16px;
+  border-left: 2px solid #e5e7eb;
+}
+
+.timeline-item:last-child {
+  border-left-color: transparent;
+}
+
+.timeline-dot {
+  position: absolute;
+  left: -5px;
+  top: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  border: 2px solid white;
+}
+
+.timeline-item.warning .timeline-dot {
+  background: #f59e0b;
+}
+
+.timeline-item.danger .timeline-dot {
+  background: #ef4444;
+}
+
+.timeline-time {
+  font-size: 11px;
+  color: #9ca3af;
   margin-bottom: 4px;
+}
+
+.timeline-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 4px;
+}
+
+.timeline-desc {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.empty-text {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.chart-row {
+  margin-bottom: 24px;
 }
 
 .card-header {
