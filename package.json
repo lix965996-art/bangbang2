@@ -1,0 +1,69 @@
+{
+  "name": "bangbang-agro-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "vue-cli-service serve",
+    "build": "vue-cli-service build",
+    "lint": "vue-cli-service lint",
+    "test:unit": "jest --coverage"
+  },
+  "dependencies": {
+    "core-js": "^3.8.3",
+    "element-ui": "^2.15.13",
+    "vue": "^2.6.14",
+    "vue-router": "^3.5.4",
+    "vuex": "^3.6.2",
+    "axios": "^1.6.2",
+    "echarts": "^5.4.3",
+    "echarts-gl": "^2.0.9",
+    "three": "^0.160.0"
+  },
+  "devDependencies": {
+    "@vue/cli-plugin-babel": "~5.0.8",
+    "@vue/cli-plugin-eslint": "~5.0.8",
+    "@vue/cli-plugin-router": "~5.0.8",
+    "@vue/cli-plugin-unit-jest": "~5.0.8",
+    "@vue/cli-plugin-vuex": "~5.0.8",
+    "@vue/cli-service": "~5.0.8",
+    "@vue/eslint-config-prettier": "^7.0.0",
+    "@vue/eslint-config-standard": "^6.1.0",
+    "babel-eslint": "^10.1.0",
+    "eslint": "^7.32.0",
+    "eslint-plugin-import": "^2.25.4",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-promise": "^5.1.0",
+    "eslint-plugin-standard": "^5.0.0",
+    "eslint-plugin-vue": "^8.0.3",
+    "prettier": "^2.8.8",
+    "sass": "^1.32.13",
+    "sass-loader": "^12.6.0",
+    "vue-template-compiler": "^2.6.14"
+  },
+  "eslintConfig": {
+    "root": true,
+    "env": {
+      "node": true
+    },
+    "extends": [
+      "plugin:vue/essential",
+      "@vue/standard",
+      "@vue/prettier"
+    ],
+    "parserOptions": {
+      "parser": "babel-eslint"
+    },
+    "rules": {
+      "no-console": "off",
+      "no-debugger": "warn",
+      "no-unused-vars": "warn",
+      "vue/multi-word-component-names": "off"
+    }
+  },
+  "browserslist": [
+    "> 1%",
+    "last 2 versions",
+    "not dead",
+    "not ie <= 11"
+  ]
+}
