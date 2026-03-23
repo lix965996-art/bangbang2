@@ -74,7 +74,7 @@ public class WebSocketServer {
     @OnError
     public void onError(Session session, Throwable error) {
         log.error("发生错误");
-        error.printStackTrace();
+        log.error("WebSocket error", error);
     }
     /**
      * 服务端发送消息给客户端

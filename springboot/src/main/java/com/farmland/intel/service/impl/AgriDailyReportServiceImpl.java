@@ -8,6 +8,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.farmland.intel.entity.Statistic;
 import com.farmland.intel.mapper.StatisticMapper;
 import com.farmland.intel.service.IAgriDailyReportService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -22,6 +24,7 @@ import java.util.*;
 @Service
 @SuppressWarnings("unchecked")
 public class AgriDailyReportServiceImpl implements IAgriDailyReportService {
+    private static final Logger log = LoggerFactory.getLogger(AgriDailyReportServiceImpl.class);
     
     @Autowired
     private StatisticMapper statisticMapper;
@@ -60,7 +63,7 @@ public class AgriDailyReportServiceImpl implements IAgriDailyReportService {
             result.put("success", true);
             
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Generate agri daily report failed", e);
             result.put("success", false);
             result.put("error", e.getMessage());
             result.put("aiAdvice", generateDefaultAdvice());
@@ -144,7 +147,7 @@ public class AgriDailyReportServiceImpl implements IAgriDailyReportService {
                 }
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            log.warn("Fetch weather data failed, fallback to defaults", e);
         }
         
         // 如果获取失败，返回默认数据

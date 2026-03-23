@@ -5,6 +5,8 @@ import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.farmland.intel.common.Result;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,6 +19,7 @@ import java.util.*;
 @RequestMapping("/aether/weather")
 @CrossOrigin
 public class AetherWeatherController {
+    private static final Logger log = LoggerFactory.getLogger(AetherWeatherController.class);
     
     // JavaScript API密钥（前端地图使用）
     @Value("${amap.js-key:}")
@@ -41,7 +44,6 @@ public class AetherWeatherController {
         Map<String, Object> config = new HashMap<>();
         config.put("amapKey", jsKey); // 前端使用JavaScript API Key
         config.put("jsKey", jsKey);
-        config.put("webKey", webKey);
         config.put("city", defaultCity);
         return Result.success(config);
     }
@@ -60,7 +62,6 @@ public class AetherWeatherController {
             
             String url = AMAP_WEATHER_URL + "?city=" + defaultCity + "&key=" + apiKey + "&extensions=base";
             
-            System.out.println("🌤️ 调用高德天气API: " + url.substring(0, Math.min(100, url.length())));
             String response = HttpUtil.get(url);
             JSONObject json = JSONUtil.parseObj(response);
             
@@ -86,7 +87,7 @@ public class AetherWeatherController {
             }
             return Result.success(getMockWeatherNow());
         } catch (Exception e) {
-            System.out.println("获取高德天气失败: " + e.getMessage());
+            log.warn("Get current weather failed", e);
             return Result.success(getMockWeatherNow());
         }
     }
@@ -161,7 +162,7 @@ public class AetherWeatherController {
             }
             return Result.success(getMockWeather7d());
         } catch (Exception e) {
-            System.out.println("获取高德天气预报失败: " + e.getMessage());
+            log.warn("Get 7d weather failed", e);
             return Result.success(getMockWeather7d());
         }
     }
@@ -243,7 +244,7 @@ public class AetherWeatherController {
             }
             return Result.success(getMockWeather24h());
         } catch (Exception e) {
-            System.out.println("获取24小时天气预报失败: " + e.getMessage());
+            log.warn("Get 24h weather failed", e);
             return Result.success(getMockWeather24h());
         }
     }

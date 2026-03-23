@@ -281,38 +281,6 @@ export default {
       return Math.round(dailyGDD * 30)
     },
     
-    // 生成 Mock 数据
-    generateMockData() {
-      const crops = ['草莓', '玉米', '小麦', '番茄', '黄瓜', '西瓜', '水稻', '葡萄']
-      const keepers = ['张三', '李四', '王五', '赵六', '孙七', '周八']
-      const states = ['生长良好', '缺水预警', '病虫害风险', '监测中']
-      
-      return Array.from({ length: 10 }, (_, i) => {
-        const temp = 20 + Math.random() * 15
-        const humidity = 40 + Math.random() * 40
-        const healthScore = this.calculateHealthScore(temp, humidity)
-        
-        return {
-          id: i + 1,
-          farm: `${i + 1}号田-${['有机实验区', '高产示范区', '智能温室', '露天种植区'][i % 4]}`,
-          crop: crops[i % crops.length],
-          keeper: keepers[i % keepers.length],
-          temperature: Math.round(temp * 10) / 10,
-          soilhumidity: Math.round(humidity),
-          airhumidity: Math.round(50 + Math.random() * 30),
-          carbon: Math.round(400 + Math.random() * 200),
-          light: `${Math.round(20000 + Math.random() * 30000)} Lux`,
-          state: states[healthScore > 90 ? 0 : healthScore > 70 ? 3 : healthScore > 50 ? 1 : 2],
-          pump: Math.random() > 0.5 ? '开启' : '关闭',
-          filllight: Math.random() > 0.5 ? '开启' : '关闭',
-          healthScore,
-          gdd: this.calculateGDD(temp),
-          tempTrend: Math.random() > 0.5 ? 1 : Math.random() > 0.5 ? -1 : 0,
-          aiAdvice: healthScore > 90 ? 'AI建议：适宜追肥' : healthScore > 70 ? 'AI建议：保持当前管理' : 'AI建议：需加强监测'
-        }
-      })
-    },
-    
     // 加载数据（真实 API）
     async loadData() {
       this.loading = true
@@ -362,22 +330,6 @@ export default {
         this.total = 0
         this.$message.error("Statistic data load failed")
       })
-    },
-    
-    // Mock 数据降级方案
-    loadMockData() {
-      let mockData = this.generateMockData()
-      
-      if (this.searchFarm) {
-        mockData = mockData.filter(f => f.farm.includes(this.searchFarm))
-      }
-      
-      const start = (this.pageNum - 1) * this.pageSize
-      const end = start + this.pageSize
-      this.fieldData = mockData.slice(start, end)
-      this.total = mockData.length
-      
-      this.loading = false
     },
     
     // 生成 AI 建议

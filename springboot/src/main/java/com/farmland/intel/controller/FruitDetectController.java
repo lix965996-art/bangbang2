@@ -1,6 +1,8 @@
 package com.farmland.intel.controller;
 
 import com.farmland.intel.common.Result;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.*;
 import org.springframework.util.LinkedMultiValueMap;
@@ -18,6 +20,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/fruit-detect")
 public class FruitDetectController {
+    private static final Logger log = LoggerFactory.getLogger(FruitDetectController.class);
 
     // Python检测服务地址
     private static final String PYTHON_API_URL = "http://localhost:5000/api/detect";
@@ -78,7 +81,7 @@ public class FruitDetectController {
             }
 
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Fruit detect analyze failed", e);
             return Result.error("500", "检测服务异常，请确保Python检测服务已启动: " + e.getMessage());
         }
     }

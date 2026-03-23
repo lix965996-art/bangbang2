@@ -3,6 +3,8 @@ package com.farmland.intel.controller;
 import com.farmland.intel.common.Constants;
 import com.farmland.intel.common.Result;
 import com.farmland.intel.service.IAgriDailyReportService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,6 +17,7 @@ import java.util.Map;
 @RequestMapping("/agri-report")
 @CrossOrigin
 public class AgriDailyReportController {
+    private static final Logger log = LoggerFactory.getLogger(AgriDailyReportController.class);
     
     @Autowired
     private IAgriDailyReportService agriDailyReportService;
@@ -32,7 +35,7 @@ public class AgriDailyReportController {
             Map<String, Object> report = agriDailyReportService.generateDailyReport(userId, farmlandId);
             return Result.success(report);
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Generate daily report failed", e);
             return Result.error(Constants.CODE_500, "生成农情日报失败: " + e.getMessage());
         }
     }
@@ -46,7 +49,7 @@ public class AgriDailyReportController {
             Map<String, Object> analysis = agriDailyReportService.getWeatherAnalysis();
             return Result.success(analysis);
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Get weather analysis failed", e);
             return Result.error(Constants.CODE_500, "获取天气分析失败: " + e.getMessage());
         }
     }
@@ -61,7 +64,7 @@ public class AgriDailyReportController {
             String advice = agriDailyReportService.generateFarmlandAdvice(farmlandId);
             return Result.success(advice);
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Get farmland advice failed, farmlandId={}", farmlandId, e);
             return Result.error(Constants.CODE_500, "获取农田建议失败: " + e.getMessage());
         }
     }

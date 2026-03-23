@@ -229,39 +229,6 @@ export default {
     }
   },
   methods: {
-    // Mock 数据生成（仅在 API 失败时使用）
-    generateMockData() {
-      const materials = [
-        { name: '复合肥(NPK 15-15-15)', maxStock: 500, current: 450 },
-        { name: '尿素(含氮46%)', maxStock: 300, current: 180 },
-        { name: '草甘膦除草剂', maxStock: 200, current: 35 },
-        { name: '吡虫啉杀虫剂', maxStock: 150, current: 120 },
-        { name: '锄头(加厚型)', maxStock: 50, current: 8 },
-        { name: '喷雾器(电动)', maxStock: 30, current: 25 },
-        { name: '有机肥(腐熟鸡粪)', maxStock: 400, current: 380 },
-        { name: '水溶肥(速效型)', maxStock: 100, current: 12 },
-        { name: '地膜(0.01mm)', maxStock: 200, current: 190 },
-        { name: '滴灌管(PE)', maxStock: 500, current: 420 },
-        { name: '种子(玉米)', maxStock: 100, current: 5 },
-        { name: '防虫网(40目)', maxStock: 150, current: 135 }
-      ]
-      
-      const warehouses = ['1号仓', '2号仓']
-      const regions = ['A-01', 'A-02', 'B-01', 'B-02', 'C-01']
-      const keepers = ['张三', '李四', '王五', '赵六']
-      
-      return materials.map((mat, index) => ({
-        id: index + 1,
-        produce: mat.name,
-        warehouse: warehouses[index % 2],
-        region: regions[index % regions.length] + '货架',
-        number: mat.current,
-        maxStock: mat.maxStock,
-        keeper: keepers[index % keepers.length],
-        remark: mat.current < mat.maxStock * 0.2 ? '需要补货' : '库存充足'
-      }))
-    },
-    
     // 数据加载 - 优先使用真实 API
     load() {
       this.loading = true;
@@ -296,20 +263,6 @@ export default {
       })
     },
     
-    // Mock 数据降级方案
-    loadMockData() {
-      const mockData = this.generateMockData()
-      
-      if (this.produce) {
-        this.tableData = mockData.filter(item => 
-          item.produce.includes(this.produce)
-        )
-      } else {
-        this.tableData = mockData
-      }
-      this.total = this.tableData.length
-      this.loading = false
-    },
     save() {
       this.request.post("/inventory", this.form).then(res => {
         if (res.code === '200') {

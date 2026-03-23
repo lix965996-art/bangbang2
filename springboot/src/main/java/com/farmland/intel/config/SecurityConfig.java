@@ -47,10 +47,8 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
             .and()
             .authorizeRequests()
             .antMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-            // 开发环境允许所有请求
+            // 业务鉴权由 JwtInterceptor 处理，Spring Security 这里主要负责 CORS 和无状态配置
             .antMatchers("/**").permitAll()
-            // 其他请求需要认证
-            .anyRequest().authenticated()
 
             // 添加CORS配置
             .and()

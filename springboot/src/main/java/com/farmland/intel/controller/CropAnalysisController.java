@@ -1,6 +1,8 @@
 package com.farmland.intel.controller;
 
 import com.farmland.intel.common.Result;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.*;
 import org.springframework.util.LinkedMultiValueMap;
@@ -18,6 +20,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/crop-analysis")
 public class CropAnalysisController {
+    private static final Logger log = LoggerFactory.getLogger(CropAnalysisController.class);
 
     // Python集成检测服务地址
     private static final String PYTHON_API_URL = "http://localhost:5000/api";
@@ -76,7 +79,7 @@ public class CropAnalysisController {
             }
 
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Crop ripeness analysis failed", e);
             return Result.error("500", "成熟度检测服务异常: " + e.getMessage());
         }
     }
@@ -141,7 +144,7 @@ public class CropAnalysisController {
             }
 
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Crop disease analysis failed", e);
             return Result.error("500", "病虫害检测服务异常: " + e.getMessage());
         }
     }
@@ -206,7 +209,7 @@ public class CropAnalysisController {
             }
 
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Crop combined analysis failed", e);
             return Result.error("500", "双检分析服务异常: " + e.getMessage());
         }
     }
