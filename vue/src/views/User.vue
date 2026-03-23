@@ -48,7 +48,7 @@
       </div>
       <div class="right-tools">
         <el-button size="medium" type="success" icon="el-icon-plus" @click="handleAdd">新增农人</el-button>
-        <el-upload action="http://localhost:9090/user/import" :show-file-list="false" accept="xlsx" :on-success="handleExcelImportSuccess" style="display: inline-block; margin: 0 10px;">
+        <el-upload :action="apiBaseUrl + '/user/import'" :show-file-list="false" accept="xlsx" :on-success="handleExcelImportSuccess" style="display: inline-block; margin: 0 10px;">
           <el-button size="medium" type="primary" plain icon="el-icon-upload2">导入</el-button>
         </el-upload>
         <el-button size="medium" type="warning" plain icon="el-icon-download" @click="exp">导出</el-button>
@@ -283,6 +283,11 @@ export default {
       loading: false
     }
   },
+  computed: {
+    apiBaseUrl() {
+      return this.request.defaults.baseURL || ''
+    }
+  },
   created() {
     this.load()
   },
@@ -401,7 +406,7 @@ export default {
     reset() { this.username = ""; this.email = ""; this.address = ""; this.load() },
     handleSizeChange(pageSize) { this.pageSize = pageSize; this.load() },
     handleCurrentChange(pageNum) { this.pageNum = pageNum; this.load() },
-    exp() { window.open("http://localhost:9090/user/export") },
+    exp() { window.open(this.apiBaseUrl + "/user/export") },
     handleExcelImportSuccess() { this.$message.success("数据导入成功"); this.load() }
   }
 }

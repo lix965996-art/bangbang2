@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class AgentService {
 
-    @Value("${qwen.api-key:sk-ac55e3c1bff04024ab56bd6066ba5662}")
+    @Value("${qwen.api-key:}")
     private String apiKey;
 
     @Value("${qwen.api-url:https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation}")

@@ -139,7 +139,7 @@
           </el-col>
         </el-row>
         <el-form-item label="图片">
-          <el-upload action="http://localhost:9090/file/upload" :on-success="handleImgUploadSuccess" :show-file-list="false">
+          <el-upload :action="apiBaseUrl + '/file/upload'" :on-success="handleImgUploadSuccess" :show-file-list="false">
             <el-button size="small" type="primary" plain>上传现场图</el-button>
             <span v-if="form.img" style="margin-left: 10px; color: #67C23A"><i class="el-icon-check"></i> 已上传</span>
           </el-upload>
@@ -171,6 +171,11 @@ export default {
   },
   created() {
     this.load()
+  },
+  computed: {
+    apiBaseUrl() {
+      return this.request.defaults.baseURL || ''
+    }
   },
   methods: {
     load() {

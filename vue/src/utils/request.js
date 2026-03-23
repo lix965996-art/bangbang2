@@ -2,7 +2,7 @@ import axios from 'axios'
 import router from "@/router";
 
 const request = axios.create({
-    baseURL: process.env.VUE_APP_API_BASE_URL || 'http://localhost:9090',
+    baseURL: process.env.VUE_APP_API_BASE_URL || 'http://localhost:9094',
     timeout: 60000  // 60秒超时，AI接口响应较慢
 })
 
@@ -10,7 +10,12 @@ const request = axios.create({
 // 可以自请求发送前对请求做一些处理
 // 比如统一加token，对请求参数统一加密
 request.interceptors.request.use(config => {
-    config.headers['Content-Type'] = 'application/json;charset=utf-8';
+    const method = (config.method || 'get').toLowerCase();
+    if (['post', 'put', 'patch', 'delete'].includes(method)) {
+        config.headers['Content-Type'] = 'application/json;charset=utf-8';
+    } else {
+        delete config.headers['Content-Type'];
+    }
     let user = null;
     try {
         const userStr = localStorage.getItem("user");
@@ -100,4 +105,3 @@ request.interceptors.response.use(
 
 
 export default request
-

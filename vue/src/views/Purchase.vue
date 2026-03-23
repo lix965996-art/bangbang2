@@ -181,6 +181,9 @@ export default {
         }
       });
       return suppliers.size;
+    },
+    apiBaseUrl() {
+      return this.request.defaults.baseURL || '';
     }
   },
   created() {
@@ -261,7 +264,7 @@ export default {
       this.load()
     },
     exp() {
-      window.open("http://localhost:9090/purchase/export")
+      window.open(this.apiBaseUrl + "/purchase/export")
     }
   }
 }

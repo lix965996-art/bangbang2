@@ -185,8 +185,8 @@ export default {
     return {
       map: null,
       // 高德地图 JS API 2.0 配置（必须同时设置 Key 和 SecurityCode）
-      amapKey: 'c3685874d99f880cd919b0149d061860',
-      securityCode: '7b145cdc181c76f925611dc751d6af65', // 必须启用安全密钥
+      amapKey: process.env.VUE_APP_AMAP_JS_KEY || '',
+      securityCode: process.env.VUE_APP_AMAP_SECURITY_CODE || '',
       
       allFarms: [],
       searchKeyword: '',
@@ -503,7 +503,6 @@ export default {
       }
 
       console.log('🔄 开始加载高德地图 SDK...');
-      console.log('Key:', this.amapKey);
 
       // 4. 加载新脚本
       const script = document.createElement('script');

@@ -352,12 +352,15 @@ export default {
           this.total = res.data.total
         } else {
           // 后端无数据时使用 Mock 数据作为降级
-          console.warn('后端返回空数据，使用 Mock 数据演示')
-          this.loadMockData()
+          this.fieldData = []
+          this.total = 0
+          this.$message.warning("Statistic data is empty")
         }
       }).catch(err => {
-        console.error('API 调用失败，使用 Mock 数据降级', err)
-        this.loadMockData()
+        this.loading = false
+        this.fieldData = []
+        this.total = 0
+        this.$message.error("Statistic data load failed")
       })
     },
     

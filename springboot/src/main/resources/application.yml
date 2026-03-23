@@ -1,5 +1,5 @@
 server:
-  port: 9090
+  port: 9094
   servlet:
     context-path: /
   tomcat:
@@ -71,22 +71,26 @@ files:
 
 # 高德地图API配置
 amap:
-  js-key: a0dc4534ab26be714e94cef345e480aa  # JavaScript API Key（前端地图使用）
-  web-key: ad1347855b35e84080018cf5c811d3e7  # Web服务API Key（后端REST API使用）
-  city: 430800  # 张家界市的adcode
+  js-key: ${AMAP_JS_KEY:}
+  web-key: ${AMAP_WEB_KEY:}
+  city: ${AMAP_CITY:430800}
+
+# CORS配置
+cors:
+  allowed-origins: "http://localhost:8080,http://127.0.0.1:8080,http://localhost:8087,http://127.0.0.1:8087"
 
 # 通义千问AI配置（智能Agent）
 qwen:
-  api-key: sk-ac55e3c1bff04024ab56bd6066ba5662
-  api-url: https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation
-  model: qwen-max
+  api-key: ${QWEN_API_KEY:}
+  api-url: ${QWEN_API_URL:https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation}
+  model: ${QWEN_MODEL:qwen-max}
 
 # OneNET物联网平台配置（STM32硬件）
 onenet:
-  api-url: https://iot-api.heclouds.com
-  author-key: 2eb8177d8aef4736a03d004ac8538238  # 使用与index(1).vue相同的密钥
-  user-id: 470386
-  version: 2022-05-01
-  product-id: CzL61ga8FI
-  device-name: d1
-  enabled: true
+  api-url: ${ONENET_API_URL:https://iot-api.heclouds.com}
+  author-key: ${ONENET_AUTHOR_KEY:}
+  user-id: ${ONENET_USER_ID:470386}
+  version: ${ONENET_VERSION:2022-05-01}
+  product-id: ${ONENET_PRODUCT_ID:CzL61ga8FI}
+  device-name: ${ONENET_DEVICE_NAME:d1}
+  enabled: ${ONENET_ENABLED:true}

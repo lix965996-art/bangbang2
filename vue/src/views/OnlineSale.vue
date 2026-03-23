@@ -200,6 +200,9 @@ export default {
       return this.tableData
         .filter(item => item.status === '上架中')
         .reduce((sum, item) => sum + parseFloat(item.totalPrice || 0), 0);
+    },
+    apiBaseUrl() {
+      return this.request.defaults.baseURL || '';
     }
   },
   created() {
@@ -332,7 +335,7 @@ export default {
       return 'info';
     },
     exp() {
-      window.open("http://localhost:9090/onlineSale/export");
+      window.open(this.apiBaseUrl + "/onlineSale/export");
     }
   }
 }

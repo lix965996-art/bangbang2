@@ -119,7 +119,6 @@ export default {
       
       selectedLocation: { lng: null, lat: null, address: '' },
       amapKey: mapConfig.amap.jsKey, // 从配置文件获取JavaScript API Key
-      webApiKey: mapConfig.amap.webKey, // Web服务API Key
       
       // 输入提示相关
       inputTips: [], // 输入提示列表

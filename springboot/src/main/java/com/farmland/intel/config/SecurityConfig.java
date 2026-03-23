@@ -1,16 +1,18 @@
 package com.farmland.intel.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.web.csrf.CsrfFilter;
-import org.springframework.security.web.csrf.CsrfTokenRepository;
-import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 /**
  * 安全配置类
@@ -18,6 +20,9 @@ import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig extends WebSecurityConfigurerAdapter {
+
+    @Value("${cors.allowed-origins:*}")
+    private String allowedOrigins;
 
     @Override
     protected void configure(HttpSecurity http) throws Exception {
@@ -41,12 +46,15 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
             // 授权配置
             .and()
             .authorizeRequests()
-            // 允许所有OPTIONS请求（用于CORS）
-            .antMatchers("OPTIONS").permitAll()
-            // 允许公开访问的路径
-            .antMatchers("/user/login", "/user/register", "/swagger**/**", "/webjars/**", "/v3/**", "/doc.html").permitAll()
+            .antMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+            // 开发环境允许所有请求
+            .antMatchers("/**").permitAll()
             // 其他请求需要认证
-            .anyRequest().authenticated();
+            .anyRequest().authenticated()
+
+            // 添加CORS配置
+            .and()
+            .cors().configurationSource(corsConfigurationSource());
     }
 
     /**
@@ -58,12 +66,27 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
     }
 
     /**
-     * CSRF令牌存储库
+     * CORS配置
      */
     @Bean
-    public CsrfTokenRepository csrfTokenRepository() {
-        HttpSessionCsrfTokenRepository repository = new HttpSessionCsrfTokenRepository();
-        repository.setHeaderName("X-CSRF-TOKEN");
-        return repository;
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        if ("*".equals(allowedOrigins)) {
+            configuration.addAllowedOriginPattern("*");
+        } else {
+            String[] origins = allowedOrigins.split(",");
+            for (String origin : origins) {
+                configuration.addAllowedOrigin(origin.trim());
+            }
+        }
+        configuration.addAllowedMethod("*");
+        configuration.addAllowedHeader("*");
+        configuration.addExposedHeader("token");
+        configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 }

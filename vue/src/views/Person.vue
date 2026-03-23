@@ -3,7 +3,7 @@
     <el-form label-width="80px" size="small">
       <el-upload
           class="avatar-uploader"
-          action="http://localhost:9090/file/upload"
+          :action="apiBaseUrl + '/file/upload'"
           :show-file-list="false"
           :on-success="handleAvatarSuccess"
       >
@@ -53,9 +53,13 @@ export default {
   },
   created() {
     this.getUser().then(res => {
-      console.log(res)
       this.form = res
     })
+  },
+  computed: {
+    apiBaseUrl() {
+      return this.request.defaults.baseURL || ''
+    }
   },
   methods: {
     async getUser() {

@@ -37,7 +37,7 @@ public class OneNetServiceImpl implements IOneNetService {
     @Value("${onenet.api-url:https://iot-api.heclouds.com}")
     private String apiUrl;
     
-    @Value("${onenet.author-key:2eb8177d8aef4736a03d004ac8538238}")
+    @Value("${onenet.author-key:}")
     private String authorKey;
     
     @Value("${onenet.user-id:470386}")
@@ -69,6 +69,10 @@ public class OneNetServiceImpl implements IOneNetService {
      */
     private String generateToken() {
         try {
+            if (authorKey == null || authorKey.trim().isEmpty()) {
+                log.warn("OneNET author key is empty");
+                return "";
+            }
             // 1. 计算过期时间（1年后，完全按照key.js）
             long et = (System.currentTimeMillis() + 365L * 24 * 3600 * 1000) / 1000;
             String res = "userid/" + userId;
@@ -157,7 +161,15 @@ public class OneNetServiceImpl implements IOneNetService {
                         Map<String, Object> humi = dataList.get(0);
                         Map<String, Object> led = dataList.get(1);
                         Map<String, Object> temp = dataList.get(2);
-                        
+
+                        // 添加空值检查
+                        if (temp.get("value") == null || humi.get("value") == null || led.get("value") == null) {
+                            log.warn("❌ 数据值为空: temp.value={}, humi.value={}, led.value={}",
+                                    temp.get("value"), humi.get("value"), led.get("value"));
+                            result.put("error", "数据值为空");
+                            return result;
+                        }
+
                         Double temperature = Double.parseDouble(temp.get("value").toString());
                         Double humidity = Double.parseDouble(humi.get("value").toString());
                         Integer ledState = "true".equals(led.get("value").toString()) ? 1 : 0;
@@ -325,6 +337,16 @@ public Map<String, Object> getNewDeviceData() {
                 
                 // 根据你提供的代码：data[0]=bump, data[1]=humi, data[2]=led, data[3]=temp
                 if (dataList.size() >= 4) {
+                    // 添加空值检查
+                    if (dataList.get(3).get("value") == null || dataList.get(1).get("value") == null ||
+                        dataList.get(0).get("value") == null || dataList.get(2).get("value") == null) {
+                        log.warn("❌ 新设备数据值为空: bump.value={}, humi.value={}, led.value={}, temp.value={}",
+                                dataList.get(0).get("value"), dataList.get(1).get("value"),
+                                dataList.get(2).get("value"), dataList.get(3).get("value"));
+                        result.put("error", "新设备数据值为空");
+                        return result;
+                    }
+
                     Double temperature = Double.parseDouble(dataList.get(3).get("value").toString());
                     Double humidity = Double.parseDouble(dataList.get(1).get("value").toString());
                     boolean bumpState = "true".equals(dataList.get(0).get("value").toString());

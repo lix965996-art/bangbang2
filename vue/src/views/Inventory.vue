@@ -214,6 +214,9 @@ export default {
         const percentage = this.getStockPercentage(item)
         return percentage >= 50
       }).length
+    },
+    apiBaseUrl() {
+      return this.request.defaults.baseURL || ''
     }
   },
   created() {
@@ -228,7 +231,6 @@ export default {
   methods: {
     // Mock 数据生成（仅在 API 失败时使用）
     generateMockData() {
-      console.warn('⚠️ 使用 Mock 数据演示，请检查后端 API 连接')
       const materials = [
         { name: '复合肥(NPK 15-15-15)', maxStock: 500, current: 450 },
         { name: '尿素(含氮46%)', maxStock: 300, current: 180 },
@@ -280,15 +282,17 @@ export default {
             maxStock: item.maxStock || 100 // 设置默认最大库存
           }))
           this.total = res.data.total
-          console.log('✅ 已加载真实库存数据')
         } else {
           // 降级到 Mock 数据
-          this.loadMockData()
+          this.tableData = []
+          this.total = 0
+          this.$message.warning("搴撳瓨鏁版嵁鏆傛湭杩斿洖")
         }
       }).catch(err => {
-        console.error('❌ API 调用失败:', err)
         this.loading = false;
-        this.loadMockData()
+        this.tableData = []
+        this.total = 0
+        this.$message.error("搴撳瓨鏁版嵁鍔犺浇澶辫触")
       })
     },
     
@@ -346,7 +350,7 @@ export default {
     },
     
     exp() {
-      window.open("http://localhost:9090/inventory/export")
+      window.open(this.apiBaseUrl + "/inventory/export")
     },
     
     // 计算库存百分比

@@ -42,7 +42,7 @@ public class ChatController {
     @Value("${amap.city:430800}")
     private String defaultCity;
 
-    @Value("${qwen.api-key:sk-ac55e3c1bff04024ab56bd6066ba5662}")
+    @Value("${qwen.api-key:}")
     private String qwenApiKey;
 
     @Value("${qwen.api-url:https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation}")
@@ -108,10 +108,6 @@ public class ChatController {
         }
 
         // 3. 调用接口定义的方法
-        System.out.println("🤖 AI Chat 正在获取环境数据...");
-        System.out.println("   [室内] 温度: " + indoorTemp + "°C, 湿度: " + indoorHumidity + "%");
-        System.out.println("   [室外] 温度: " + outdoorTemp + "°C");
-        
         String answer = qwenService.askAgriExpert(question, indoorTemp, indoorHumidity, outdoorTemp);
 
         response.put("code", 200);

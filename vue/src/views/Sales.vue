@@ -201,6 +201,9 @@ export default {
       }
       
       return hotCrop;
+    },
+    apiBaseUrl() {
+      return this.request.defaults.baseURL || '';
     }
   },
   created() {
@@ -281,7 +284,7 @@ export default {
       this.load()
     },
     exp() {
-      window.open("http://localhost:9090/sales/export")
+      window.open(this.apiBaseUrl + "/sales/export")
     }
   }
 }

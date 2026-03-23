@@ -24,7 +24,7 @@ module.exports = {
     // 开发环境代理配置
     proxy: {
       '/api': {
-        target: process.env.VUE_APP_API_BASE_URL || 'http://localhost:9090',
+        target: process.env.VUE_APP_API_BASE_URL || 'http://localhost:9094',
         changeOrigin: true,
         pathRewrite: {
           '^/api': ''

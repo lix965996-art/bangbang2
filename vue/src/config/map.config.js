@@ -7,10 +7,10 @@ const mapConfig = {
   // 高德地图API配置
   amap: {
     // JavaScript API Key（前端地图使用）
-    jsKey: 'a0dc4534ab26be714e94cef345e480aa',
+    jsKey: process.env.VUE_APP_AMAP_JS_KEY || '',
     
     // Web服务API Key（后端REST API使用）- 备用
-    webKey: 'ad1347855b35e84080018cf5c811d3e7',
+    webKey: process.env.VUE_APP_AMAP_WEB_KEY || '',
     
     // API版本
     version: '2.0',
