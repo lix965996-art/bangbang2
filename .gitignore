@@ -1,5 +1,6 @@
 # IDE本地配置
 .idea/
+.claude/settings.local.json
 # 日志文件
 logs/
 # SpringBoot编译产物
