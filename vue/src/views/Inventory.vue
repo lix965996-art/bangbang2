@@ -303,7 +303,7 @@ export default {
     },
     
     exp() {
-      window.open(this.apiBaseUrl + "/inventory/export")
+      this.request.download("/inventory/export", "inventory.xlsx")
     },
     
     // 计算库存百分比

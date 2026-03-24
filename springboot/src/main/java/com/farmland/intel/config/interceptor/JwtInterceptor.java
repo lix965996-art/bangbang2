@@ -6,10 +6,10 @@ import com.auth0.jwt.JWTVerifier;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.exceptions.JWTDecodeException;
 import com.auth0.jwt.exceptions.JWTVerificationException;
+import com.farmland.intel.common.Constants;
 import com.farmland.intel.entity.User;
 import com.farmland.intel.exception.ServiceException;
 import com.farmland.intel.service.IUserService;
-import com.farmland.intel.common.Constants;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.AntPathMatcher;
 import org.springframework.web.method.HandlerMethod;
@@ -18,16 +18,12 @@ import org.springframework.web.servlet.HandlerInterceptor;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 public class JwtInterceptor implements HandlerInterceptor {
-    private static final Set<String> SAFE_METHODS = new HashSet<>(Arrays.asList("GET", "HEAD", "OPTIONS"));
     private static final List<String> PUBLIC_PATH_PATTERNS = Arrays.asList(
             "/user/login",
             "/user/register",
-            "/user/reset",
             "/api/chat/**",
             "/api/agent/**",
             "/fruit-detect/**",
@@ -37,7 +33,8 @@ public class JwtInterceptor implements HandlerInterceptor {
             "/v3/**",
             "/doc.html",
             "/actuator/**",
-            "/health"
+            "/health",
+            "/error"
     );
 
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
@@ -52,18 +49,16 @@ public class JwtInterceptor implements HandlerInterceptor {
             response.setStatus(HttpServletResponse.SC_OK);
             return true;
         }
-        if (requestMethod != null && SAFE_METHODS.contains(requestMethod.toUpperCase())) {
-            return true;
-        }
 
-        if(handler instanceof HandlerMethod) {
+        if (handler instanceof HandlerMethod) {
             AuthAccess annotation = ((HandlerMethod) handler).getMethodAnnotation(AuthAccess.class);
             if (annotation != null) {
                 return true;
             }
         }
 
-        if (isPublicPath(request.getRequestURI())) {
+        String requestUri = request.getRequestURI();
+        if (isPublicPath(requestUri) || isPublicFileDownloadPath(requestMethod, requestUri)) {
             return true;
         }
 
@@ -73,24 +68,26 @@ public class JwtInterceptor implements HandlerInterceptor {
         }
 
         if (StrUtil.isBlank(token)) {
-            throw new ServiceException(Constants.CODE_401, "无token，请重新登录");
+            throw new ServiceException(Constants.CODE_401, "无 token，请重新登录");
         }
 
         String userId;
         try {
             userId = JWT.decode(token).getAudience().get(0);
-        } catch (JWTDecodeException j) {
-            throw new ServiceException(Constants.CODE_401, "token验证失败，请重新登录");
+        } catch (JWTDecodeException ex) {
+            throw new ServiceException(Constants.CODE_401, "token 验证失败，请重新登录");
         }
+
         User user = userService.getById(userId);
         if (user == null) {
             throw new ServiceException(Constants.CODE_401, "用户不存在，请重新登录");
         }
+
         JWTVerifier jwtVerifier = JWT.require(Algorithm.HMAC256(user.getPassword())).build();
         try {
             jwtVerifier.verify(token);
-        } catch (JWTVerificationException e) {
-            throw new ServiceException(Constants.CODE_401, "token验证失败，请重新登录");
+        } catch (JWTVerificationException ex) {
+            throw new ServiceException(Constants.CODE_401, "token 验证失败，请重新登录");
         }
         return true;
     }
@@ -102,5 +99,13 @@ public class JwtInterceptor implements HandlerInterceptor {
             }
         }
         return false;
+    }
+
+    private boolean isPublicFileDownloadPath(String requestMethod, String requestUri) {
+        if (!"GET".equalsIgnoreCase(requestMethod) || !requestUri.startsWith("/file/")) {
+            return false;
+        }
+        String path = StrUtil.removePrefix(requestUri, "/file/");
+        return StrUtil.isNotBlank(path) && !path.contains("/") && !"page".equals(path);
     }
 }

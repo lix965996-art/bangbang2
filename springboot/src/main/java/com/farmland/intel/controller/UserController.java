@@ -5,6 +5,10 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.poi.excel.ExcelReader;
 import cn.hutool.poi.excel.ExcelUtil;
 import cn.hutool.poi.excel.ExcelWriter;
+import com.auth0.jwt.JWT;
+import com.auth0.jwt.JWTVerifier;
+import com.auth0.jwt.algorithms.Algorithm;
+import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.farmland.intel.common.Constants;
@@ -15,6 +19,7 @@ import com.farmland.intel.controller.dto.UserPasswordDTO;
 import com.farmland.intel.entity.User;
 import com.farmland.intel.exception.ServiceException;
 import com.farmland.intel.service.IUserService;
+import com.farmland.intel.utils.TokenUtils;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,6 +34,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
 import javax.servlet.ServletOutputStream;
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.InputStream;
 import java.net.URLEncoder;
@@ -39,6 +45,8 @@ import java.util.Map;
 @RestController
 @RequestMapping("/user")
 public class UserController {
+
+    private static final String DEFAULT_PASSWORD = "123456";
 
     @Resource
     private IUserService userService;
@@ -63,75 +71,92 @@ public class UserController {
         if (StrUtil.isBlank(username) || StrUtil.isBlank(password)) {
             return Result.error(Constants.CODE_400, "参数错误");
         }
+        validatePassword(password);
         userDTO.setNickname(userDTO.getUsername());
         return Result.success(userService.register(userDTO));
     }
 
     @PostMapping
     public Result save(@RequestBody User user) {
-        String username = user.getUsername();
-        if (StrUtil.isBlank(username)) {
-            return Result.error(Constants.CODE_400, "参数错误");
+        User currentUser = requireCurrentUser();
+        if (isAdmin(currentUser)) {
+            return saveByAdmin(user);
         }
-        if (StrUtil.isBlank(user.getNickname())) {
-            user.setNickname(username);
-        }
-        if (user.getId() != null) {
-            user.setPassword(null);
-        } else {
-            String rawPassword = StrUtil.blankToDefault(user.getPassword(), "123");
-            user.setPassword(passwordEncoder.encode(rawPassword));
-        }
-        return Result.success(userService.saveOrUpdate(user));
+        return updateOwnProfile(currentUser, user);
     }
 
     @PostMapping("/password")
     public Result password(@RequestBody UserPasswordDTO userPasswordDTO) {
+        User currentUser = requireCurrentUser();
+        if (!isAdmin(currentUser) && !StrUtil.equals(currentUser.getUsername(), userPasswordDTO.getUsername())) {
+            throw new ServiceException(Constants.CODE_403, "只能修改自己的密码");
+        }
+        validatePassword(userPasswordDTO.getNewPassword());
         userService.updatePassword(userPasswordDTO);
         return Result.success();
     }
 
     @AuthAccess
     @PutMapping("/reset")
-    public Result reset(@RequestBody UserPasswordDTO userPasswordDTO) {
-        if (StrUtil.isBlank(userPasswordDTO.getUsername()) || StrUtil.isBlank(userPasswordDTO.getPhone())) {
-            throw new ServiceException(Constants.CODE_400, "参数异常");
+    public Result reset(@RequestBody UserPasswordDTO userPasswordDTO, HttpServletRequest request) {
+        User currentUser = authenticateResetOperator(request);
+        if (currentUser == null) {
+            return Result.error(Constants.CODE_403, "在线找回密码已关闭，请联系管理员重置为 123456");
         }
+        if (!isAdmin(currentUser)) {
+            throw new ServiceException(Constants.CODE_403, "仅管理员可操作");
+        }
+        if (StrUtil.isBlank(userPasswordDTO.getUsername())) {
+            throw new ServiceException(Constants.CODE_400, "用户名不能为空");
+        }
+
         QueryWrapper<User> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("username", userPasswordDTO.getUsername());
-        queryWrapper.eq("phone", userPasswordDTO.getPhone());
-        List<User> list = userService.list(queryWrapper);
-        if (CollUtil.isEmpty(list)) {
-            return Result.error(Constants.CODE_404, "用户不存在或手机号错误");
+        User user = userService.getOne(queryWrapper);
+        if (user == null) {
+            return Result.error(Constants.CODE_404, "用户不存在");
         }
-        User user = list.get(0);
-        user.setPassword(passwordEncoder.encode("123"));
+
+        String rawPassword = StrUtil.blankToDefault(userPasswordDTO.getNewPassword(), DEFAULT_PASSWORD);
+        validatePassword(rawPassword);
+        user.setPassword(passwordEncoder.encode(rawPassword));
         userService.updateById(user);
-        return Result.success();
+        return Result.success(rawPassword);
     }
 
     @DeleteMapping("/{id}")
     public Result delete(@PathVariable Integer id) {
+        requireAdmin();
         return Result.success(userService.removeById(id));
     }
 
     @PostMapping("/del/batch")
     public Result deleteBatch(@RequestBody List<Integer> ids) {
+        requireAdmin();
         return Result.success(userService.removeByIds(ids));
     }
 
     @GetMapping
     public Result findAll() {
+        requireAdmin();
         return Result.success(userService.list());
     }
 
     @GetMapping("/{id}")
     public Result findOne(@PathVariable Integer id) {
+        User currentUser = requireCurrentUser();
+        if (!isAdmin(currentUser) && !id.equals(currentUser.getId())) {
+            throw new ServiceException(Constants.CODE_403, "权限不足");
+        }
         return Result.success(userService.getById(id));
     }
 
     @GetMapping("/username/{username}")
     public Result findByUsername(@PathVariable String username) {
+        User currentUser = requireCurrentUser();
+        if (!isAdmin(currentUser) && !StrUtil.equals(currentUser.getUsername(), username)) {
+            throw new ServiceException(Constants.CODE_403, "权限不足");
+        }
         QueryWrapper<User> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("username", username);
         return Result.success(userService.getOne(queryWrapper));
@@ -143,7 +168,7 @@ public class UserController {
                            @RequestParam(defaultValue = "") String username,
                            @RequestParam(defaultValue = "") String email,
                            @RequestParam(defaultValue = "") String address) {
-
+        requireAdmin();
         QueryWrapper<User> queryWrapper = new QueryWrapper<>();
         queryWrapper.orderByDesc("id");
         if (StrUtil.isNotBlank(username)) {
@@ -155,12 +180,12 @@ public class UserController {
         if (StrUtil.isNotBlank(address)) {
             queryWrapper.like("address", address);
         }
-
         return Result.success(userService.page(new Page<>(pageNum, pageSize), queryWrapper));
     }
 
     @GetMapping("/export")
     public void export(HttpServletResponse response) throws Exception {
+        requireAdmin();
         List<User> list = userService.list();
         ExcelWriter writer = ExcelUtil.getWriter(true);
         writer.addHeaderAlias("username", "用户名");
@@ -197,28 +222,33 @@ public class UserController {
 
     @PostMapping("/import")
     public Result imp(@RequestParam("file") MultipartFile file) throws Exception {
+        requireAdmin();
         if (file == null || file.isEmpty()) {
             return Result.error(Constants.CODE_400, "导入文件不能为空");
         }
-        InputStream inputStream = file.getInputStream();
-        ExcelReader reader = ExcelUtil.getReader(inputStream);
-        List<List<Object>> rows = reader.read(1);
+
         List<User> users = CollUtil.newArrayList();
-        for (List<Object> row : rows) {
-            User user = new User();
-            user.setUsername(getCellValue(row, 0));
-            if (StrUtil.isBlank(user.getUsername())) {
-                continue;
+        try (InputStream inputStream = file.getInputStream()) {
+            ExcelReader reader = ExcelUtil.getReader(inputStream);
+            List<List<Object>> rows = reader.read(1);
+            for (List<Object> row : rows) {
+                User user = new User();
+                user.setUsername(getCellValue(row, 0));
+                if (StrUtil.isBlank(user.getUsername())) {
+                    continue;
+                }
+
+                String rawPassword = StrUtil.blankToDefault(getCellValue(row, 1), DEFAULT_PASSWORD);
+                validatePassword(rawPassword);
+                user.setPassword(passwordEncoder.encode(rawPassword));
+                user.setNickname(StrUtil.blankToDefault(getCellValue(row, 2), user.getUsername()));
+                user.setEmail(getCellValue(row, 3));
+                user.setPhone(getCellValue(row, 4));
+                user.setAddress(getCellValue(row, 5));
+                user.setAvatarUrl(getCellValue(row, 6));
+                user.setRole(Constants.ROLE_USER);
+                users.add(user);
             }
-            String rawPassword = StrUtil.blankToDefault(getCellValue(row, 1), "123");
-            user.setPassword(passwordEncoder.encode(rawPassword));
-            user.setNickname(StrUtil.blankToDefault(getCellValue(row, 2), user.getUsername()));
-            user.setEmail(getCellValue(row, 3));
-            user.setPhone(getCellValue(row, 4));
-            user.setAddress(getCellValue(row, 5));
-            user.setAvatarUrl(getCellValue(row, 6));
-            user.setRole("ROLE_USER");
-            users.add(user);
         }
 
         if (CollUtil.isEmpty(users)) {
@@ -227,6 +257,98 @@ public class UserController {
 
         userService.saveBatch(users);
         return Result.success(true);
+    }
+
+    private Result saveByAdmin(User user) {
+        if (StrUtil.isBlank(user.getUsername())) {
+            return Result.error(Constants.CODE_400, "用户名不能为空");
+        }
+        if (StrUtil.isBlank(user.getNickname())) {
+            user.setNickname(user.getUsername());
+        }
+
+        if (user.getId() == null) {
+            String rawPassword = StrUtil.blankToDefault(user.getPassword(), DEFAULT_PASSWORD);
+            validatePassword(rawPassword);
+            user.setPassword(passwordEncoder.encode(rawPassword));
+            if (StrUtil.isBlank(user.getRole())) {
+                user.setRole(Constants.ROLE_USER);
+            }
+        } else {
+            User dbUser = userService.getById(user.getId());
+            if (dbUser == null) {
+                return Result.error(Constants.CODE_404, "用户不存在");
+            }
+            user.setPassword(null);
+            if (StrUtil.isBlank(user.getRole())) {
+                user.setRole(dbUser.getRole());
+            }
+        }
+        return Result.success(userService.saveOrUpdate(user));
+    }
+
+    private Result updateOwnProfile(User currentUser, User user) {
+        User dbUser = userService.getById(currentUser.getId());
+        if (dbUser == null) {
+            throw new ServiceException(Constants.CODE_404, "用户不存在");
+        }
+        dbUser.setNickname(StrUtil.blankToDefault(user.getNickname(), dbUser.getUsername()));
+        dbUser.setEmail(user.getEmail());
+        dbUser.setPhone(user.getPhone());
+        dbUser.setAddress(user.getAddress());
+        dbUser.setAvatarUrl(user.getAvatarUrl());
+        return Result.success(userService.updateById(dbUser));
+    }
+
+    private User requireCurrentUser() {
+        User currentUser = TokenUtils.getCurrentUser();
+        if (currentUser == null) {
+            throw new ServiceException(Constants.CODE_401, "请先登录");
+        }
+        return currentUser;
+    }
+
+    private User requireAdmin() {
+        User currentUser = requireCurrentUser();
+        if (!isAdmin(currentUser)) {
+            throw new ServiceException(Constants.CODE_403, "仅管理员可操作");
+        }
+        return currentUser;
+    }
+
+    private User authenticateResetOperator(HttpServletRequest request) {
+        String token = request.getHeader("token");
+        if (StrUtil.isBlank(token)) {
+            token = request.getParameter("token");
+        }
+        if (StrUtil.isBlank(token)) {
+            return null;
+        }
+
+        try {
+            String userId = JWT.decode(token).getAudience().get(0);
+            User user = userService.getById(userId);
+            if (user == null) {
+                return null;
+            }
+            JWTVerifier jwtVerifier = JWT.require(Algorithm.HMAC256(user.getPassword())).build();
+            jwtVerifier.verify(token);
+            return user;
+        } catch (IllegalArgumentException | IndexOutOfBoundsException | JWTVerificationException e) {
+            return null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private boolean isAdmin(User user) {
+        return user != null && Constants.ROLE_ADMIN.equals(user.getRole());
+    }
+
+    private void validatePassword(String password) {
+        if (StrUtil.isBlank(password) || password.length() < 3 || password.length() > 20) {
+            throw new ServiceException(Constants.CODE_400, "密码长度需在 3 到 20 位之间");
+        }
     }
 
     private String getCellValue(List<Object> row, int index) {

@@ -49,7 +49,7 @@
               @click="handleFarmClick(farm)"
             >
               <div class="item-left">
-                <img :src="getCropIcon(farm.crop)" class="crop-icon-img" alt="作物" />
+                <img :src="getCropIconByType(farm.crop)" class="crop-icon-img" alt="作物" />
               </div>
               <div class="item-center">
                 <div class="f-name">{{ farm.farm }}</div>
@@ -345,6 +345,32 @@ export default {
   methods: {
     updateTime() { this.currentTime = new Date().toLocaleString('zh-CN', { hour12: false }); },
     normalize(val, max) { return Math.min((Number(val) / max) * 100, 100); },
+    resolveCropType(crop) {
+        const raw = String(crop || '').trim();
+        const lower = raw.toLowerCase();
+        if (!raw) return null;
+        if (this.cropConfig[lower]) return lower;
+        if (raw.includes('小麦') || lower.includes('wheat')) return 'wheat';
+        if (raw.includes('艾') || lower.includes('mugwort') || lower.includes('rhy')) return 'mugwort';
+        if (raw.includes('竹') || lower.includes('bamboo')) return 'bamboo';
+        if (raw.includes('玉米') || lower.includes('maize') || lower.includes('corn')) return 'maize';
+        if (raw.includes('棕') || raw.includes('榈') || lower.includes('palm') || lower.includes('tree')) return 'palm';
+        if (raw.includes('西红柿') || raw.includes('番茄') || lower.includes('tomato')) return 'tomato';
+        return 'default';
+    },
+    getCropIconByType(crop) {
+        const cropType = this.resolveCropType(crop);
+        const icons = {
+            wheat: require('@/assets/xiaomai.png'),
+            mugwort: require('@/assets/aiye.png'),
+            bamboo: require('@/assets/zhuzi.png'),
+            maize: require('@/assets/yumi.png'),
+            palm: require('@/assets/zongshu.png'),
+            tomato: require('@/assets/xihongshi.png'),
+            default: require('@/assets/moreng.png')
+        };
+        return icons[cropType] || icons.default;
+    },
     getCropIcon(crop) {
         const icons = {
             '小麦': require('@/assets/xiaomai.png'),
@@ -1114,9 +1140,11 @@ export default {
         
         // 支持多种作物混种（严格过滤，只加载已配置的作物）
         if (farm.crop && typeof farm.crop === 'string' && farm.crop.trim()) {
-          const crops = farm.crop.split(',')
-            .map(c => c.trim())
-            .filter(c => c && this.cropConfig[c]); // 只保留已明确配置的作物
+          const crops = [...new Set(
+            farm.crop.split(',')
+            .map(c => this.resolveCropType(c))
+            .filter(Boolean)
+          )];
           
           if (crops.length > 0) {
             const cropCount = crops.length;
@@ -1224,7 +1252,8 @@ export default {
     },
 
     loadCropsWithFallback(parentMesh, cropType, size, index = 0, totalCount = 1) {
-      const config = this.cropConfig[cropType];
+      const resolvedCropType = this.resolveCropType(cropType);
+      const config = this.cropConfig[resolvedCropType] || this.cropConfig.default;
       if (!config) {
           console.warn(`⚠️ 作物 "${cropType}" 未配置，跳过加载`);
           return;  // 不使用 default，直接跳过

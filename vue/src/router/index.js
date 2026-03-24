@@ -128,6 +128,12 @@ setRoutes()
 router.beforeEach((to, from, next) => {
   localStorage.setItem("currentPathName", to.name)
   store.commit("setPath")
+  const whiteList = ['/login', '/register', '/404']
+  const user = localStorage.getItem("user")
+  if (!whiteList.includes(to.path) && !user) {
+    next("/login")
+    return
+  }
   if (!to.matched.length) {
     const menus = localStorage.getItem("menus")
     if (!menus) {

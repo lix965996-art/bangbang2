@@ -284,7 +284,7 @@ export default {
       this.load()
     },
     exp() {
-      window.open(this.apiBaseUrl + "/sales/export")
+      this.request.download("/sales/export", "sales.xlsx")
     }
   }
 }

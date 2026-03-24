@@ -36,7 +36,7 @@
                 <img v-else src="@/assets/nongming.png" alt="农民" class="avatar-img" />
               </div>
               <div class="bubble">
-                <div v-html="formatText(msg.content)"></div>
+                <div class="message-text">{{ msg.content }}</div>
                 <!-- 动作确认按钮 -->
                 <button 
                   v-if="msg.isDeviceAction && msg.action" 
@@ -770,6 +770,10 @@ html, body, #app {
   box-shadow: 0 2px 12px rgba(0,0,0,0.04);
   position: relative;
   word-wrap: break-word;
+}
+.message-text {
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 .message-row.user .bubble {
   background: linear-gradient(135deg, #2af598 0%, #009efd 100%);

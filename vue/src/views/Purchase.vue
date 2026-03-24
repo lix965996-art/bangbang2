@@ -264,7 +264,7 @@ export default {
       this.load()
     },
     exp() {
-      window.open(this.apiBaseUrl + "/purchase/export")
+      this.request.download("/purchase/export", "purchase.xlsx")
     }
   }
 }

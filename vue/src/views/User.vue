@@ -81,6 +81,7 @@
                 </span>
                 <el-dropdown-menu slot="dropdown">
                   <el-dropdown-item command="edit" icon="el-icon-edit">编辑档案</el-dropdown-item>
+                  <el-dropdown-item command="resetPassword" icon="el-icon-refresh-right">重置密码</el-dropdown-item>
                   <el-dropdown-item command="task" icon="el-icon-tickets">分配任务</el-dropdown-item>
                   <el-dropdown-item command="delete" icon="el-icon-delete" style="color: #F56C6C">离职归档</el-dropdown-item>
                 </el-dropdown-menu>
@@ -378,6 +379,8 @@ export default {
     handleCommand(command, row) {
       if (command === 'edit') {
         this.handleEdit(row);
+      } else if (command === 'resetPassword') {
+        this.resetPassword(row);
       } else if (command === 'delete') {
         this.$confirm('此操作将永久删除该农人档案, 是否继续?', '提示', { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }).then(() => { this.del(row.id); }).catch(() => {});
       } else if (command === 'task') {
@@ -394,9 +397,10 @@ export default {
       return 'success';
     },
     save() {
+      const isNewUser = !this.form.id
       this.request.post("/user", this.form).then(res => {
         if (res.code === '200') {
-          this.$message.success("档案保存成功")
+          this.$message.success(isNewUser ? "档案保存成功，初始密码为 123456" : "档案保存成功")
           this.dialogFormVisible = false
           this.load()
         } else {
@@ -412,10 +416,28 @@ export default {
         else { this.$message.error("删除失败") }
       })
     },
+    resetPassword(row) {
+      this.$confirm(`确认将 ${row.username} 的密码重置为 123456 吗？`, '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(() => {
+        this.request.put("/user/reset", {
+          username: row.username,
+          newPassword: "123456"
+        }).then(res => {
+          if (res.code === '200') {
+            this.$message.success(`密码已重置为 ${res.data || '123456'}`)
+          } else {
+            this.$message.error(res.msg || "重置失败")
+          }
+        })
+      }).catch(() => {})
+    },
     reset() { this.username = ""; this.email = ""; this.address = ""; this.load() },
     handleSizeChange(pageSize) { this.pageSize = pageSize; this.load() },
     handleCurrentChange(pageNum) { this.pageNum = pageNum; this.load() },
-    exp() { window.open(this.apiBaseUrl + "/user/export") },
+    exp() { this.request.download("/user/export", "users.xlsx") },
     handleExcelImportSuccess() { this.$message.success("数据导入成功"); this.load() }
   }
 }

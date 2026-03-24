@@ -117,8 +117,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         if (user == null || isEncodedPassword(user.getPassword()) || !StrUtil.equals(user.getPassword(), rawPassword)) {
             return;
         }
-        user.setPassword(passwordEncoder.encode(rawPassword));
-        updateById(user);
+        try {
+            user.setPassword(passwordEncoder.encode(rawPassword));
+            updateById(user);
+        } catch (Exception ex) {
+            LOG.error("Failed to upgrade plaintext password for user: {}", user.getUsername(), ex);
+        }
     }
 
     private boolean isEncodedPassword(String password) {

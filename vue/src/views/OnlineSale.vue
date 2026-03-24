@@ -335,7 +335,7 @@ export default {
       return 'info';
     },
     exp() {
-      window.open(this.apiBaseUrl + "/onlineSale/export");
+      this.request.download("/onlineSale/export", "online-sale.xlsx");
     }
   }
 }

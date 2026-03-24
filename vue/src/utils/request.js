@@ -110,5 +110,17 @@ request.interceptors.response.use(
     }
 )
 
+request.download = async (url, filename = 'download.xlsx') => {
+    const blob = await request.get(url, { responseType: 'blob' })
+    const downloadUrl = window.URL.createObjectURL(new Blob([blob]))
+    const link = document.createElement('a')
+    link.href = downloadUrl
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(downloadUrl)
+}
+
 
 export default request

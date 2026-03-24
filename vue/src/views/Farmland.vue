@@ -637,9 +637,8 @@ export default {
     },
     exp() {
       this.$message.info('📊 正在生成Excel报表，请稍候...')
-      const exportUrl = this.request.defaults.baseURL + '/statistic/export'
       setTimeout(() => {
-        window.open(exportUrl)
+        this.request.download('/statistic/export', 'farmland.xlsx')
       }, 300)
     },
     handleSizeChange(pageSize) {
