@@ -24,17 +24,20 @@ public class AmapProxyController {
     @Value("${amap.web-key:}")
     private String webApiKey;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
+
+    public AmapProxyController(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+    }
 
     @GetMapping("/inputtips")
-    public Map<String, Object> inputTips(
-            @RequestParam String keywords,
-            @RequestParam(required = false, defaultValue = "张家界") String city) {
+    public Map<String, Object> inputTips(@RequestParam String keywords,
+                                         @RequestParam(required = false, defaultValue = "张家界") String city) {
 
         Map<String, Object> result = new HashMap<>();
         if (keywords == null || keywords.trim().isEmpty()) {
             result.put("status", "0");
-            result.put("info", "请输入关键词");
+            result.put("info", "请输入关键字");
             result.put("tips", new ArrayList<>());
             return result;
         }
@@ -82,9 +85,8 @@ public class AmapProxyController {
     }
 
     @GetMapping("/geocode")
-    public Map<String, Object> geocode(
-            @RequestParam String address,
-            @RequestParam(required = false) String city) {
+    public Map<String, Object> geocode(@RequestParam String address,
+                                       @RequestParam(required = false) String city) {
 
         if (webApiKey == null || webApiKey.trim().isEmpty()) {
             return error("高德 Web API Key 未配置");
@@ -117,9 +119,8 @@ public class AmapProxyController {
     }
 
     @GetMapping("/regeocode")
-    public Map<String, Object> regeocode(
-            @RequestParam String location,
-            @RequestParam(required = false, defaultValue = "base") String extensions) {
+    public Map<String, Object> regeocode(@RequestParam String location,
+                                         @RequestParam(required = false, defaultValue = "base") String extensions) {
 
         if (webApiKey == null || webApiKey.trim().isEmpty()) {
             return error("高德 Web API Key 未配置");
@@ -152,9 +153,7 @@ public class AmapProxyController {
         Map<String, Object> errorResult = new HashMap<>();
         errorResult.put("status", "0");
         errorResult.put("info", info);
-        if (!errorResult.containsKey("tips")) {
-            errorResult.put("tips", new ArrayList<>());
-        }
+        errorResult.put("tips", new ArrayList<>());
         return errorResult;
     }
 }

@@ -11,7 +11,10 @@ const request = axios.create({
 // 比如统一加token，对请求参数统一加密
 request.interceptors.request.use(config => {
     const method = (config.method || 'get').toLowerCase();
-    if (['post', 'put', 'patch', 'delete'].includes(method)) {
+    const isFormData =
+        typeof FormData !== 'undefined' &&
+        config.data instanceof FormData;
+    if (['post', 'put', 'patch', 'delete'].includes(method) && !isFormData) {
         config.headers['Content-Type'] = 'application/json;charset=utf-8';
     } else {
         delete config.headers['Content-Type'];
@@ -46,7 +49,11 @@ request.interceptors.response.use(
         }
         // 兼容服务端返回的字符串数据
         if (typeof res === 'string') {
-            res = res ? JSON.parse(res) : res
+            try {
+                res = res ? JSON.parse(res) : res
+            } catch (e) {
+                return res
+            }
         }
         // 当权限验证不通过的时候给出提示
         if (res.code === '401') {

@@ -184,46 +184,37 @@ export default {
   data() {
     return {
       map: null,
-      // 高德地图 JS API 2.0 配置（必须同时设置 Key 和 SecurityCode）
       amapKey: process.env.VUE_APP_AMAP_JS_KEY || '',
       securityCode: process.env.VUE_APP_AMAP_SECURITY_CODE || '',
-      
       allFarms: [],
       searchKeyword: '',
       currentFarm: null,
-      mapPitch: 60, 
+      mapPitch: 60,
       mapError: false,
       userMarker: null,
       expandedRegions: {
-        '吉首市': true,
-        '武陵源区': true,
-        '永定区': true
+        Jishou: true,
+        Wulingyuan: true,
+        Yongding: true
       },
-      
-      // 图层控制
       layers: {
-        satellite: false,  // 卫星光谱
-        underground: false, // 地下管网
-        drone: false       // 无人机空域
+        satellite: false,
+        underground: false,
+        drone: false
       },
-      
-      // 地下管网数据（天空蓝水流）
       undergroundPipes: [
         { path: [[110.478, 29.116], [110.479, 29.117], [110.480, 29.118]], color: '#0ea5e9' },
         { path: [[110.477, 29.115], [110.479, 29.116], [110.481, 29.117]], color: '#0ea5e9' }
       ],
-      
-      // 无人机路径
       dronePath: [
         [110.478, 29.120],
         [110.480, 29.119],
         [110.482, 29.118],
         [110.481, 29.116]
       ],
-      
-      pipeLines: [],  // 管网覆盖物
-      droneMarker: null, // 无人机标记
-      dronePathLine: null // 无人机路径线
+      pipeLines: [],
+      droneMarker: null,
+      dronePathLine: null
     }
   },
   computed: {
@@ -271,7 +262,7 @@ export default {
       return sortedGroups;
     },
     warningCount() {
-      return this.allFarms.filter(f => this.getFarmStatus(f).type === 'warning').length;
+      return this.allFarms.filter(f => this.getFarmStatus(f).type !== 'success').length;
     },
     currentFarmStatus() {
       return this.currentFarm ? this.getFarmStatus(this.currentFarm) : {};
@@ -363,10 +354,17 @@ export default {
     },
     
     getFarmStatus(farm) {
-      const random = (farm.id || 0) % 3;
-      if (random === 1) return { type: 'warning', color: '#E6A23C', label: '缺水' };
-      if (random === 2 && farm.area > 50) return { type: 'danger', color: '#F56C6C', label: '告警' };
-      return { type: 'success', color: '#67C23A', label: '正常' };
+      const temperature = Number(farm.temperature || 0);
+      const humidity = Number(farm.soilhumidity || 0);
+      const stateText = String(farm.state || farm.status || '').toLowerCase();
+
+      if (stateText.includes('warning') || stateText.includes('error') || stateText.includes('abnormal') || temperature >= 35) {
+        return { type: 'danger', color: '#F56C6C', label: 'ALERT' };
+      }
+      if ((humidity > 0 && humidity < 20) || (temperature > 0 && temperature >= 30) || stateText.includes('pending')) {
+        return { type: 'warning', color: '#E6A23C', label: 'WATCH' };
+      }
+      return { type: 'success', color: '#67C23A', label: 'OK' };
     },
 
     getRegionByFarm(farm) {

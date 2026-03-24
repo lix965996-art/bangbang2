@@ -323,6 +323,7 @@ export default {
       
       // 轮询定时器
       pollingTimer: null,
+      historyTimer: null,
       weatherTimer: null,
       
       // 粒子动画相关
@@ -344,21 +345,26 @@ export default {
     this.fetchDeviceStatus();
     this.fetchWeatherData();
     this.fetchHistoryData();
-    
-    // 启动轮询
+
     this.pollingTimer = setInterval(() => {
       this.fetchDeviceStatus();
-      this.fetchHistoryData(); // 实时刷新图表数据
-    }, 2000); // 每2秒更新一次设备状态和图表
-    
+    }, 5000);
+
+    this.historyTimer = setInterval(() => {
+      this.fetchHistoryData();
+    }, 60000);
+
     this.weatherTimer = setInterval(() => {
       this.fetchWeatherData();
-    }, 300000); // 每5分钟更新一次天气
+    }, 300000);
   },
   
   beforeDestroy() {
     if (this.pollingTimer) {
       clearInterval(this.pollingTimer);
+    }
+    if (this.historyTimer) {
+      clearInterval(this.historyTimer);
     }
     if (this.weatherTimer) {
       clearInterval(this.weatherTimer);

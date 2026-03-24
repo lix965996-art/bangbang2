@@ -4,6 +4,7 @@
       <el-upload
           class="avatar-uploader"
           :action="apiBaseUrl + '/file/upload'"
+          :headers="uploadHeaders"
           :show-file-list="false"
           :on-success="handleAvatarSuccess"
       >
@@ -59,6 +60,15 @@ export default {
   computed: {
     apiBaseUrl() {
       return this.request.defaults.baseURL || ''
+    },
+    uploadHeaders() {
+      try {
+        const userStr = localStorage.getItem("user")
+        const user = userStr ? JSON.parse(userStr) : null
+        return user && user.token ? { token: user.token } : {}
+      } catch (e) {
+        return {}
+      }
     }
   },
   methods: {
@@ -85,7 +95,11 @@ export default {
       })
     },
     handleAvatarSuccess(res) {
-      this.form.avatarUrl = res
+      if (typeof res === 'string') {
+        this.form.avatarUrl = res
+        return
+      }
+      this.$message.error((res && res.msg) || "上传失败")
     }
   }
 }

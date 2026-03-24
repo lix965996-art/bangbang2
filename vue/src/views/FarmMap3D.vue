@@ -207,80 +207,75 @@ export default {
       summary: { farmCount: 0, totalArea: 0, totalStock: 0, normalCount: 0 },
       farms: [],
       weatherMode: 'sunny',
-      
       loadingState: { water: false, fertilizer: false, pest: false },
-      // 开关状态
       switchState: { water: false, fertilizer: false, pest: false },
       textureMap: {},
       lightningBolts: [],
       lightningMesh: null,
-      
-      // 当前活跃的动画模型（用于开关关闭时移除）
       activeDrone: null,
       activeWaterValve: null,
-      
-      // STM32实时传感器数据（两个设备）
+      clockTimer: null,
       stm32Data: {
-        // 旧设备 CzL61ga8FI (STM32-001)
         device1: { temperature: null, humidity: null },
-        // 新设备 KK57iNOm8d (STM32-PUMP)
         device2: { temperature: null, humidity: null, bump: false }
       },
-      // 农田与设备的映射关系（随机分配）
       farmDeviceMap: {},
-      
       cropConfig: {
-        '小麦': { model: '/models/wheat.glb', scale: 3.0, color: 0xe6c658, fallback: 'spike', yOffset: 8.0 }, // 小麦超大幅抬高
-        '艾叶': { model: '/models/rhy.glb', scale: 6, color: 0x8BC34A, fallback: 'spike' },
-        '竹子': { model: '/models/bamboo.glb', scale: 0.1, color: 0x4CAF50, fallback: 'spike' },
-        '玉米': { model: '/models/maize.glb', scale: 6, color: 0xFFC107, fallback: 'column' },
-        '棕树': { model: '/models/tree.glb', scale: 1.0, color: 0x388E3C, fallback: 'bush' }, 
-        '西红柿': { model: '/models/tomato.glb', scale: 0.05, color: 0xFF5722, fallback: 'fruit', fruitColor: 0xD84315 },
-        'default': { scale: 1.0, color: 0x8BC34A, fallback: 'bush' }
+        wheat: { model: '/models/wheat.glb', scale: 3.0, color: 0xe6c658, fallback: 'spike', yOffset: 8.0 },
+        mugwort: { model: '/models/rhy.glb', scale: 6, color: 0x8BC34A, fallback: 'spike' },
+        bamboo: { model: '/models/bamboo.glb', scale: 0.1, color: 0x4CAF50, fallback: 'spike' },
+        maize: { model: '/models/maize.glb', scale: 6, color: 0xFFC107, fallback: 'column' },
+        palm: { model: '/models/tree.glb', scale: 1.0, color: 0x388E3C, fallback: 'bush' },
+        tomato: { model: '/models/tomato.glb', scale: 0.05, color: 0xFF5722, fallback: 'fruit', fruitColor: 0xD84315 },
+        default: { scale: 1.0, color: 0x8BC34A, fallback: 'bush' }
       },
-      
       customColors: [
-        {color: '#F44336', percentage: 60},
-        {color: '#FF9800', percentage: 80},
-        {color: '#4CAF50', percentage: 100}
+        { color: '#F44336', percentage: 60 },
+        { color: '#FF9800', percentage: 80 },
+        { color: '#4CAF50', percentage: 100 }
       ]
     };
   },
   
   computed: {
     currentWeatherIcon() {
-      const map = { sunny: '☀️', rain: '🌧️', snow: '❄️', storm: '⛈️' };
-      return map[this.weatherMode] || '⛅';
+      const map = { sunny: '\u2600', rain: '\u2614', snow: '\u2744', storm: '\u26c8' };
+      return map[this.weatherMode] || '\u2600';
     },
     weatherModeText() {
-      const map = { sunny: '晴朗', rain: '小雨', snow: '降雪', storm: '雷暴' };
+      const map = { sunny: 'Sunny', rain: 'Rain', snow: 'Snow', storm: 'Storm' };
       return map[this.weatherMode];
     },
     farmStatus() {
-      if (!this.selectedFarm) return { health: 100, msg: '', needsWater: false, needsFertilizer: false, hasBugs: false, tempHigh: false };
-      
-      // 温度检测：大于30度警告
-      let tempHigh = Number(this.selectedFarm.temperature) > 30;
-      // 湿度检测：低于20%警告
-      let needsWater = Number(this.selectedFarm.soilhumidity) < 20;
-      let needsFertilizer = (this.selectedFarm.id % 3 === 0) && !this.selectedFarm.fertilizerFixed; 
-      let hasBugs = (this.selectedFarm.id % 2 === 0) && !this.selectedFarm.bugFixed; 
-      
+      if (!this.selectedFarm) {
+        return { health: 100, msg: '', needsWater: false, needsFertilizer: false, hasBugs: false, tempHigh: false };
+      }
+
+      const temperature = Number(this.selectedFarm.temperature || 0);
+      const humidity = Number(this.selectedFarm.soilhumidity || 0);
+      const stateText = String(this.selectedFarm.state || this.selectedFarm.status || '');
+      const tempHigh = temperature > 30;
+      const needsWater = humidity > 0 && humidity < 20;
+      const needsFertilizer = humidity >= 20 && humidity < 35 && !this.selectedFarm.fertilizerFixed;
+      const hasBugs = /(bug|disease|worm|pest)/i.test(stateText) && !this.selectedFarm.bugFixed;
+
       let msg = '';
       let health = 100;
-      
-      // 优先级：温度过高 > 湿度过低 > 其他问题
-      if (tempHigh) { 
-        msg = `⚠️ 温度过高警告！当前温度 ${this.selectedFarm.temperature}°C，建议开启降温设备`; 
-        health -= 30; 
+
+      if (tempHigh) {
+        msg = 'Temperature is high, ventilation is recommended';
+        health -= 30;
+      } else if (needsWater) {
+        msg = 'Soil humidity is low, irrigation is recommended';
+        health -= 25;
+      } else if (needsFertilizer) {
+        msg = 'Soil fertility is dropping, fertilization is recommended';
+        health -= 15;
+      } else if (hasBugs) {
+        msg = 'Pest risk detected, treatment is recommended';
+        health -= 20;
       }
-      else if (needsWater) { 
-        msg = `⚠️ 土壤湿度过低！当前湿度 ${this.selectedFarm.soilhumidity}%，请立即灌溉`; 
-        health -= 25; 
-      }
-      else if (needsFertilizer) { msg = '土壤肥力下降，建议追肥'; health -= 15; }
-      else if (hasBugs) { msg = '光谱监测发现虫害风险！'; health -= 20; }
-      
+
       return { needsWater, needsFertilizer, hasBugs, tempHigh, msg, health };
     }
   },
@@ -293,44 +288,33 @@ export default {
     this.raycaster = new THREE.Raycaster();
     this.mouse = new THREE.Vector2();
     this.gltfLoader = new GLTFLoader();
-    
-    // 用于区分拖拽和点击
     this.mouseDownPos = { x: 0, y: 0 };
     this.mouseDownTime = 0;
-    
     this.farmBlocks = [];
     this.labels = [];
-    this.lightningBolts = [];
     this.requestId = null;
-    
-    // 加载贴图
-    this.loadTextures();
 
+    this.loadTextures();
     this.updateTime();
-    setInterval(this.updateTime, 1000);
+    this.clockTimer = setInterval(this.updateTime, 1000);
     this.fetchData();
-    
-    // 每30秒刷新一次STM32传感器数据
+
     this.stm32Timer = setInterval(() => {
       this.fetchSTM32Data();
       this.updateFarmsWithSTM32Data();
     }, 30000);
-    
+
     window.addEventListener('resize', this.onWindowResize);
-    
-    // 监听 AI 动作执行事件，同步更新开关状态
+
     eventBus.$on(EVENTS.IRRIGATION_ON, () => {
-      console.log('📡 收到 AI 灌溉开启事件');
       this.switchState.water = true;
-      this.$message.success('AI 已开启智能灌溉');
+      this.$message.success('AI irrigation enabled');
     });
     eventBus.$on(EVENTS.IRRIGATION_OFF, () => {
-      console.log('📡 收到 AI 灌溉关闭事件');
       this.switchState.water = false;
-      this.$message.info('AI 已关闭智能灌溉');
+      this.$message.info('AI irrigation disabled');
     });
     eventBus.$on('DRONE_SPRAY_ON', () => {
-      console.log('📡 收到 AI 飞防消杀事件');
       this.switchState.pest = true;
       if (this.selectedFarm) {
         this.handleAction('pest');
@@ -341,23 +325,21 @@ export default {
   beforeDestroy() {
     cancelAnimationFrame(this.requestId);
     window.removeEventListener('resize', this.onWindowResize);
-    
-    // 清理事件总线监听
+    if (this.clockTimer) {
+      clearInterval(this.clockTimer);
+    }
     eventBus.$off(EVENTS.IRRIGATION_ON);
     eventBus.$off(EVENTS.IRRIGATION_OFF);
     eventBus.$off('DRONE_SPRAY_ON');
-    
-    // 清理STM32数据刷新定时器
     if (this.stm32Timer) {
       clearInterval(this.stm32Timer);
     }
-    
     if (this.renderer) {
       this.renderer.dispose();
       this.renderer.forceContextLoss();
     }
-    if(this.matGrass) this.matGrass.dispose();
-    if(this.matSoil) this.matSoil.dispose();
+    if (this.matGrass) this.matGrass.dispose();
+    if (this.matSoil) this.matSoil.dispose();
   },
   
   methods: {

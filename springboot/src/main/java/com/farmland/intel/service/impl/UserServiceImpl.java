@@ -1,37 +1,31 @@
 package com.farmland.intel.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.util.StrUtil;
 import cn.hutool.log.Log;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.farmland.intel.controller.dto.UserDTO;
-import com.farmland.intel.controller.dto.UserPasswordDTO;
-import com.farmland.intel.exception.ServiceException;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.farmland.intel.common.Constants;
 import com.farmland.intel.common.RoleEnum;
+import com.farmland.intel.controller.dto.UserDTO;
+import com.farmland.intel.controller.dto.UserPasswordDTO;
 import com.farmland.intel.entity.Menu;
 import com.farmland.intel.entity.User;
+import com.farmland.intel.exception.ServiceException;
 import com.farmland.intel.mapper.RoleMapper;
 import com.farmland.intel.mapper.RoleMenuMapper;
 import com.farmland.intel.mapper.UserMapper;
 import com.farmland.intel.service.IMenuService;
 import com.farmland.intel.service.IUserService;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.farmland.intel.utils.TokenUtils;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * <p>
- *  服务实现类
- * </p>
- *
- * @author
- * @since 2022-01-26
- */
 @Service
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IUserService {
 
@@ -49,86 +43,106 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     @Resource
     private IMenuService menuService;
 
+    @Resource
+    private PasswordEncoder passwordEncoder;
+
     @Override
     public UserDTO login(UserDTO userDTO) {
-        User one = getUserInfo(userDTO);
-        if (one != null) {
-            BeanUtil.copyProperties(one, userDTO, true);
-            // 设置token
-            String token = TokenUtils.genToken(one.getId().toString(), one.getPassword());
-            userDTO.setToken(token);
-
-            String role = one.getRole(); // ROLE_ADMIN
-            // 设置用户的菜单列表
-            List<Menu> roleMenus = getRoleMenus(role);
-            userDTO.setMenus(roleMenus);
-            return userDTO;
-        } else {
+        User user = getUserByUsername(userDTO.getUsername());
+        if (user == null || !matchesPassword(userDTO.getPassword(), user)) {
             throw new ServiceException(Constants.CODE_600, "用户名或密码错误");
         }
+
+        upgradePlaintextPasswordIfNeeded(user, userDTO.getPassword());
+        BeanUtil.copyProperties(user, userDTO, true);
+        userDTO.setPassword(null);
+        userDTO.setToken(TokenUtils.genToken(user.getId().toString(), user.getPassword()));
+        userDTO.setMenus(getRoleMenus(user.getRole()));
+        return userDTO;
     }
 
     @Override
     public User register(UserDTO userDTO) {
-        User one = getOne(Wrappers.<User>lambdaQuery().eq(User::getUsername, userDTO.getUsername()));
-        if (one == null) {
-            one = new User();
-            BeanUtil.copyProperties(userDTO, one, true);
-            // 默认一个普通用户的角色
-            one.setRole(RoleEnum.ROLE_USER.toString());
-            save(one);  // 把 copy完之后的用户对象存储到数据库
-        } else {
+        User existedUser = getOne(Wrappers.<User>lambdaQuery().eq(User::getUsername, userDTO.getUsername()));
+        if (existedUser != null) {
             throw new ServiceException(Constants.CODE_600, "用户已存在");
         }
-        return one;
+
+        User user = new User();
+        BeanUtil.copyProperties(userDTO, user, true);
+        user.setPassword(passwordEncoder.encode(userDTO.getPassword()));
+        user.setRole(RoleEnum.ROLE_USER.toString());
+        save(user);
+        return user;
     }
 
     @Override
     public void updatePassword(UserPasswordDTO userPasswordDTO) {
-        int update = userMapper.updatePassword(userPasswordDTO);
-        if (update < 1) {
+        User user = getUserByUsername(userPasswordDTO.getUsername());
+        if (user == null || !matchesPassword(userPasswordDTO.getPassword(), user)) {
             throw new ServiceException(Constants.CODE_600, "密码错误");
         }
+        user.setPassword(passwordEncoder.encode(userPasswordDTO.getNewPassword()));
+        updateById(user);
     }
 
-    private User getUserInfo(UserDTO userDTO) {
+    private User getUserByUsername(String username) {
         QueryWrapper<User> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("username", userDTO.getUsername());
-        queryWrapper.eq("password", userDTO.getPassword());
-        User one;
+        queryWrapper.eq("username", username);
         try {
-            one = getOne(queryWrapper); // 从数据库查询用户信息
+            return getOne(queryWrapper);
         } catch (Exception e) {
             LOG.error(e);
             throw new ServiceException(Constants.CODE_500, "系统错误");
         }
-        return one;
     }
 
-    /**
-     * 获取当前角色的菜单列表
-     * @param roleFlag
-     * @return
-     */
+    private boolean matchesPassword(String rawPassword, User user) {
+        String storedPassword = user == null ? null : user.getPassword();
+        if (StrUtil.isBlank(rawPassword) || StrUtil.isBlank(storedPassword)) {
+            return false;
+        }
+        if (!isEncodedPassword(storedPassword)) {
+            return storedPassword.equals(rawPassword);
+        }
+        try {
+            return passwordEncoder.matches(rawPassword, storedPassword);
+        } catch (IllegalArgumentException ex) {
+            LOG.warn("Invalid encoded password for user: {}", user.getUsername());
+            return false;
+        }
+    }
+
+    private void upgradePlaintextPasswordIfNeeded(User user, String rawPassword) {
+        if (user == null || isEncodedPassword(user.getPassword()) || !StrUtil.equals(user.getPassword(), rawPassword)) {
+            return;
+        }
+        user.setPassword(passwordEncoder.encode(rawPassword));
+        updateById(user);
+    }
+
+    private boolean isEncodedPassword(String password) {
+        return StrUtil.isNotBlank(password) && password.startsWith("$2");
+    }
+
     private List<Menu> getRoleMenus(String roleFlag) {
         Integer roleId = roleMapper.selectByFlag(roleFlag);
-        // 当前角色的所有菜单id集合
-        List<Integer> menuIds = roleMenuMapper.selectByRoleId(roleId);
+        if (roleId == null) {
+            return new ArrayList<>();
+        }
 
-        // 查出系统所有的菜单(树形)
+        List<Integer> menuIds = roleMenuMapper.selectByRoleId(roleId);
         List<Menu> menus = menuService.findMenus("");
-        // new一个最后筛选完成之后的list
         List<Menu> roleMenus = new ArrayList<>();
-        // 筛选当前用户角色的菜单
         for (Menu menu : menus) {
             if (menuIds.contains(menu.getId())) {
                 roleMenus.add(menu);
             }
             List<Menu> children = menu.getChildren();
-            // removeIf()  移除 children 里面不在 menuIds集合中的 元素
-            children.removeIf(child -> !menuIds.contains(child.getId()));
+            if (children != null) {
+                children.removeIf(child -> !menuIds.contains(child.getId()));
+            }
         }
         return roleMenus;
     }
-
 }

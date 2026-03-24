@@ -3,24 +3,16 @@ package com.farmland.intel.entity;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
-
-import java.io.Serializable;
-import java.util.Date;
-
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
-/**
- * <p>
- *
- * </p>
- *
- * @author
- * @since 2022-01-26
- */
+import java.io.Serializable;
+import java.util.Date;
+
 @Getter
 @Setter
 @TableName("sys_user")
@@ -37,6 +29,7 @@ public class User implements Serializable {
     @ApiModelProperty("用户名")
     private String username;
 
+    @JsonIgnore
     @ApiModelProperty("密码")
     private String password;
 
@@ -60,5 +53,4 @@ public class User implements Serializable {
 
     @ApiModelProperty("角色")
     private String role;
-
 }

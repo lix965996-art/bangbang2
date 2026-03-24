@@ -215,7 +215,8 @@ export default {
       
       // 数据刷新定时器
       dataTimer: null,
-      analysisTimer: null
+      analysisTimer: null,
+      clockTimer: null
     }
   },
   mounted() {
@@ -228,11 +229,12 @@ export default {
       window.addEventListener('resize', this.handleResize);
       
       // 定时更新时间
-      setInterval(this.updateTime, 1000);
+      this.clockTimer = setInterval(this.updateTime, 1000);
     });
   },
   beforeDestroy() {
     window.removeEventListener('resize', this.handleResize);
+    if (this.clockTimer) clearInterval(this.clockTimer);
     if(this.radarChart && !this.radarChart.isDisposed()) this.radarChart.dispose();
     if(this.compareChart && !this.compareChart.isDisposed()) this.compareChart.dispose();
     if(this.animationId) cancelAnimationFrame(this.animationId);
@@ -251,7 +253,9 @@ export default {
             area: item.area || 100, // 面积（亩）
             crop: item.crop || '小麦', // 作物
             plantDate: item.plantDate || '2025-01-01', // 种植日期
-            growthDays: item.growthDays || 90 // 生长周期
+            growthDays: item.growthDays || 90, // 生长周期
+            temperature: Number(item.temperature || 0),
+            humidity: Number(item.soilhumidity || 0)
           }));
           // 默认选中第一个
           if (this.farmList.length > 0) {
@@ -311,7 +315,6 @@ export default {
     async analyzeWithQwen() {
       // 防止重复调用
       if (this.qwenAnalyzing) {
-        console.log('AI分析正在进行中，跳过重复调用');
         return;
       }
       
@@ -516,10 +519,11 @@ export default {
       this.kpiData[3].value = this.calculateRemainingDays();
       
       // 更新趋势信息
-      this.kpiData[0].trend = Math.random() * 10 - 5; // 模拟趋势
-      this.kpiData[1].trend = Math.random() * 10 - 5;
+      const growthRate = Number(this.aiPredictions.growthRate || 0);
+      this.kpiData[0].trend = growthRate >= 80 ? 4 : growthRate >= 60 ? 1 : -2;
+      this.kpiData[1].trend = this.currentFarmData.area >= 50 ? 3 : 1;
       this.kpiData[2].trend = 0; // 面积不变
-      this.kpiData[3].trend = -1; // 天数递减
+      this.kpiData[3].trend = this.calculateRemainingDays() > 0 ? -1 : 0;
       
       this.animateKPIValues();
     },
@@ -542,22 +546,38 @@ export default {
     
     // 获取天气数据（模拟）
     async getWeatherData() {
-      // 实际应用中应调用天气API
-      return {
-        temperature: 18 + Math.random() * 10,
-        humidity: 60 + Math.random() * 20,
-        forecast: '未来7天以晴天为主，局部有小雨'
-      };
+      try {
+        const [nowRes, weekRes] = await Promise.all([
+          this.request.get('/aether/weather/now'),
+          this.request.get('/aether/weather/7d')
+        ]);
+        const nowData = nowRes?.code === '200' ? nowRes.data?.data : null;
+        const weekData = weekRes?.code === '200' ? (weekRes.data?.data?.daily || weekRes.data?.data || []) : [];
+        const forecast = Array.isArray(weekData) && weekData.length > 0
+          ? weekData.slice(0, 3).map(item => item.textDay || item.text || '晴').join('，')
+          : '未来天气以晴到多云为主';
+
+        return {
+          temperature: Number(nowData?.temp || this.sensorData.temperature || 24),
+          humidity: Number(nowData?.humidity || this.sensorData.humidity || 60),
+          forecast
+        };
+      } catch (e) {
+        return {
+          temperature: Number(this.sensorData.temperature || 24),
+          humidity: Number(this.sensorData.humidity || 60),
+          forecast: '未来天气以晴到多云为主'
+        };
+      }
     },
     
     // 获取市场数据（模拟）
     async getMarketData() {
-      // 实际应用中应调用市场数据API
       const prices = {
-        '小麦': 2800 + Math.random() * 200,
-        '水稻': 3200 + Math.random() * 300,
-        '玉米': 2600 + Math.random() * 200,
-        '大豆': 5500 + Math.random() * 500
+        '小麦': 2800,
+        '水稻': 3200,
+        '玉米': 2600,
+        '大豆': 5500
       };
       return {
         price: prices[this.currentFarmData.crop] || 3000
@@ -637,9 +657,6 @@ export default {
       else if (month >= 6 && month <= 8) score = 70; // 夏季
       else if (month >= 9 && month <= 11) score = 80; // 秋季
       else score = 65; // 冬季
-      
-      // 加上一些随机波动
-      score += (Math.random() * 10 - 5);
       
       return Math.max(0, Math.min(100, score)).toFixed(1);
     },
@@ -833,7 +850,8 @@ export default {
     initCompareChart() {
       if (!this.$refs.compareChart) return; // DOM不存在则跳过
       this.compareChart = echarts.init(this.$refs.compareChart);
-      const farms = this.farmList.filter(f => this.selectedFarms.includes(f.id)).map(f => f.name);
+      const compareFarms = this.farmList.filter(f => this.selectedFarms.includes(f.id));
+      const farms = compareFarms.map(f => f.name);
       
       const option = {
         tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
@@ -845,7 +863,7 @@ export default {
           {
             name: '温度',
             type: 'bar',
-            data: farms.map(() => 20 + Math.random() * 10),
+            data: compareFarms.map(f => Number(f.temperature || 0)),
             itemStyle: {
               color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
                 { offset: 0, color: '#ff9a56' },
@@ -856,7 +874,7 @@ export default {
           {
             name: '湿度',
             type: 'bar',
-            data: farms.map(() => 50 + Math.random() * 20),
+            data: compareFarms.map(f => Number(f.humidity || 0)),
             itemStyle: {
               color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
                 { offset: 0, color: '#4facfe' },

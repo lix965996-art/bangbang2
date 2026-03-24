@@ -31,7 +31,6 @@ spring:
     time-zone: GMT+8
 
 mybatis:
-  mapper-locations: classpath:mapper/*.xml
   type-aliases-package: com.farmland.intel.entity
   configuration:
     map-underscore-to-camel-case: true
@@ -94,3 +93,10 @@ onenet:
   product-id: ${ONENET_PRODUCT_ID:CzL61ga8FI}
   device-name: ${ONENET_DEVICE_NAME:d1}
   enabled: ${ONENET_ENABLED:true}
+
+websocket:
+  enabled: ${WEBSOCKET_ENABLED:true}
+
+fruit-detect:
+  api-url: ${FRUIT_DETECT_API_URL:http://localhost:5000/api/detect}
+  health-url: ${FRUIT_DETECT_HEALTH_URL:http://localhost:5000/api/health}

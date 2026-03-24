@@ -326,7 +326,7 @@ export default {
       
       // 实时流相关
       streamActive: false,
-      mjpegUrl: 'http://192.168.137.192/mjpeg/1',
+      mjpegUrl: process.env.VUE_APP_MJPEG_STREAM_URL || 'http://192.168.137.227/mjpeg/1',
       streamDetections: [],
       
       // 分析结果
@@ -461,91 +461,8 @@ export default {
       this.inferenceTime = null
       this.currentSample = null
     },
-    async analyzeImage() {
-      if (!this.selectedFile) {
-        this.$message.warning('请先上传图片')
-        return
-      }
-
-      this.analyzing = true
-      this.inferenceTime = null
-      if (this.currentSample) {
-        this.currentSample.status = 'analyzing'
-      }
-
-      const start = performance.now()
-
-      try {
-        const formData = new FormData()
-        formData.append('file', this.selectedFile)
-        formData.append('crop_type', 'tomato')
-        formData.append('conf', '0.5')
-
-        const apiEndpoints = {
-          both: 'http://localhost:5000/api/detect/both',
-          ripeness: 'http://localhost:5000/api/detect/ripeness',
-          disease: 'http://localhost:5000/api/detect/disease',
-        }
-
-        const apiUrl = apiEndpoints[this.detectType] || apiEndpoints.both
-
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          body: formData,
-        })
-
-        const res = await response.json()
-
-        if (res.code === '200') {
-          let data = res.data || {}
-
-          if (this.detectType === 'ripeness' && data.statistics) {
-            data = {
-              result_image: data.result_image,
-              detect_time: data.detect_time,
-              ripeness_analysis: {
-                detections: data.detections,
-                statistics: data.statistics,
-              },
-            }
-          }
-
-          if (
-            this.detectType === 'disease' &&
-            data.detections &&
-            !data.disease_analysis
-          ) {
-            data = {
-              result_image: data.result_image,
-              detect_time: data.detect_time,
-              disease_analysis: {
-                detections: data.detections,
-                statistics: data.statistics,
-              },
-            }
-          }
-
-          this.detectResult = data
-          this.inferenceTime = Math.round(performance.now() - start)
-          if (this.currentSample) {
-            this.currentSample.status = 'done'
-          }
-          this.$message.success('分析完成')
-        } else {
-          this.$message.error(res.msg || '分析失败')
-          if (this.currentSample) {
-            this.currentSample.status = 'pending'
-          }
-        }
-      } catch (err) {
-        console.error(err)
-        this.$message.error('分析请求失败，请确认后端服务已启动')
-        if (this.currentSample) {
-          this.currentSample.status = 'pending'
-        }
-      } finally {
-        this.analyzing = false
-      }
+    async analyzeImageLegacy() {
+      return this.analyzeImage()
     },
     getMainDisease() {
       const analysis = this.detectResult && this.detectResult.disease_analysis
@@ -667,6 +584,7 @@ export default {
       if (this.currentSample) this.currentSample.status = 'analyzing'
 
       const start = performance.now()
+      let success = false
 
       try {
         const formData = new FormData()
@@ -674,23 +592,53 @@ export default {
         formData.append('crop_type', 'tomato')
         formData.append('conf', '0.5')
 
-        const apiUrl = `http://localhost:5000/api/detect/${this.detectType}`
-        const response = await fetch(apiUrl, { method: 'POST', body: formData })
-        const res = await response.json()
+        const endpointMap = {
+          both: '/crop-analysis/both',
+          ripeness: '/crop-analysis/ripeness',
+          disease: '/crop-analysis/disease',
+        }
+        const res = await this.request.post(
+          endpointMap[this.detectType] || endpointMap.both,
+          formData
+        )
 
         if (res.code === '200') {
-          this.processDetectionResult(res.data, performance.now() - start)
+          let data = res.data || {}
+
+          if (this.detectType === 'ripeness' && data.statistics && !data.ripeness_analysis) {
+            data = {
+              result_image: data.result_image,
+              detect_time: data.detect_time,
+              ripeness_analysis: {
+                detections: data.detections || [],
+                statistics: data.statistics || {},
+              },
+            }
+          }
+
+          if (this.detectType === 'disease' && data.detections && !data.disease_analysis) {
+            data = {
+              result_image: data.result_image,
+              detect_time: data.detect_time,
+              disease_analysis: {
+                detections: data.detections || [],
+                statistics: data.statistics || {},
+              },
+            }
+          }
+
+          this.processDetectionResult(data, performance.now() - start)
+          success = true
           this.$message.success('分析完成')
         } else {
-          throw new Error(res.msg)
+          throw new Error(res.msg || '分析失败')
         }
       } catch (err) {
-        console.warn('后端未连接，使用Mock数据', err)
-        this.generateMockResult(performance.now() - start)
-        this.$message.warning('后端未启动，展示模拟数据')
+        console.error('Image analysis failed:', err)
+        this.$message.error(err.message || '分析失败，请确认后端识别服务已启动')
       } finally {
         this.analyzing = false
-        if (this.currentSample) this.currentSample.status = 'done'
+        if (this.currentSample) this.currentSample.status = success ? 'done' : 'pending'
       }
     },
     processDetectionResult(data, time) {
@@ -714,21 +662,6 @@ export default {
           }
         })
       }
-    },
-    generateMockResult(time) {
-      this.detectResult = {
-        ripeness_analysis: {
-          detections: [
-            { class_id: 0, class_name: 'Riped', confidence: 0.95, bbox: [80, 100, 220, 260] },
-            { class_id: 1, class_name: 'Unriped', confidence: 0.88, bbox: [280, 140, 400, 280] }
-          ],
-          statistics: { riped_ratio: 85 }
-        },
-        disease_analysis: {
-          detections: [{ class_name: 'Healthy', confidence: 0.92 }]
-        }
-      }
-      this.processDetectionResult(this.detectResult, time)
     },
     startScanAnimation() {
       this.scanY = 0

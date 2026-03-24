@@ -93,9 +93,9 @@ export default {
       inputMsg: '',
       isLoading: false,
       messages: [
-        { 
-          role: 'ai', 
-          content: '你好！我是你的专属 AI 农艺师。我已经连接到大棚传感器，随时为你分析环境数据。' 
+        {
+          role: 'ai',
+          content: 'Hello, I am your AI agriculture assistant.'
         }
       ],
       // 拖动相关
@@ -113,11 +113,8 @@ export default {
   },
   computed: {
     showFloatingChat() {
-      // 强制显示聊天机器人，除了登录和注册页面
       const hiddenRoutes = ['/login', '/register'];
-      const shouldShow = !hiddenRoutes.includes(this.$route.path);
-      console.log('showFloatingChat:', shouldShow, 'current route:', this.$route.path);
-      return shouldShow;
+      return !hiddenRoutes.includes(this.$route.path);
     },
     containerStyle() {
       const baseStyle = {

@@ -45,16 +45,17 @@
           <div class="panel-title">
             <i class="el-icon-video-camera"></i> 实时视频监控
             <span class="decoration"></span>
-            <select v-if="farmlandList.length > 0" v-model="selectedFarmland" class="farmland-select">
+            <select v-if="farmlandList.length > 0" v-model="selectedFarmland" class="farmland-select" @change="handleFarmlandChange">
               <option v-for="farm in farmlandList" :key="farm.id" :value="farm.id">{{ farm.name }}</option>
             </select>
           </div>
           <div class="panel-body live-video-body">
             <div class="live-video-container">
               <img 
-                src="http://192.168.137.192/mjpeg/1" 
+                :src="currentVideoStreamUrl" 
                 alt="实时监控" 
                 class="live-video-stream"
+                @load="onVideoLoad"
                 @error="onVideoError"
               />
               <div class="video-overlay" v-if="videoError">
@@ -183,7 +184,8 @@ export default {
       farmCount: 0,             // 监测地块数
       pendingShipments: 0,      // 待发货数
       hasData: false,            // 是否有数据
-      videoError: false           // 视频流错误状态
+      videoError: false,          // 视频流错误状态
+      defaultVideoStreamUrl: process.env.VUE_APP_MJPEG_STREAM_URL || 'http://192.168.137.227/mjpeg/1'
     }
   },
   computed: {
@@ -191,6 +193,12 @@ export default {
     currentCamera() {
       if (!this.selectedFarmland) return null;
       return this.cameraList.find(cam => cam.farmlandId === this.selectedFarmland);
+    },
+    currentVideoStreamUrl() {
+      if (this.currentCamera && this.currentCamera.streamUrl) {
+        return this.currentCamera.streamUrl;
+      }
+      return this.defaultVideoStreamUrl;
     }
   },
   mounted() {
@@ -303,6 +311,15 @@ export default {
     },
     
     // 视频流加载错误处理
+    handleFarmlandChange() {
+      this.videoError = false;
+    },
+    
+    onVideoLoad() {
+      this.videoError = false;
+    },
+    
+    // 视频流加载错误处理
     onVideoError() {
       this.videoError = true;
     },
@@ -333,7 +350,8 @@ export default {
             id: item.id,
             farmlandId: item.id,
             name: `${item.farm || '农田' + item.id}`,
-            online: false  // 默认离线状态
+            streamUrl: this.defaultVideoStreamUrl,
+            online: Boolean(this.defaultVideoStreamUrl)
           }));
           
           this.farmCount = res.data.length;

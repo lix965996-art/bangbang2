@@ -332,27 +332,26 @@ export default {
       // 表单验证规则
       rules: {
         farm: [
-          { required: true, message: '请输入农田名称', trigger: 'blur' },
-          { min: 2, max: 50, message: '长度在 2 到 50 个字符', trigger: 'blur' }
+          { required: true, message: 'Please enter farmland name', trigger: 'blur' },
+          { min: 2, max: 50, message: 'Length must be between 2 and 50 characters', trigger: 'blur' }
         ],
         crop: [
-          { required: true, message: '请输入种植作物', trigger: 'blur' }
+          { required: true, message: 'Please enter crop name', trigger: 'blur' }
         ],
         area: [
-          { required: true, message: '请输入面积', trigger: 'change' },
-          { type: 'number', min: 0.1, max: 10000, message: '面积需在 0.1-10000 亩之间', trigger: 'change' }
+          { required: true, message: 'Please enter area', trigger: 'change' },
+          { type: 'number', min: 0.1, max: 10000, message: 'Area must be between 0.1 and 10000 mu', trigger: 'change' }
         ],
         keeper: [
-          { required: true, message: '请输入负责人', trigger: 'blur' }
+          { required: true, message: 'Please enter manager name', trigger: 'blur' }
         ]
       },
       
-      // 溯源弹窗相关数据
       traceVisible: false, 
       currentTraceRow: null,
       traceData: {
         score: 98,
-        level: 'S级',
+        level: 'S',
         sunlight: 1200,
         waterCount: 45,
         desc: '',
