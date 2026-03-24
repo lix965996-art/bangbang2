@@ -34,7 +34,7 @@
             class="custom-input"
             clearable
             @clear="load"
-            @keyup.enter.native="load">
+            @keyup.enter="load">
           </el-input>
           <el-button type="primary" icon="el-icon-search" @click="load">查询</el-button>
           <el-button plain icon="el-icon-refresh" @click="reset">重置</el-button>
@@ -59,37 +59,37 @@
         <el-table-column prop="id" label="ID" width="70" align="center" sortable></el-table-column>
         
         <el-table-column prop="produce" label="商品名称" min-width="120">
-          <template slot-scope="scope">
+          <template #default="scope">
             <span style="font-weight:bold; color:#303133">{{ scope.row.produce }}</span>
           </template>
         </el-table-column>
         
         <el-table-column prop="warehouse" label="所属仓库" width="100">
-          <template slot-scope="scope">
+          <template #default="scope">
             <el-tag size="small" effect="plain">{{ scope.row.warehouse || '默认仓' }}</el-tag>
           </template>
         </el-table-column>
         
         <el-table-column prop="quantity" label="出售数量" width="100" align="center">
-          <template slot-scope="scope">
+          <template #default="scope">
             <span style="font-weight:bold; color:#409eff">{{ scope.row.quantity }}</span>
           </template>
         </el-table-column>
         
         <el-table-column prop="price" label="单价(元)" width="100" align="center">
-          <template slot-scope="scope">
+          <template #default="scope">
             <span style="color:#e6a23c; font-weight:bold">¥{{ scope.row.price }}</span>
           </template>
         </el-table-column>
         
         <el-table-column prop="totalPrice" label="总价(元)" width="110" align="center">
-          <template slot-scope="scope">
+          <template #default="scope">
             <span style="color:#67c23a; font-weight:bold">¥{{ scope.row.totalPrice }}</span>
           </template>
         </el-table-column>
         
         <el-table-column prop="status" label="状态" width="100" align="center">
-          <template slot-scope="scope">
+          <template #default="scope">
             <el-tag :type="getStatusType(scope.row.status)" size="small">
               {{ scope.row.status }}
             </el-tag>
@@ -101,7 +101,7 @@
         <el-table-column prop="remark" label="备注" show-overflow-tooltip></el-table-column>
 
         <el-table-column label="操作" width="220" align="center" fixed="right">
-          <template slot-scope="scope">
+          <template #default="scope">
             <el-button type="text" icon="el-icon-edit" @click="handleEdit(scope.row)">编辑</el-button>
             <el-button type="text" class="status-btn" icon="el-icon-sold-out" @click="toggleStatus(scope.row)">
               {{ scope.row.status === '上架中' ? '下架' : '上架' }}
@@ -125,7 +125,7 @@
     </div>
 
     <!-- 上架商品弹窗 -->
-    <el-dialog :title="form.id ? '📝 编辑商品' : '🛒 上架商品'" :visible.sync="dialogFormVisible" width="550px" :close-on-click-modal="false">
+    <el-dialog :title="form.id ? '📝 编辑商品' : '🛒 上架商品'" v-model="dialogFormVisible" width="550px" :close-on-click-modal="false">
       <el-form label-width="100px" size="small" :model="form" :rules="rules" ref="formRef" class="custom-form">
         <el-form-item label="选择商品" prop="inventoryId">
           <el-select v-model="form.inventoryId" placeholder="请选择库存商品" style="width:100%" @change="onInventoryChange" :disabled="!!form.id">
@@ -155,10 +155,12 @@
           <el-input type="textarea" v-model="form.remark" placeholder="可填写商品描述、优惠信息等"></el-input>
         </el-form-item>
       </el-form>
-      <div slot="footer" class="dialog-footer">
-        <el-button @click="dialogFormVisible = false">取 消</el-button>
-        <el-button type="primary" @click="save">确 定</el-button>
-      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="dialogFormVisible = false">取 消</el-button>
+          <el-button type="primary" @click="save">确 定</el-button>
+        </div>
+      </template>
     </el-dialog>
   </div>
 </template>

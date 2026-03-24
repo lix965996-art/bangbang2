@@ -1,6 +1,7 @@
 package com.farmland.intel.controller;
 
 import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.util.StrUtil;
 import cn.hutool.poi.excel.ExcelUtil;
 import cn.hutool.poi.excel.ExcelReader;
 import cn.hutool.poi.excel.ExcelWriter;
@@ -83,7 +84,7 @@ public class StatisticController {
                 try {
                     User currentUser = TokenUtils.getCurrentUser();
                     if (currentUser != null) {
-                        statistic.setKeeper(currentUser.getUsername());
+                        statistic.setKeeper(resolveKeeperName(currentUser));
                     }
                 } catch (Exception e) {
                     // ignore
@@ -109,6 +110,34 @@ public class StatisticController {
             log.error("保存农田统计数据失败", e);
             return Result.error("500", "保存失败，请重试");
         }
+    }
+
+    private void applyKeeperDataPermission(QueryWrapper<Statistic> queryWrapper) {
+        User currentUser = TokenUtils.getCurrentUser();
+        if (currentUser == null || "ROLE_ADMIN".equals(currentUser.getRole())) {
+            return;
+        }
+
+        String username = StrUtil.trimToEmpty(currentUser.getUsername());
+        String nickname = StrUtil.trimToEmpty(currentUser.getNickname());
+        if (StrUtil.isBlank(username) && StrUtil.isBlank(nickname)) {
+            queryWrapper.eq("keeper", "__NO_MATCH__");
+            return;
+        }
+
+        if (StrUtil.isNotBlank(username) && StrUtil.isNotBlank(nickname) && !StrUtil.equals(username, nickname)) {
+            queryWrapper.and(wrapper -> wrapper.eq("keeper", username).or().eq("keeper", nickname));
+            return;
+        }
+
+        queryWrapper.eq("keeper", StrUtil.blankToDefault(username, nickname));
+    }
+
+    private String resolveKeeperName(User currentUser) {
+        if (currentUser == null) {
+            return null;
+        }
+        return StrUtil.blankToDefault(StrUtil.trim(currentUser.getNickname()), StrUtil.trim(currentUser.getUsername()));
     }
 
     /**
@@ -154,9 +183,7 @@ public class StatisticController {
         QueryWrapper<Statistic> queryWrapper = new QueryWrapper<>();
         // 非管理员只能查看自己负责的农田
         User currentUser = TokenUtils.getCurrentUser();
-        if (currentUser != null && !"ROLE_ADMIN".equals(currentUser.getRole())) {
-            queryWrapper.eq("keeper", currentUser.getUsername());
-        }
+        applyKeeperDataPermission(queryWrapper);
         return Result.success(statisticService.list(queryWrapper));
     }
 
@@ -177,9 +204,7 @@ public class StatisticController {
         
         // 数据权限控制：非管理员只能看自己负责的农田
         User currentUser = TokenUtils.getCurrentUser();
-        if (currentUser != null && !"ROLE_ADMIN".equals(currentUser.getRole())) {
-            queryWrapper.eq("keeper", currentUser.getUsername());
-        }
+        applyKeeperDataPermission(queryWrapper);
         
         return Result.success(statisticService.page(new Page<>(pageNum, pageSize), queryWrapper));
     }
@@ -243,9 +268,7 @@ public class StatisticController {
             QueryWrapper<Statistic> queryWrapper = new QueryWrapper<>();
             // 非管理员只能查看自己负责的农田
             User currentUser = TokenUtils.getCurrentUser();
-            if (currentUser != null && !"ROLE_ADMIN".equals(currentUser.getRole())) {
-                queryWrapper.eq("keeper", currentUser.getUsername());
-            }
+            applyKeeperDataPermission(queryWrapper);
             List<Statistic> list = statisticService.list(queryWrapper);
             return Result.success(list);
         } catch (Exception e) {
@@ -265,9 +288,7 @@ public class StatisticController {
             QueryWrapper<Statistic> queryWrapper = new QueryWrapper<>();
             // 非管理员只能查看自己负责的农田
             User currentUser = TokenUtils.getCurrentUser();
-            if (currentUser != null && !"ROLE_ADMIN".equals(currentUser.getRole())) {
-                queryWrapper.eq("keeper", currentUser.getUsername());
-            }
+            applyKeeperDataPermission(queryWrapper);
             List<Statistic> list = statisticService.list(queryWrapper);
             
             // 计算总面积（area是String类型，需要转换）
@@ -478,4 +499,3 @@ public class StatisticController {
         return "未知区县";  // 参考Django版本
     }
 }
-

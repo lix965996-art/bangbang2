@@ -1,10 +1,7 @@
-import Vue from 'vue'
-import Vuex from 'vuex'
+import { createStore } from 'vuex'
 import router, {resetRouter} from "@/router";
 
-Vue.use(Vuex)
-
-const store = new Vuex.Store({
+const store = createStore({
     state: {
         currentPathName: ''
     },

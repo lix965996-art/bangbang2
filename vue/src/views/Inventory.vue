@@ -143,7 +143,7 @@
     </div>
 
     <!-- 入库对话框 -->
-    <el-dialog title="📦 物资入库登记" :visible.sync="dialogFormVisible" width="500px" :close-on-click-modal="false">
+    <el-dialog title="📦 物资入库登记" v-model="dialogFormVisible" width="500px" :close-on-click-modal="false">
       <el-form label-width="100px" size="small" :model="form">
         <el-form-item label="物资名称">
           <el-input v-model="form.produce" autocomplete="off"></el-input>
@@ -170,10 +170,12 @@
           <el-input type="textarea" v-model="form.remark"></el-input>
         </el-form-item>
       </el-form>
-      <div slot="footer" class="dialog-footer">
-        <el-button @click="dialogFormVisible = false">取 消</el-button>
-        <el-button type="primary" @click="save">确 定</el-button>
-      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="dialogFormVisible = false">取 消</el-button>
+          <el-button type="primary" @click="save">确 定</el-button>
+        </div>
+      </template>
     </el-dialog>
   </div>
 </template>

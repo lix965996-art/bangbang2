@@ -94,20 +94,22 @@
       <!-- 天气预报 -->
       <el-col :span="16">
         <el-card class="weather-forecast-card" style="max-height: 240px; overflow: hidden;">
-          <div slot="header" class="card-header">
-            <img src="@/assets/yubao.png" class="header-icon" alt="天气预报" /><span>天气预报</span>
-            <!-- 现代化分段控制器 -->
-            <div class="segment-control">
-              <button 
-                :class="['segment-btn', { active: activeWeatherTab === '24h' }]" 
-                @click="activeWeatherTab = '24h'"
-              >24小时</button>
-              <button 
-                :class="['segment-btn', { active: activeWeatherTab === '7d' }]" 
-                @click="activeWeatherTab = '7d'"
-              >4天</button>
+          <template #header>
+            <div class="card-header">
+              <img src="@/assets/yubao.png" class="header-icon" alt="天气预报" /><span>天气预报</span>
+              <!-- 现代化分段控制器 -->
+              <div class="segment-control">
+                <button 
+                  :class="['segment-btn', { active: activeWeatherTab === '24h' }]" 
+                  @click="activeWeatherTab = '24h'"
+                >24小时</button>
+                <button 
+                  :class="['segment-btn', { active: activeWeatherTab === '7d' }]" 
+                  @click="activeWeatherTab = '7d'"
+                >4天</button>
+              </div>
             </div>
-          </div>
+          </template>
           <!-- 24小时预报 -->
           <div class="forecast-rail" v-if="activeWeatherTab === '24h'">
             <template v-if="weather24h.length > 0">
@@ -191,9 +193,11 @@
       <!-- 预警信息 -->
       <el-col :span="8">
         <el-card class="alert-card" style="max-height: 240px; overflow: hidden;">
-          <div slot="header" class="card-header">
-            <span>⚠️ 预警信息</span>
-          </div>
+          <template #header>
+            <div class="card-header">
+              <span>⚠️ 预警信息</span>
+            </div>
+          </template>
           <div class="alert-list">
             <!-- 天气预警 -->
             <div v-if="weatherAlerts.length > 0">

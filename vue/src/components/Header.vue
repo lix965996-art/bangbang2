@@ -19,26 +19,28 @@
         <span class="user-name">{{ user ? user.nickname : '用户' }}</span>
         <i class="el-icon-arrow-down"></i>
       </div>
-      <el-dropdown-menu slot="dropdown" class="user-menu">
-        <el-dropdown-item>
-          <router-link to="/person" class="menu-link">
-            <i class="el-icon-user"></i>
-            个人信息
-          </router-link>
-        </el-dropdown-item>
-        <el-dropdown-item>
-          <router-link to="/password" class="menu-link">
-            <i class="el-icon-key"></i>
-            修改密码
-          </router-link>
-        </el-dropdown-item>
-        <el-dropdown-item divided>
-          <div class="menu-link logout-btn" @click="logout">
-            <i class="el-icon-switch-button"></i>
-            退出登录
-          </div>
-        </el-dropdown-item>
-      </el-dropdown-menu>
+      <template #dropdown>
+        <el-dropdown-menu class="user-menu">
+          <el-dropdown-item>
+            <router-link to="/person" class="menu-link">
+              <i class="el-icon-user"></i>
+              个人信息
+            </router-link>
+          </el-dropdown-item>
+          <el-dropdown-item>
+            <router-link to="/password" class="menu-link">
+              <i class="el-icon-key"></i>
+              修改密码
+            </router-link>
+          </el-dropdown-item>
+          <el-dropdown-item divided>
+            <div class="menu-link logout-btn" @click="logout">
+              <i class="el-icon-switch-button"></i>
+              退出登录
+            </div>
+          </el-dropdown-item>
+        </el-dropdown-menu>
+      </template>
     </el-dropdown>
   </div>
 </template>

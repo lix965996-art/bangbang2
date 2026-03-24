@@ -166,7 +166,7 @@
       </el-pagination>
     </div>
 
-    <el-dialog title="地块信息管理" :visible.sync="dialogFormVisible" width="40%" :close-on-click-modal="false">
+    <el-dialog title="地块信息管理" v-model="dialogFormVisible" width="40%" :close-on-click-modal="false">
       <el-form label-width="120px" size="small" style="width: 90%">
         <el-form-item label="农田名称">
            <el-input v-model="form.farm" autocomplete="off"></el-input>
@@ -188,7 +188,7 @@
               ref="saveTagInput"
               size="small"
               style="width: 100px"
-              @keyup.enter.native="handleInputConfirm"
+              @keyup.enter="handleInputConfirm"
               @blur="handleInputConfirm"
             >
             </el-input>
@@ -206,10 +206,12 @@
           <el-input v-model="form.keeper" autocomplete="off"></el-input>
         </el-form-item>
         </el-form>
-      <div slot="footer" class="dialog-footer">
-        <el-button @click="dialogFormVisible = false">取 消</el-button>
-        <el-button type="primary" @click="save">保 存</el-button>
-      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="dialogFormVisible = false">取 消</el-button>
+          <el-button type="primary" @click="save">保 存</el-button>
+        </div>
+      </template>
     </el-dialog>
 
   </div>

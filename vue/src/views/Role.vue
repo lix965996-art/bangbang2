@@ -49,10 +49,12 @@
             </div>
             <el-dropdown trigger="click" class="card-more" @command="handleCommand($event, item)">
               <i class="el-icon-more"></i>
-              <el-dropdown-menu slot="dropdown">
-                <el-dropdown-item command="edit" icon="el-icon-edit">编辑信息</el-dropdown-item>
-                <el-dropdown-item command="delete" icon="el-icon-delete" style="color: #F56C6C">删除角色</el-dropdown-item>
-              </el-dropdown-menu>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="edit" icon="el-icon-edit">编辑信息</el-dropdown-item>
+                  <el-dropdown-item command="delete" icon="el-icon-delete" style="color: #F56C6C">删除角色</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
             </el-dropdown>
           </div>
 
@@ -108,7 +110,7 @@
       </el-pagination>
     </div>
 
-    <el-dialog :title="form.id ? '编辑角色' : '创建新角色'" :visible.sync="dialogFormVisible" width="400px" custom-class="glass-dialog">
+    <el-dialog :title="form.id ? '编辑角色' : '创建新角色'" v-model="dialogFormVisible" width="400px" custom-class="glass-dialog">
       <el-form label-position="top" size="medium">
         <el-form-item label="角色名称">
           <el-input v-model="form.name" placeholder="请输入名称"></el-input>
@@ -120,15 +122,17 @@
           <el-input type="textarea" v-model="form.description" rows="3"></el-input>
         </el-form-item>
       </el-form>
-      <div slot="footer" class="dialog-footer">
-        <el-button @click="dialogFormVisible = false">取消</el-button>
-        <el-button type="primary" @click="save">保存提交</el-button>
-      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="dialogFormVisible = false">取消</el-button>
+          <el-button type="primary" @click="save">保存提交</el-button>
+        </div>
+      </template>
     </el-dialog>
 
     <el-drawer
       title="菜单权限配置"
-      :visible.sync="menuDialogVis"
+      v-model="menuDialogVis"
       direction="rtl"
       size="400px">
       <div style="padding: 20px; height: calc(100% - 60px); overflow: auto;">
@@ -140,9 +144,11 @@
             ref="tree"
             :default-expanded-keys="expends"
             :default-checked-keys="checks">
-            <span class="custom-tree-node" slot-scope="{ node, data }">
-              <span><i :class="data.icon"></i> {{ data.name }}</span>
-            </span>
+            <template #default="{ node, data }">
+              <span class="custom-tree-node">
+                <span><i :class="data.icon"></i> {{ data.name }}</span>
+              </span>
+            </template>
          </el-tree>
       </div>
       <div class="drawer-actions">

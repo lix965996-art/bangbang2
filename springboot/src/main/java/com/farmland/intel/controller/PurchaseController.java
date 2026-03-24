@@ -19,6 +19,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.farmland.intel.common.Result;
 import org.springframework.web.multipart.MultipartFile;
 import com.farmland.intel.utils.TokenUtils;
+import com.farmland.intel.utils.DataPermissionUtils;
 
 import org.springframework.web.bind.annotation.RestController;
 
@@ -47,7 +48,7 @@ public class PurchaseController {
             try {
                 User currentUser = TokenUtils.getCurrentUser();
                 if (currentUser != null) {
-                    purchase.setPurchaser(currentUser.getUsername());
+                    purchase.setPurchaser(DataPermissionUtils.resolveUserDisplayName(currentUser));
                 }
             } catch (Exception e) {
                 // ignore
@@ -74,9 +75,7 @@ public class PurchaseController {
         QueryWrapper<Purchase> queryWrapper = new QueryWrapper<>();
         // 非管理员只能查看自己的采购记录
         User currentUser = TokenUtils.getCurrentUser();
-        if (currentUser != null && !"ROLE_ADMIN".equals(currentUser.getRole())) {
-            queryWrapper.eq("purchaser", currentUser.getUsername());
-        }
+        DataPermissionUtils.applyUserMatchPermission(queryWrapper, "purchaser", currentUser);
         return Result.success(purchaseService.list(queryWrapper));
     }
 
@@ -97,9 +96,7 @@ public class PurchaseController {
         
         // 数据权限控制：非管理员只能看自己的
         User currentUser = TokenUtils.getCurrentUser();
-        if (currentUser != null && !"ROLE_ADMIN".equals(currentUser.getRole())) {
-            queryWrapper.eq("purchaser", currentUser.getUsername());
-        }
+        DataPermissionUtils.applyUserMatchPermission(queryWrapper, "purchaser", currentUser);
         
         return Result.success(purchaseService.page(new Page<>(pageNum, pageSize), queryWrapper));
     }
@@ -150,4 +147,3 @@ public class PurchaseController {
     }
 
 }
-

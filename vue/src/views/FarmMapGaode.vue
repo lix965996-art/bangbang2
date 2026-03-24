@@ -103,6 +103,7 @@
       <div class="error-content">
         <i class="el-icon-warning-outline"></i>
         <p>地图资源加载失败</p>
+        <p class="error-detail">{{ mapErrorMessage }}</p>
         <el-button type="primary" size="medium" @click="retryLoadMap" icon="el-icon-refresh">重新加载</el-button>
       </div>
     </div>
@@ -179,6 +180,8 @@
 </template>
 
 <script>
+import { loadAmapSdk, resetAmapLoader } from '@/utils/amapLoader'
+
 export default {
   name: 'FarmMapGaode',
   data() {
@@ -191,6 +194,7 @@ export default {
       currentFarm: null,
       mapPitch: 60,
       mapError: false,
+      mapErrorMessage: '',
       userMarker: null,
       expandedRegions: {
         Jishou: true,
@@ -345,11 +349,10 @@ export default {
     
     retryLoadMap() {
       this.mapError = false;
+      this.mapErrorMessage = '';
       // 清理旧实例
       this.cleanupMap();
-      // 移除旧脚本防止重复
-      const oldScript = document.getElementById('amap-script');
-      if(oldScript) oldScript.remove();
+      resetAmapLoader();
       this.loadAmapScript();
     },
     
@@ -453,85 +456,43 @@ export default {
       }
     },
 
-    loadAmapScript() {
-      // 1. 设置安全密钥（高德地图 2.0 必须设置）
-      if (!window._AMapSecurityConfig) {
-        window._AMapSecurityConfig = {
-          securityJsCode: this.securityCode,
-        };
-        console.log('🔐 安全密钥已设置');
-      }
+    async loadAmapScript() {
+      this.mapError = false;
+      this.mapErrorMessage = '';
 
-      // 2. 检查是否已加载
-      if (window.AMap && window.AMap.Map) {
-        console.log('✅ 高德地图 SDK 已存在，直接初始化');
-        setTimeout(() => {
-          this.initMap();
-        }, 100);
-        return;
-      }
-      
-      // 3. 检查脚本是否正在加载
-      const existingScript = document.getElementById('amap-script');
-      if (existingScript) {
-        console.log('⏳ 地图脚本正在加载中，等待完成...');
-        
-        // 设置超时机制，避免永久等待
-        const timeout = setTimeout(() => {
-          console.warn('⚠️ 脚本加载超时，尝试重新加载');
-          existingScript.remove();
-          this.loadAmapScript();
-        }, 10000);
-        
-        // 监听加载完成
-        const onLoad = () => {
-          clearTimeout(timeout);
-          console.log('✅ 已存在的脚本加载完成');
-          if (window.AMap && window.AMap.Map) {
-            this.initMap();
-          }
-        };
-        
-        if (existingScript.complete || existingScript.readyState === 'complete') {
-          onLoad();
-        } else {
-          existingScript.addEventListener('load', onLoad, { once: true });
-        }
-        return;
-      }
-
-      console.log('🔄 开始加载高德地图 SDK...');
-
-      // 4. 加载新脚本
-      const script = document.createElement('script');
-      script.id = 'amap-script';
-      script.type = 'text/javascript';
-      script.async = true;
-      script.src = `https://webapi.amap.com/maps?v=2.0&key=${this.amapKey}&plugin=AMap.Scale,AMap.ToolBar`;
-      
-      script.onload = () => {
-        console.log('✅ 地图脚本加载成功');
-        this.mapError = false;
-        setTimeout(() => {
-          if (window.AMap && window.AMap.Map) {
-            this.initMap();
-          } else {
-            console.error('❌ AMap 对象未正确加载');
-            this.mapError = true;
-          }
-        }, 300);
-      };
-      
-      script.onerror = (e) => {
-        console.error('❌ 高德地图脚本加载失败:', e);
-        console.error('可能原因: 1.网络问题 2.Key无效 3.Key和SecurityCode不匹配 4.域名未配置白名单');
+      try {
+        console.log('🔄 开始加载高德地图 SDK...');
+        await loadAmapSdk({
+          key: this.amapKey,
+          securityCode: this.securityCode,
+          plugins: ['AMap.Scale', 'AMap.ToolBar', 'AMap.Geolocation']
+        });
+        this.initMap();
+      } catch (error) {
+        console.error('❌ 高德地图脚本加载失败:', error);
         this.mapError = true;
-        this.$message.error('地图连接失败，请检查API Key配置和域名白名单');
-        // 移除失败的脚本
-        script.remove();
-      };
-      
-      document.head.appendChild(script);
+        this.mapErrorMessage = this.resolveMapErrorMessage(error);
+        this.$message.error(this.mapErrorMessage);
+      }
+    },
+
+    resolveMapErrorMessage(error) {
+      if (!this.amapKey) {
+        return '未配置 VUE_APP_AMAP_JS_KEY，地图无法初始化';
+      }
+      if (!this.securityCode) {
+        return '未配置 VUE_APP_AMAP_SECURITY_CODE，地图无法初始化';
+      }
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        return '当前浏览器处于离线状态，请先恢复网络连接';
+      }
+      if (error && error.message === 'AMAP_NETWORK_ERROR') {
+        return '高德地图资源请求被网络、代理或防火墙拦截，请检查本机网络环境';
+      }
+      if (error && error.message === 'AMAP_SDK_UNAVAILABLE') {
+        return '高德地图脚本已返回，但 SDK 未初始化，请检查 Key、SecurityCode 和域名白名单';
+      }
+      return '高德地图加载失败，请检查网络环境以及 Key/SecurityCode 配置';
     },
 
     initMap() {
@@ -1818,6 +1779,13 @@ export default {
 .error-content { text-align: center; color: #909399; }
 .error-content i { font-size: 48px; margin-bottom: 16px; color: #F56C6C; }
 .error-content p { margin-bottom: 20px; font-size: 16px; }
+.error-detail {
+  max-width: 420px;
+  margin: 0 auto 20px;
+  font-size: 13px !important;
+  line-height: 1.6;
+  color: #6b7280;
+}
 
 .tool-btn {
   width: 44px; height: 44px; background: white; border-radius: 50%;

@@ -34,7 +34,7 @@
             class="custom-input"
             clearable
             @clear="load"
-            @keyup.enter.native="load">
+            @keyup.enter="load">
           </el-input>
           <el-button type="primary" icon="el-icon-search" @click="load">查询</el-button>
           <el-button plain icon="el-icon-refresh" @click="reset">重置</el-button>
@@ -59,26 +59,26 @@
         <el-table-column prop="id" label="ID" width="80" align="center" sortable></el-table-column>
         
         <el-table-column prop="product" label="销售作物">
-          <template slot-scope="scope">
+          <template #default="scope">
             <span style="font-weight:bold; color:#303133">{{ scope.row.product }}</span>
             <el-tag size="mini" type="success" style="margin-left: 5px">现货</el-tag>
           </template>
         </el-table-column>
         
         <el-table-column prop="price" label="销售单价 (元)" align="right">
-          <template slot-scope="scope">
+          <template #default="scope">
             <span style="color: #67C23A; font-weight:bold">¥{{ scope.row.price }}</span>
           </template>
         </el-table-column>
 
         <el-table-column prop="number" label="销售数量" align="center">
-           <template slot-scope="scope">
+           <template #default="scope">
              <span style="font-family: monospace; font-size: 14px">{{ scope.row.number }}</span>
            </template>
         </el-table-column>
 
         <el-table-column label="销售总额" align="right">
-          <template slot-scope="scope">
+          <template #default="scope">
             <span style="color: #67C23A; font-weight:bold; font-size: 15px">
               + ¥{{ (scope.row.price * scope.row.number).toFixed(2) }}
             </span>
@@ -86,7 +86,7 @@
         </el-table-column>
         
         <el-table-column prop="buyer" label="采购商/客户" show-overflow-tooltip>
-           <template slot-scope="scope">
+           <template #default="scope">
              <i class="el-icon-s-custom"></i> {{ scope.row.buyer }}
            </template>
         </el-table-column>
@@ -94,7 +94,7 @@
         <el-table-column prop="time" label="销售时间" width="160" sortable></el-table-column>
 
         <el-table-column label="操作" width="180" align="center">
-          <template slot-scope="scope">
+          <template #default="scope">
             <el-button type="text" icon="el-icon-edit" @click="handleEdit(scope.row)">编辑</el-button>
             <el-button type="text" class="del-btn" icon="el-icon-delete" @click="del(scope.row.id)">撤单</el-button>
           </template>
@@ -114,7 +114,7 @@
       </div>
     </div>
 
-    <el-dialog title="💰 销售订单录入" :visible.sync="dialogFormVisible" width="500px" :close-on-click-modal="false">
+    <el-dialog title="💰 销售订单录入" v-model="dialogFormVisible" width="500px" :close-on-click-modal="false">
       <el-form label-width="100px" size="small" :model="form" class="custom-form">
         <el-form-item label="销售作物">
           <el-input v-model="form.product" autocomplete="off" placeholder="请输入销售作物名称"></el-input>
@@ -135,10 +135,12 @@
           <el-input type="textarea" v-model="form.remark" placeholder="选填"></el-input>
         </el-form-item>
       </el-form>
-      <div slot="footer" class="dialog-footer">
-        <el-button @click="dialogFormVisible = false">取 消</el-button>
-        <el-button type="primary" @click="save">确认销售</el-button>
-      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="dialogFormVisible = false">取 消</el-button>
+          <el-button type="primary" @click="save">确认销售</el-button>
+        </div>
+      </template>
     </el-dialog>
   </div>
 </template>

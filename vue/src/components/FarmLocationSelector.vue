@@ -1,7 +1,7 @@
 <template>
   <el-dialog
     title="Farm Location"
-    :visible.sync="dialogVisible"
+    v-model="dialogVisible"
     width="70%"
     top="5vh"
     :close-on-click-modal="false"
@@ -14,7 +14,7 @@
           v-model="searchKeyword"
           placeholder="Search address or place"
           clearable
-          @keyup.enter.native="handleSearch"
+          @keyup.enter="handleSearch"
         />
         <el-button type="primary" icon="el-icon-search" @click="handleSearch">Search</el-button>
         <el-button type="success" icon="el-icon-edit-outline" :disabled="isDrawing" @click="startDraw">
@@ -41,15 +41,18 @@
       </div>
     </div>
 
-    <div slot="footer" class="dialog-footer">
-      <el-button @click="dialogVisible = false">Cancel</el-button>
-      <el-button type="primary" @click="confirmSelection">Confirm</el-button>
-    </div>
+    <template #footer>
+      <div class="dialog-footer">
+        <el-button @click="dialogVisible = false">Cancel</el-button>
+        <el-button type="primary" @click="confirmSelection">Confirm</el-button>
+      </div>
+    </template>
   </el-dialog>
 </template>
 
 <script>
 import mapConfig from '@/config/map.config.js'
+import { loadAmapSdk } from '@/utils/amapLoader'
 
 export default {
   name: 'FarmLocationSelector',
@@ -75,8 +78,7 @@ export default {
         lng: null,
         lat: null,
         address: ''
-      },
-      amapKey: mapConfig.amap.jsKey
+      }
     }
   },
   computed: {
@@ -94,45 +96,30 @@ export default {
   },
   methods: {
     async initMap() {
-      await this.ensureMapSdk()
-      this.createMap()
-    },
-    ensureMapSdk() {
-      if (window.AMap && window.AMap.Map && window.AMap.MouseTool) {
-        return Promise.resolve()
+      try {
+        await this.ensureMapSdk()
+        this.createMap()
+      } catch (error) {
+        console.error('Failed to initialize map selector:', error)
       }
+    },
+    async ensureMapSdk() {
       if (this.isLoadingMap) {
-        return Promise.resolve()
+        return
       }
 
       this.isLoadingMap = true
-      return new Promise((resolve, reject) => {
-        const existingScript = document.getElementById('farm-location-amap')
-        if (existingScript) {
-          existingScript.addEventListener('load', () => {
-            this.isLoadingMap = false
-            resolve()
-          }, { once: true })
-          existingScript.addEventListener('error', reject, { once: true })
-          return
-        }
-
-        const script = document.createElement('script')
-        script.id = 'farm-location-amap'
-        script.src = `https://webapi.amap.com/maps?v=2.0&key=${this.amapKey}&plugin=AMap.ToolBar,AMap.PlaceSearch,AMap.Geocoder,AMap.MouseTool`
-        script.onload = () => {
-          this.isLoadingMap = false
-          resolve()
-        }
-        script.onerror = (error) => {
-          this.isLoadingMap = false
-          reject(error)
-        }
-        document.head.appendChild(script)
-      }).catch((error) => {
+      try {
+        await loadAmapSdk({
+          plugins: ['AMap.ToolBar', 'AMap.PlaceSearch', 'AMap.Geocoder', 'AMap.MouseTool', 'AMap.GeometryUtil']
+        })
+      } catch (error) {
         console.error('Failed to load AMap SDK:', error)
-        this.$message.error('Map loading failed')
-      })
+        this.$message.error('高德地图加载失败，请检查网络或 Key 配置')
+        throw error
+      } finally {
+        this.isLoadingMap = false
+      }
     },
     createMap() {
       this.$nextTick(() => {
