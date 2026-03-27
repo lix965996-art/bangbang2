@@ -8,8 +8,6 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.farmland.intel.entity.Statistic;
 import com.farmland.intel.mapper.StatisticMapper;
 import com.farmland.intel.service.IAgriDailyReportService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -24,13 +22,15 @@ import java.util.*;
 @Service
 @SuppressWarnings("unchecked")
 public class AgriDailyReportServiceImpl implements IAgriDailyReportService {
-    private static final Logger log = LoggerFactory.getLogger(AgriDailyReportServiceImpl.class);
     
     @Autowired
     private StatisticMapper statisticMapper;
     
     @Value("${amap.web-key:}")
     private String amapWebKey;
+
+    @Value("${amap.js-security-key:}")
+    private String amapJsSecurityKey;
     
     @Value("${amap.city:430800}")
     private String defaultCity;
@@ -63,7 +63,7 @@ public class AgriDailyReportServiceImpl implements IAgriDailyReportService {
             result.put("success", true);
             
         } catch (Exception e) {
-            log.error("Generate agri daily report failed", e);
+            e.printStackTrace();
             result.put("success", false);
             result.put("error", e.getMessage());
             result.put("aiAdvice", generateDefaultAdvice());
@@ -113,7 +113,7 @@ public class AgriDailyReportServiceImpl implements IAgriDailyReportService {
         try {
             if (amapWebKey != null && !amapWebKey.isEmpty()) {
                 // 获取实时天气
-                String url = AMAP_WEATHER_URL + "?city=" + defaultCity + "&key=" + amapWebKey + "&extensions=base";
+                String url = buildWeatherUrl("base");
                 String response = HttpUtil.get(url);
                 JSONObject json = JSONUtil.parseObj(response);
                 
@@ -133,7 +133,7 @@ public class AgriDailyReportServiceImpl implements IAgriDailyReportService {
                 }
                 
                 // 获取天气预报
-                String forecastUrl = AMAP_WEATHER_URL + "?city=" + defaultCity + "&key=" + amapWebKey + "&extensions=all";
+                String forecastUrl = buildWeatherUrl("all");
                 String forecastResponse = HttpUtil.get(forecastUrl);
                 JSONObject forecastJson = JSONUtil.parseObj(forecastResponse);
                 
@@ -147,7 +147,7 @@ public class AgriDailyReportServiceImpl implements IAgriDailyReportService {
                 }
             }
         } catch (Exception e) {
-            log.warn("Fetch weather data failed, fallback to defaults", e);
+            e.printStackTrace();
         }
         
         // 如果获取失败，返回默认数据
@@ -450,5 +450,17 @@ public class AgriDailyReportServiceImpl implements IAgriDailyReportService {
      */
     private String generateDefaultAdvice() {
         return "智能农情分析系统正在初始化，请确保已配置天气API密钥并录入农田信息。建议定期巡检农田，关注作物生长状况，及时调整农事计划。";
+    }
+
+    private String buildWeatherUrl(String extensions) {
+        StringBuilder url = new StringBuilder(AMAP_WEATHER_URL)
+                .append("?city=").append(defaultCity)
+                .append("&key=").append(amapWebKey)
+                .append("&extensions=").append(extensions)
+                .append("&sdk=server");
+        if (amapJsSecurityKey != null && !amapJsSecurityKey.isEmpty()) {
+            url.append("&jscode=").append(amapJsSecurityKey);
+        }
+        return url.toString();
     }
 }

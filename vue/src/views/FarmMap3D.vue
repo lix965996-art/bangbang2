@@ -416,11 +416,21 @@ export default {
     async fetchData() {
       try {
         // 先获取STM32传感器数据（两个设备）
-        await this.fetchSTM32Data();
         
         const res = await this.request.get('/statistic/dashboard');
         if (res.code === '200') {
-            this.farms = res.data;
+            this.farms = Array.isArray(res.data) ? res.data : [];
+            this.applyFarmFallbackData();
+            this.initializeFarmScene();
+
+            this.fetchSTM32Data()
+              .then(() => {
+                this.applyFarmFallbackData();
+              })
+              .catch(error => {
+                console.warn('STM32 data refresh failed:', error);
+              });
+            return;
             
             // 优先使用数据库数据，传感器数据作为备用
             this.farms = this.farms.map(farm => {
@@ -456,6 +466,46 @@ export default {
             });
         }
       } catch (e) { console.error(e); }
+    },
+
+    applyFarmFallbackData() {
+      const selectedFarmId = this.selectedFarm ? this.selectedFarm.id : null;
+      this.farms = (this.farms || []).map(farm => {
+        const updatedFarm = { ...farm };
+        const deviceKey = this.assignDeviceToFarm(farm.id);
+        const deviceData = this.getDeviceData(deviceKey);
+
+        if (!updatedFarm.temperature || updatedFarm.temperature <= 0) {
+          updatedFarm.temperature = deviceData.temperature;
+          updatedFarm.dataSource = deviceKey === 'device1' ? 'STM32-001' : 'STM32-PUMP';
+        } else {
+          updatedFarm.dataSource = 'Database';
+        }
+
+        if (!updatedFarm.soilhumidity || updatedFarm.soilhumidity <= 0) {
+          updatedFarm.soilhumidity = deviceData.humidity;
+        }
+
+        return updatedFarm;
+      });
+
+      this.summary.farmCount = this.farms.length;
+      this.summary.totalArea = this.farms.reduce((acc, cur) => acc + (Number(cur.area) || 0), 0);
+
+      if (!this.farms.length) {
+        this.selectedFarm = null;
+        return;
+      }
+
+      this.selectedFarm = this.farms.find(farm => farm.id === selectedFarmId) || this.farms[0];
+    },
+
+    initializeFarmScene() {
+      this.$nextTick(() => {
+        if (!this.scene && this.$refs.threeContainer) {
+          this.initThreeJS();
+        }
+      });
     },
     
     // 获取STM32传感器实时数据（两个设备）

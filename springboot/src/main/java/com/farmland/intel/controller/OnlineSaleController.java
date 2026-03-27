@@ -11,6 +11,7 @@ import com.farmland.intel.entity.User;
 import com.farmland.intel.service.IInventoryService;
 import com.farmland.intel.service.IOnlineSaleService;
 import com.farmland.intel.utils.TokenUtils;
+import com.farmland.intel.utils.DataPermissionUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
@@ -57,7 +58,7 @@ public class OnlineSaleController {
             try {
                 User currentUser = TokenUtils.getCurrentUser();
                 if (currentUser != null) {
-                    onlineSale.setSeller(currentUser.getUsername());
+                    onlineSale.setSeller(DataPermissionUtils.resolveUserDisplayName(currentUser));
                 }
             } catch (Exception e) {
                 // 忽略获取用户失败的情况，避免影响主流程
@@ -92,9 +93,7 @@ public class OnlineSaleController {
         QueryWrapper<OnlineSale> queryWrapper = new QueryWrapper<>();
         // 非管理员只能查看自己的在线销售记录
         User currentUser = TokenUtils.getCurrentUser();
-        if (currentUser != null && !"ROLE_ADMIN".equals(currentUser.getRole())) {
-            queryWrapper.eq("seller", currentUser.getUsername());
-        }
+        DataPermissionUtils.applyUserMatchPermission(queryWrapper, "seller", currentUser);
         return Result.success(onlineSaleService.list(queryWrapper));
     }
 
@@ -115,9 +114,7 @@ public class OnlineSaleController {
         
         // 数据权限控制：非管理员只能看自己的
         User currentUser = TokenUtils.getCurrentUser();
-        if (currentUser != null && !"ROLE_ADMIN".equals(currentUser.getRole())) {
-            queryWrapper.eq("seller", currentUser.getUsername());
-        }
+        DataPermissionUtils.applyUserMatchPermission(queryWrapper, "seller", currentUser);
         
         Page<OnlineSale> page = onlineSaleService.page(new Page<>(pageNum, pageSize), queryWrapper);
         return Result.success(page);

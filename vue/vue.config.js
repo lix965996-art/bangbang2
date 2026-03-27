@@ -4,6 +4,15 @@
   outputDir: 'dist',
   assetsDir: 'static',
   productionSourceMap: false,
+  transpileDependencies: [
+    'element-plus',
+    'vue-router',
+    'vuex',
+    '@ctrl/tinycolor',
+    '@vueuse/core',
+    '@vueuse/shared',
+    '@element-plus/icons-vue'
+  ],
 
   devServer: {
     host: '0.0.0.0',

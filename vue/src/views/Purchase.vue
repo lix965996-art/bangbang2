@@ -34,7 +34,7 @@
             class="custom-input"
             clearable
             @clear="load"
-            @keyup.enter.native="load">
+            @keyup.enter="load">
           </el-input>
           <el-button type="primary" icon="el-icon-search" @click="load">查询</el-button>
           <el-button plain icon="el-icon-refresh" @click="reset">重置</el-button>
@@ -59,25 +59,25 @@
         <el-table-column prop="id" label="ID" width="80" align="center" sortable></el-table-column>
         
         <el-table-column prop="product" label="采购物资">
-          <template slot-scope="scope">
+          <template #default="scope">
             <span style="font-weight:bold; color:#303133">{{ scope.row.product }}</span>
           </template>
         </el-table-column>
         
         <el-table-column prop="price" label="单价 (元)" align="right">
-          <template slot-scope="scope">
+          <template #default="scope">
             <span style="color: #909399">¥{{ scope.row.price }}</span>
           </template>
         </el-table-column>
 
         <el-table-column prop="number" label="数量" align="center">
-           <template slot-scope="scope">
+           <template #default="scope">
              <el-tag size="small" effect="plain">{{ scope.row.number }}</el-tag>
            </template>
         </el-table-column>
 
         <el-table-column label="总金额" align="right">
-          <template slot-scope="scope">
+          <template #default="scope">
             <span style="color: #F56C6C; font-weight:bold">
               ¥{{ (scope.row.price * scope.row.number).toFixed(2) }}
             </span>
@@ -85,7 +85,7 @@
         </el-table-column>
         
         <el-table-column prop="provider" label="供应商" show-overflow-tooltip>
-           <template slot-scope="scope">
+           <template #default="scope">
              <i class="el-icon-office-building"></i> {{ scope.row.provider || '未知供应商' }}
            </template>
         </el-table-column>
@@ -94,7 +94,7 @@
         <el-table-column prop="time" label="采购时间" width="160" sortable></el-table-column>
 
         <el-table-column label="操作" width="180" align="center">
-          <template slot-scope="scope">
+          <template #default="scope">
             <el-button type="text" icon="el-icon-edit" @click="handleEdit(scope.row)">编辑</el-button>
             <el-button type="text" class="del-btn" icon="el-icon-delete" @click="del(scope.row.id)">删除</el-button>
           </template>
@@ -114,7 +114,7 @@
       </div>
     </div>
 
-    <el-dialog title="📝 采购单填报" :visible.sync="dialogFormVisible" width="500px" :close-on-click-modal="false">
+    <el-dialog title="📝 采购单填报" v-model="dialogFormVisible" width="500px" :close-on-click-modal="false">
       <el-form label-width="100px" size="small" :model="form" class="custom-form">
         <el-form-item label="物资名称">
           <el-input v-model="form.product" autocomplete="off" placeholder="请输入物资名称"></el-input>
@@ -136,10 +136,12 @@
           <el-input type="textarea" v-model="form.remark" placeholder="选填"></el-input>
         </el-form-item>
       </el-form>
-      <div slot="footer" class="dialog-footer">
-        <el-button @click="dialogFormVisible = false">取 消</el-button>
-        <el-button type="primary" @click="save">提交入库</el-button>
-      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="dialogFormVisible = false">取 消</el-button>
+          <el-button type="primary" @click="save">提交入库</el-button>
+        </div>
+      </template>
     </el-dialog>
   </div>
 </template>

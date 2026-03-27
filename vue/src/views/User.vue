@@ -79,12 +79,14 @@
                 <span class="el-dropdown-link options-btn">
                   <i class="el-icon-more"></i>
                 </span>
-                <el-dropdown-menu slot="dropdown">
-                  <el-dropdown-item command="edit" icon="el-icon-edit">编辑档案</el-dropdown-item>
-                  <el-dropdown-item command="resetPassword" icon="el-icon-refresh-right">重置密码</el-dropdown-item>
-                  <el-dropdown-item command="task" icon="el-icon-tickets">分配任务</el-dropdown-item>
-                  <el-dropdown-item command="delete" icon="el-icon-delete" style="color: #F56C6C">离职归档</el-dropdown-item>
-                </el-dropdown-menu>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="edit" icon="el-icon-edit">编辑档案</el-dropdown-item>
+                    <el-dropdown-item command="resetPassword" icon="el-icon-refresh-right">重置密码</el-dropdown-item>
+                    <el-dropdown-item command="task" icon="el-icon-tickets">分配任务</el-dropdown-item>
+                    <el-dropdown-item command="delete" icon="el-icon-delete" style="color: #F56C6C">离职归档</el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
               </el-dropdown>
             </div>
 
@@ -135,7 +137,7 @@
       </el-pagination>
     </div>
 
-    <el-dialog title="📝 编辑农人档案" :visible.sync="dialogFormVisible" width="30%" :close-on-click-modal="false">
+    <el-dialog title="📝 编辑农人档案" v-model="dialogFormVisible" width="30%" :close-on-click-modal="false">
       <el-form label-width="80px" size="small" :model="form">
         <el-form-item label="用户名">
           <el-input v-model="form.username" autocomplete="off"></el-input>
@@ -158,15 +160,17 @@
           <el-input v-model="form.address" placeholder="例如：A5号智能大棚"></el-input>
         </el-form-item>
       </el-form>
-      <div slot="footer" class="dialog-footer">
-        <el-button @click="dialogFormVisible = false">取 消</el-button>
-        <el-button type="primary" @click="save">保存档案</el-button>
-      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="dialogFormVisible = false">取 消</el-button>
+          <el-button type="primary" @click="save">保存档案</el-button>
+        </div>
+      </template>
     </el-dialog>
 
     <el-dialog 
       :title=" form.username + ' - AI 智能农事绩效报告'" 
-      :visible.sync="performanceDialogVisible" 
+      v-model="performanceDialogVisible" 
       width="40%"
       center>
       <div style="text-align: center; margin-bottom: 20px;">
@@ -182,14 +186,16 @@
           <div style="line-height: 1.5;">该农人在 <span style="color: #409EFF; font-weight: bold;">{{ form.address || '作业区' }}</span> 表现优异，能及时响应IoT预警，建议作为“智慧农业带头人”进行表彰。</div>
         </el-descriptions-item>
       </el-descriptions>
-      <span slot="footer" class="dialog-footer">
-        <el-button @click="performanceDialogVisible = false">关 闭</el-button>
-      </span>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="performanceDialogVisible = false">关 闭</el-button>
+        </span>
+      </template>
     </el-dialog>
 
     <el-dialog 
       :title="  form.username + ' - 今日作业轨迹 (GIS实时)'" 
-      :visible.sync="trajectoryDialogVisible" 
+      v-model="trajectoryDialogVisible" 
       width="35%">
       <div style="height: 300px; overflow-y: auto; padding: 10px;">
         <el-timeline>
@@ -217,14 +223,16 @@
           </el-timeline-item>
         </el-timeline>
       </div>
-      <span slot="footer" class="dialog-footer">
-        <el-button type="primary" plain @click="trajectoryDialogVisible = false">查看 3D 轨迹回放</el-button>
-      </span>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button type="primary" plain @click="trajectoryDialogVisible = false">查看 3D 轨迹回放</el-button>
+        </span>
+      </template>
     </el-dialog>
 
     <el-dialog 
       :title="'向 ' + form.username + ' 发送指令'" 
-      :visible.sync="messageDialogVisible" 
+      v-model="messageDialogVisible" 
       width="30%">
       <el-form label-position="top">
         <el-form-item label="快捷指令">
@@ -238,10 +246,12 @@
           <el-input type="textarea" :rows="4" placeholder="请输入具体的作业指令..." v-model="messageContent"></el-input>
         </el-form-item>
       </el-form>
-      <span slot="footer" class="dialog-footer">
-        <el-button @click="messageDialogVisible = false">取 消</el-button>
-        <el-button type="primary" icon="el-icon-s-promotion" @click="performSend">发 送</el-button>
-      </span>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="messageDialogVisible = false">取 消</el-button>
+          <el-button type="primary" icon="el-icon-s-promotion" @click="performSend">发 送</el-button>
+        </span>
+      </template>
     </el-dialog>
 
   </div>

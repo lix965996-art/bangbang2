@@ -14,7 +14,7 @@
           clearable 
           @clear="load"
           @input="debouncedSearch"
-          @keyup.enter.native="load">
+          @keyup.enter="load">
         </el-input>
         <el-button type="primary" icon="el-icon-search" @click="load">查询</el-button>
         <el-button type="success" icon="el-icon-plus" @click="handleAdd">新建地块</el-button>
@@ -37,7 +37,7 @@
         <el-table-column prop="id" label="ID" width="60" align="center" sortable></el-table-column>
         
         <el-table-column label="农田信息" width="220">
-          <template slot-scope="scope">
+          <template #default="scope">
             <div class="farm-info-cell">
               <div class="farm-icon">
                 <img :src="getCropIcon(scope.row.crop)" class="farm-icon-img" />
@@ -51,19 +51,19 @@
         </el-table-column>
 
         <el-table-column prop="crop" label="作物" width="100">
-           <template slot-scope="scope">
+           <template #default="scope">
              <el-tag size="small" effect="plain">{{ scope.row.crop }}</el-tag>
            </template>
         </el-table-column>
         
         <el-table-column prop="area" label="面积 (亩)" width="100" align="center">
-          <template slot-scope="scope">
+          <template #default="scope">
             <span style="font-weight: bold; color: #409EFF">{{ scope.row.area }}</span>
           </template>
         </el-table-column>
         
         <el-table-column prop="keeper" label="负责人" width="120">
-           <template slot-scope="scope">
+           <template #default="scope">
              <div class="keeper-tag">
                <i class="el-icon-user"></i> {{ scope.row.keeper }}
              </div>
@@ -71,7 +71,7 @@
         </el-table-column>
 
         <el-table-column label=" AI品质评级" width="180">
-          <template slot-scope="scope">
+          <template #default="scope">
              <el-rate
               :value="getFakeScore(scope.row.id)"
               disabled
@@ -83,7 +83,7 @@
         </el-table-column>
 
         <el-table-column label="资产操作" align="center">
-          <template slot-scope="scope">
+          <template #default="scope">
             <el-button 
               type="text" 
               class="trace-btn"
@@ -113,7 +113,7 @@
     <!-- 适量的底部空间 -->
     <div style="height: 50px; opacity: 0; pointer-events: none;"></div>
 
-    <el-dialog title="农田信息录入" :visible.sync="dialogFormVisible" width="500px" :close-on-click-modal="false" append-to-body :lock-scroll="false">
+    <el-dialog title="农田信息录入" v-model="dialogFormVisible" width="500px" :close-on-click-modal="false" append-to-body :lock-scroll="false">
       <el-form label-width="100px" size="medium" :model="form" :rules="rules" ref="farmForm" class="custom-form">
         <el-form-item label="农田名称" prop="farm">
           <el-input v-model="form.farm" placeholder="例如：A1号有机示范田"></el-input>
@@ -135,7 +135,7 @@
               ref="saveTagInput"
               size="small"
               style="width: 100px"
-              @keyup.enter.native="handleInputConfirm"
+              @keyup.enter="handleInputConfirm"
               @blur="handleInputConfirm"
             >
             </el-input>
@@ -187,20 +187,22 @@
           </div>
         </el-form-item>
       </el-form>
-      <div slot="footer" class="dialog-footer">
-        <el-button @click="dialogFormVisible = false">取 消</el-button>
-        <el-button type="primary" @click="save">确 定</el-button>
-      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="dialogFormVisible = false">取 消</el-button>
+          <el-button type="primary" @click="save">确 定</el-button>
+        </div>
+      </template>
     </el-dialog>
 
     <farm-location-selector
-      :visible.sync="locationSelectorVisible"
+      v-model:visible="locationSelectorVisible"
       :initial-data="form"
       @confirm="handleLocationConfirm"
     />
 
     <el-dialog 
-      :visible.sync="traceVisible" 
+      v-model="traceVisible" 
       width="420px" 
       custom-class="mobile-preview-dialog"
       :show-close="false"

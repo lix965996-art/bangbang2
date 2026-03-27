@@ -1,0 +1,20 @@
+flask
+flask-cors
+tensorflow
+tensorflow-hub
+numpy
+pillow
+redis
+requests
+scikit-learn
+torch
+torchvision
+opencv-python
+matplotlib
+seaborn
+pandas
+scipy
+tqdm
+click
+pyyaml
+ waitress

@@ -28,10 +28,12 @@
       
       <el-col :span="16">
         <el-card class="glass-card" shadow="never">
-          <div slot="header" class="panel-header">
-            <span><i class="el-icon-timer"></i> 农事作业与预警日志</span>
-            <el-button style="float: right; padding: 3px 0; color: #409EFF" type="text" icon="el-icon-plus" @click="handleAdd">发布新日志</el-button>
-          </div>
+          <template #header>
+            <div class="panel-header">
+              <span><i class="el-icon-timer"></i> 农事作业与预警日志</span>
+              <el-button style="float: right; padding: 3px 0; color: #409EFF" type="text" icon="el-icon-plus" @click="handleAdd">发布新日志</el-button>
+            </div>
+          </template>
 
           <div class="timeline-wrapper">
             <el-timeline>
@@ -77,7 +79,9 @@
                         <el-button type="text" size="mini" icon="el-icon-magic-stick" @click="mockAnalyze">AI 深度分析</el-button>
                         <el-button type="text" size="mini" icon="el-icon-edit" @click="handleEdit(item)">编辑</el-button>
                         <el-popconfirm title="删除这条记录？" @confirm="del(item.id)">
-                          <el-button slot="reference" type="text" size="mini" icon="el-icon-delete" style="color: #F56C6C; margin-left: 10px"></el-button>
+                          <template #reference>
+                            <el-button type="text" size="mini" icon="el-icon-delete" style="color: #F56C6C; margin-left: 10px"></el-button>
+                          </template>
                         </el-popconfirm>
                       </div>
                     </div>
@@ -92,14 +96,20 @@
 
       <el-col :span="8">
         <el-card class="glass-card mb-20">
-          <div slot="header" class="panel-header">🔍 智库检索</div>
+          <template #header>
+            <div class="panel-header">🔍 智库检索</div>
+          </template>
           <el-input placeholder="输入关键词..." v-model="name" class="search-input" clearable @clear="load">
-            <el-button slot="append" icon="el-icon-search" @click="load"></el-button>
+            <template #append>
+              <el-button icon="el-icon-search" @click="load"></el-button>
+            </template>
           </el-input>
         </el-card>
 
         <el-card class="glass-card ai-suggest-card">
-          <div slot="header" class="panel-header" style="color: white">🤖 DeepSeek 今日建议</div>
+          <template #header>
+            <div class="panel-header" style="color: white">🤖 DeepSeek 今日建议</div>
+          </template>
           <div class="ai-content">
             <p>“根据近 3 天的日志分析，A5 地块湿度持续偏低。建议启用智能灌溉系统，并将阈值调整为 65%。”</p>
             <el-button size="small" round style="background: rgba(255,255,255,0.2); color: white; border: none; margin-top: 10px">一键执行建议</el-button>
@@ -117,7 +127,7 @@
 
     </el-row>
 
-    <el-dialog :title="form.id ? '编辑日志' : '📝 发布新农情'" :visible.sync="dialogFormVisible" width="50%" center custom-class="custom-dialog">
+    <el-dialog :title="form.id ? '编辑日志' : '📝 发布新农情'" v-model="dialogFormVisible" width="50%" center custom-class="custom-dialog">
       <el-form label-width="80px" size="small" :model="form">
         <el-form-item label="标题">
           <el-input v-model="form.name" placeholder="请输入标题"></el-input>
@@ -145,10 +155,12 @@
           </el-upload>
         </el-form-item>
       </el-form>
-      <span slot="footer" class="dialog-footer">
-        <el-button @click="dialogFormVisible = false">取 消</el-button>
-        <el-button type="primary" @click="save">立即发布</el-button>
-      </span>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="dialogFormVisible = false">取 消</el-button>
+          <el-button type="primary" @click="save">立即发布</el-button>
+        </span>
+      </template>
     </el-dialog>
 
   </div>

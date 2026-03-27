@@ -1,0 +1,105 @@
+version: '3.8'
+
+services:
+  # Nacos服务发现
+  nacos:
+    image: nacos/nacos-server:2.2.0
+    container_name: nacos-server
+    ports:
+      - "8848:8848"
+    environment:
+      - MODE=standalone
+      - JVM_XMS=512m
+      - JVM_XMX=512m
+      - SPRING_DATASOURCE_PLATFORM=mysql
+      - MYSQL_SERVICE_HOST=mysql
+      - MYSQL_SERVICE_PORT=3306
+      - MYSQL_SERVICE_DB_NAME=nacos_config
+      - MYSQL_SERVICE_USER=nacos
+      - MYSQL_SERVICE_PASSWORD=nacos
+    volumes:
+      - ./nacos/logs:/home/nacos/logs
+      - ./nacos/init.d:/home/nacos/init.d
+    depends_on:
+      - mysql
+
+  # MySQL数据库
+  mysql:
+    image: mysql:8.0
+    container_name: mysql-db
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=123456
+      - MYSQL_DATABASE=smart_agriculture
+      - MYSQL_USER=agri_user
+      - MYSQL_PASSWORD=agri_password
+    volumes:
+      - ./mysql/data:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+  # Redis缓存
+  redis:
+    image: redis:7-alpine
+    container_name: redis-cache
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./redis/data:/data
+    command: redis-server --appendonly yes
+
+  # AI服务（Python）
+  ai-service:
+    build:
+      context: ./python
+      dockerfile: Dockerfile
+    container_name: ai-service
+    ports:
+      - "5000:5000"
+    depends_on:
+      - redis
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
+  # 农业物联网平台
+  smart-agriculture:
+    build: .
+    container_name: smart-agriculture
+    ports:
+      - "9094:9094"
+    depends_on:
+      - nacos
+      - mysql
+      - redis
+      - ai-service
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_NAME=smart_agriculture
+      - DB_USERNAME=agri_user
+      - DB_PASSWORD=agri_password
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - EUREKA_SERVER=http://nacos:8848
+      - UPLOAD_PATH=/app/uploads
+
+  # 前端服务
+  frontend:
+    build:
+      context: ./vue
+      dockerfile: Dockerfile
+    container_name: frontend-app
+    ports:
+      - "8080:80"
+    depends_on:
+      - smart-agriculture
+    environment:
+      - VUE_APP_API_BASE_URL=http://smart-agriculture:9094
+
+volumes:
+  nacos_logs:
+  mysql_data:
+  redis_data:

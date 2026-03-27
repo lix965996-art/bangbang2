@@ -18,6 +18,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.farmland.intel.common.Result;
 import org.springframework.web.multipart.MultipartFile;
 import com.farmland.intel.utils.TokenUtils;
+import com.farmland.intel.utils.DataPermissionUtils;
 
 import com.farmland.intel.entity.Inventory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,7 +48,7 @@ public class InventoryController {
             // 新增时自动填充仓库管理员为当前登录用户
             User currentUser = TokenUtils.getCurrentUser();
             if (currentUser != null) {
-                inventory.setKeeper(currentUser.getUsername());
+                inventory.setKeeper(DataPermissionUtils.resolveUserDisplayName(currentUser));
             }
         }
         inventoryService.saveOrUpdate(inventory);
@@ -71,9 +72,7 @@ public class InventoryController {
         QueryWrapper<Inventory> queryWrapper = new QueryWrapper<>();
         // 非管理员只能查看自己负责的库存
         User currentUser = TokenUtils.getCurrentUser();
-        if (currentUser != null && !"ROLE_ADMIN".equals(currentUser.getRole())) {
-            queryWrapper.eq("keeper", currentUser.getUsername());
-        }
+        DataPermissionUtils.applyUserMatchPermission(queryWrapper, "keeper", currentUser);
         return Result.success(inventoryService.list(queryWrapper));
     }
 
@@ -93,9 +92,7 @@ public class InventoryController {
         }
         // 非管理员只能查看自己负责的库存
         User currentUser = TokenUtils.getCurrentUser();
-        if (currentUser != null && !"ROLE_ADMIN".equals(currentUser.getRole())) {
-            queryWrapper.eq("keeper", currentUser.getUsername());
-        }
+        DataPermissionUtils.applyUserMatchPermission(queryWrapper, "keeper", currentUser);
         return Result.success(inventoryService.page(new Page<>(pageNum, pageSize), queryWrapper));
     }
 
@@ -206,4 +203,3 @@ public class InventoryController {
     }
 
 }
-

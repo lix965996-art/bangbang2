@@ -83,7 +83,7 @@
     </div>
 
     <!-- 找回密码对话框 -->
-    <el-dialog title="找回密码" :visible.sync="dialogFormVisible" width="30%">
+    <el-dialog title="找回密码" v-model="dialogFormVisible" width="30%">
       <el-form label-width="100px" size="small">
         <el-form-item label="用户名">
           <el-input v-model="pass.username" autocomplete="off"></el-input>
@@ -92,10 +92,12 @@
           <el-input v-model="pass.phone" autocomplete="off"></el-input>
         </el-form-item>
       </el-form>
-      <div slot="footer" class="dialog-footer">
-        <el-button @click="dialogFormVisible = false">取 消</el-button>
-        <el-button type="primary" @click="passwordBack">重置密码</el-button>
-      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="dialogFormVisible = false">取 消</el-button>
+          <el-button type="primary" @click="passwordBack">重置密码</el-button>
+        </div>
+      </template>
     </el-dialog>
   </div>
 </template>
@@ -556,4 +558,3 @@ export default {
   margin-bottom: 0;
 }
 </style>
-

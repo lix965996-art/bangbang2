@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 import lombok.extern.slf4j.Slf4j;
+import javax.annotation.PostConstruct;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -22,6 +23,22 @@ import java.util.Map;
 @RequestMapping("/api/chat")
 @Slf4j
 public class ChatController {
+
+    @PostConstruct
+    public void validateApiKey() {
+        if (qwenApiKey == null || qwenApiKey.trim().isEmpty()) {
+            log.error("❌ QWEN_API_KEY environment variable is not set. The application cannot start without a valid API key.");
+            throw new IllegalStateException("QWEN_API_KEY must be set in environment variables");
+        }
+        log.info("✅ QWEN_API_KEY is configured successfully");
+
+        // 检查高德地图API密钥
+        if ((webKey == null || webKey.trim().isEmpty()) && (jsKey == null || jsKey.trim().isEmpty())) {
+            log.error("❌ AMAP_WEB_KEY and AMAP_JS_KEY environment variables are not set. At least one must be configured for map services.");
+            throw new IllegalStateException("At least one of AMAP_WEB_KEY or AMAP_JS_KEY must be set in environment variables");
+        }
+        log.info("✅ High map API keys are configured successfully");
+    }
 
     // 2. 注意这里：注入类型必须是【接口 IQwenService】
     @Autowired
@@ -33,16 +50,19 @@ public class ChatController {
     @Autowired(required = false)
     private IOneNetService oneNetService;
 
-    @Value("${amap.web-key:}")
+    @Value("${amap.web-key}")
     private String webKey;
 
-    @Value("${amap.js-key:}")
+    @Value("${amap.js-key}")
     private String jsKey;
+
+    @Value("${amap.js-security-key:}")
+    private String jsSecurityKey;
 
     @Value("${amap.city:430800}")
     private String defaultCity;
 
-    @Value("${qwen.api-key:}")
+    @Value("${qwen.api-key}")
     private String qwenApiKey;
 
     @Value("${qwen.api-url:https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation}")
@@ -93,7 +113,8 @@ public class ChatController {
         try {
             String apiKey = (webKey != null && !webKey.isEmpty()) ? webKey : jsKey;
             if (apiKey != null && !apiKey.isEmpty()) {
-                String url = "https://restapi.amap.com/v3/weather/weatherInfo?city=" + defaultCity + "&key=" + apiKey + "&extensions=base";
+                // 构建高德API URL，包含安全密钥参数
+                String url = buildWeatherUrl(apiKey);
                 String res = HttpUtil.get(url);
                 JSONObject json = JSONUtil.parseObj(res);
                 if ("1".equals(json.getStr("status"))) {
@@ -108,11 +129,27 @@ public class ChatController {
         }
 
         // 3. 调用接口定义的方法
+        System.out.println("🤖 AI Chat 正在获取环境数据...");
+        System.out.println("   [室内] 温度: " + indoorTemp + "°C, 湿度: " + indoorHumidity + "%");
+        System.out.println("   [室外] 温度: " + outdoorTemp + "°C");
+        
         String answer = qwenService.askAgriExpert(question, indoorTemp, indoorHumidity, outdoorTemp);
 
         response.put("code", 200);
         response.put("answer", answer);
         return response;
+    }
+
+    private String buildWeatherUrl(String apiKey) {
+        StringBuilder url = new StringBuilder("https://restapi.amap.com/v3/weather/weatherInfo")
+                .append("?city=").append(defaultCity)
+                .append("&key=").append(apiKey)
+                .append("&extensions=base")
+                .append("&sdk=server");
+        if ((webKey == null || webKey.isEmpty()) && jsSecurityKey != null && !jsSecurityKey.isEmpty()) {
+            url.append("&jscode=").append(jsSecurityKey);
+        }
+        return url.toString();
     }
 
     /**
@@ -136,21 +173,29 @@ public class ChatController {
         try {
             // 构建通义千问请求格式
             JSONObject payload = new JSONObject();
-            payload.put("model", qwenModel);
-            
+            payload.set("model", qwenModel);
+
             // 构建input
             JSONObject input = new JSONObject();
             JSONArray messages = new JSONArray();
-            messages.add(new JSONObject().put("role", "system").put("content", systemPrompt));
-            messages.add(new JSONObject().put("role", "user").put("content", prompt));
-            input.put("messages", messages);
-            payload.put("input", input);
-            
+            JSONObject systemMsg = new JSONObject();
+            systemMsg.set("role", "system");
+            systemMsg.set("content", systemPrompt);
+            messages.add(systemMsg);
+
+            JSONObject userMsg = new JSONObject();
+            userMsg.set("role", "user");
+            userMsg.set("content", prompt);
+            messages.add(userMsg);
+
+            input.set("messages", messages);
+            payload.set("input", input);
+
             // 构建parameters
             JSONObject parameters = new JSONObject();
-            parameters.put("temperature", 0.7);
-            parameters.put("result_format", "message");
-            payload.put("parameters", parameters);
+            parameters.set("temperature", 0.7);
+            parameters.set("result_format", "message");
+            payload.set("parameters", parameters);
 
             // 发送请求
             String result = HttpRequest.post(qwenApiUrl)
