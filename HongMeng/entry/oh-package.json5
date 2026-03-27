@@ -1,0 +1,12 @@
+{
+  "name": "entry",
+  "version": "1.0.0",
+  "description": "智慧农场管理系统入口模块",
+  "main": "",
+  "author": "",
+  "license": "ISC",
+  dependencies: {
+    "@kit.arkui/hvigor": "^1.0.0",
+    "@kit.arkui/hvigor-ohos-plugin": "^1.0.0"
+  }
+}

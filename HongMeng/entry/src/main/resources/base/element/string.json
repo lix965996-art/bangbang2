@@ -1,0 +1,16 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "智慧农场管理系统"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "智慧农场主入口"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "智慧农场"
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "string": [
+    {
+      "name": "EntryAbility_label",
+      "value": "智慧农场"
+    },
+    {
+      "name": "app_name",
+      "value": "智慧农场"
+    },
+    {
+      "name": "login_title",
+      "value": "智慧农场管理系统"
+    },
+    {
+      "name": "username",
+      "value": "用户名"
+    },
+    {
+      "name": "password",
+      "value": "密码"
+    },
+    {
+      "name": "login",
+      "value": "登录"
+    },
+    {
+      "name": "register",
+      "value": "注册"
+    },
+    {
+      "name": "home",
+      "value": "首页"
+    },
+    {
+      "name": "farmland",
+      "value": "农田"
+    },
+    {
+      "name": "inventory",
+      "value": "库存"
+    },
+    {
+      "name": "detect",
+      "value": "识别"
+    },
+    {
+      "name": "assistant",
+      "value": "助手"
+    },
+    {
+      "name": "dashboard",
+      "value": "大屏"
+    },
+    {
+      "name": "alerts",
+      "value": "预警"
+    },
+    {
+      "name": "settings",
+      "value": "设置"
+    }
+  ]
+}

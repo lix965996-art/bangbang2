@@ -1,0 +1,64 @@
+{
+  "string": [
+    {
+      "name": "EntryAbility_label",
+      "value": "Smart Farm"
+    },
+    {
+      "name": "app_name",
+      "value": "Smart Farm"
+    },
+    {
+      "name": "login_title",
+      "value": "Smart Farm System"
+    },
+    {
+      "name": "username",
+      "value": "Username"
+    },
+    {
+      "name": "password",
+      "value": "Password"
+    },
+    {
+      "name": "login",
+      "value": "Login"
+    },
+    {
+      "name": "register",
+      "value": "Register"
+    },
+    {
+      "name": "home",
+      "value": "Home"
+    },
+    {
+      "name": "farmland",
+      "value": "Farmland"
+    },
+    {
+      "name": "inventory",
+      "value": "Inventory"
+    },
+    {
+      "name": "detect",
+      "value": "Detect"
+    },
+    {
+      "name": "assistant",
+      "value": "Assistant"
+    },
+    {
+      "name": "dashboard",
+      "value": "Dashboard"
+    },
+    {
+      "name": "alerts",
+      "value": "Alerts"
+    },
+    {
+      "name": "settings",
+      "value": "Settings"
+    }
+  ]
+}

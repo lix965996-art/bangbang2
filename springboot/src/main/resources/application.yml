@@ -1,0 +1,108 @@
+server:
+  port: 9090
+  servlet:
+    context-path: /
+  tomcat:
+    max-threads: 200
+    min-spare-threads: 10
+  # 外部访问地址，生产环境需要配置为实际域名
+  domain: ${SERVER_DOMAIN:http://localhost:9090}
+
+spring:
+  application:
+    name: smart-agriculture
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    # 云端部署时修改为实际数据库地址
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:smart-agriculture}?characterEncoding=utf8&useSSL=false&serverTimezone=UTC&rewriteBatchedStatements=true&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:123456}
+    hikari:
+      maximum-pool-size: 50      # 从10改为50，支持更多并发
+      minimum-idle: 10           # 从5改为10，保持更多空闲连接
+      connection-timeout: 30000
+      idle-timeout: 300000       # 从600000改为300000（5分钟），更快释放空闲连接
+      max-lifetime: 1800000
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
+      enabled: true
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: GMT+8
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.farmland.intel.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    cache-enabled: true
+    lazy-loading-enabled: true
+
+mybatis-plus:
+  global-config:
+    db-config:
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+# 日志配置
+logging:
+  charset:
+    console: UTF-8
+    file: UTF-8
+  level:
+    root: warn
+    com.farmland.intel: warn
+    org.springframework.web: warn
+    org.mybatis: warn
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: ../logs/smart-agriculture.log  # 改到项目根目录的 logs 文件夹
+    max-size: 10MB
+    max-history: 30
+
+# 文件上传配置
+files:
+  upload:
+    # 使用用户主目录下的uploads文件夹
+    # 会自动创建在 C:/Users/Swift/smart-agriculture-uploads/
+    path: ${UPLOAD_PATH:${user.home}/smart-agriculture-uploads/}
+    allowed-types: jpg,jpeg,png,gif,pdf,doc,docx,xls,xlsx
+    max-size: 100MB
+
+# 高德地图API配置
+amap:
+  js-key: ${AMAP_JS_KEY:}
+  web-key: ${AMAP_WEB_KEY:}
+  js-security-key: ${AMAP_JS_SECURITY_KEY:}
+  city: ${AMAP_CITY:430800}
+
+# 通义千问AI配置（智能Agent）
+qwen:
+  api-key: ${QWEN_API_KEY:}
+  api-url: https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation
+  model: qwen-max
+
+jwt:
+  secret: ${JWT_SECRET:smart-agriculture-demo-secret-change-me}
+  expire-hours: ${JWT_EXPIRE_HOURS:12}
+
+# Python检测服务配置
+python:
+  api-url: ${PYTHON_API_URL:http://localhost:5000}
+
+# OneNET物联网平台配置（STM32硬件）
+onenet:
+  api-url: https://iot-api.heclouds.com
+  author-key: ${ONENET_AUTHOR_KEY:}
+  user-id: ${ONENET_USER_ID:}
+  version: ${ONENET_VERSION:2022-05-01}
+  product-id: ${ONENET_PRODUCT_ID:}
+  device-name: ${ONENET_DEVICE_NAME:}
+  new-product-id: ${ONENET_NEW_PRODUCT_ID:}
+  new-device-name: ${ONENET_NEW_DEVICE_NAME:}
+  enabled: ${ONENET_ENABLED:true}

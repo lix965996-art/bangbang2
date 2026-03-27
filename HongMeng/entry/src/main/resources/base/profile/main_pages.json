@@ -1,0 +1,15 @@
+{
+  "src": [
+    "pages/LoginPage",
+    "pages/MainPage",
+    "pages/DashboardPage",
+    "pages/FarmlandPage",
+    "pages/FarmlandDetailPage",
+    "pages/InventoryPage",
+    "pages/FruitDetectPage",
+    "pages/AIAssistantPage",
+    "pages/AlertPage",
+    "pages/SettingsPage",
+    "pages/HealthPage"
+  ]
+}
