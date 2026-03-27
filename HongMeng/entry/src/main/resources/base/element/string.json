@@ -11,6 +11,10 @@
     {
       "name": "EntryAbility_label",
       "value": "智慧农场"
+    },
+    {
+      "name": "internet_permission_reason",
+      "value": "需要网络访问来获取农场数据"
     }
   ]
 }

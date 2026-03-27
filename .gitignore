@@ -24,6 +24,7 @@ vue/.env.production.local
 HongMeng/.hvigor/
 HongMeng/.appanalyzer/
 HongMeng/local.properties
+HongMeng/entry/.preview/
 
 .env
 .env.local
