@@ -1,19 +1,30 @@
-# IDE本地配置
 .idea/
-.claude/settings.local.json
-# 日志文件
+.vscode/
+.DS_Store
+Thumbs.db
+
 logs/
-# SpringBoot编译产物
-target/
-# Vue依赖包
-node_modules/
-# Vue编译产物
-dist/
-# 环境配置（含敏感信息则忽略）
+*.log
+model_call_log.txt
+springboot/model_call_log.txt
+
+springboot/target/
+springboot/.idea/
+springboot/.mvn/
+
+vue/node_modules/
+vue/dist/
+vue/.env.local
+vue/.env.development.local
+vue/.env.test.local
+vue/.env.production.local
+
+.env
+.env.local
 .env.development
 .env.production
-# 临时文件
+
+uploads/
+temp/
+tmp/
 *.tmp
-*.log
-*.class
-*_log.txt

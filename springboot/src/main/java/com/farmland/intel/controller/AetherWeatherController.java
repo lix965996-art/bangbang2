@@ -5,8 +5,6 @@ import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.farmland.intel.common.Result;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,15 +17,17 @@ import java.util.*;
 @RequestMapping("/aether/weather")
 @CrossOrigin
 public class AetherWeatherController {
-    private static final Logger log = LoggerFactory.getLogger(AetherWeatherController.class);
     
     // JavaScript API密钥（前端地图使用）
     @Value("${amap.js-key:}")
     private String jsKey;
-    
+
     // Web服务API密钥（后端REST API使用）
     @Value("${amap.web-key:}")
     private String webKey;
+
+    @Value("${amap.js-security-key:}")
+    private String jsSecurityKey;
     
     // 默认城市编码（张家界市）
     @Value("${amap.city:430800}")
@@ -44,6 +44,7 @@ public class AetherWeatherController {
         Map<String, Object> config = new HashMap<>();
         config.put("amapKey", jsKey); // 前端使用JavaScript API Key
         config.put("jsKey", jsKey);
+        config.put("webKey", webKey);
         config.put("city", defaultCity);
         return Result.success(config);
     }
@@ -60,8 +61,9 @@ public class AetherWeatherController {
                 return Result.success(getMockWeatherNow());
             }
             
-            String url = AMAP_WEATHER_URL + "?city=" + defaultCity + "&key=" + apiKey + "&extensions=base";
+            String url = buildWeatherUrl(apiKey, "base");
             
+            System.out.println("🌤️ 调用高德天气API: " + url.substring(0, Math.min(100, url.length())));
             String response = HttpUtil.get(url);
             JSONObject json = JSONUtil.parseObj(response);
             
@@ -87,7 +89,7 @@ public class AetherWeatherController {
             }
             return Result.success(getMockWeatherNow());
         } catch (Exception e) {
-            log.warn("Get current weather failed", e);
+            System.out.println("获取高德天气失败: " + e.getMessage());
             return Result.success(getMockWeatherNow());
         }
     }
@@ -104,7 +106,7 @@ public class AetherWeatherController {
                 return Result.success(getMockWeather7d());
             }
             
-            String url = AMAP_WEATHER_URL + "?city=" + defaultCity + "&key=" + apiKey + "&extensions=all";
+            String url = buildWeatherUrl(apiKey, "all");
             String response = HttpUtil.get(url);
             JSONObject json = JSONUtil.parseObj(response);
             
@@ -162,7 +164,7 @@ public class AetherWeatherController {
             }
             return Result.success(getMockWeather7d());
         } catch (Exception e) {
-            log.warn("Get 7d weather failed", e);
+            System.out.println("获取高德天气预报失败: " + e.getMessage());
             return Result.success(getMockWeather7d());
         }
     }
@@ -178,7 +180,7 @@ public class AetherWeatherController {
                 return Result.success(getMockWeather24h());
             }
             
-            String url = AMAP_WEATHER_URL + "?city=" + defaultCity + "&key=" + apiKey + "&extensions=all";
+            String url = buildWeatherUrl(apiKey, "all");
             String response = HttpUtil.get(url);
             JSONObject json = JSONUtil.parseObj(response);
             
@@ -244,7 +246,7 @@ public class AetherWeatherController {
             }
             return Result.success(getMockWeather24h());
         } catch (Exception e) {
-            log.warn("Get 24h weather failed", e);
+            System.out.println("获取24小时天气预报失败: " + e.getMessage());
             return Result.success(getMockWeather24h());
         }
     }
@@ -393,5 +395,17 @@ public class AetherWeatherController {
         result.put("success", true);
         result.put("data", new ArrayList<>()); // 无预警
         return result;
+    }
+
+    private String buildWeatherUrl(String apiKey, String extensions) {
+        StringBuilder url = new StringBuilder(AMAP_WEATHER_URL)
+                .append("?city=").append(defaultCity)
+                .append("&key=").append(apiKey)
+                .append("&extensions=").append(extensions)
+                .append("&sdk=server");
+        if ((webKey == null || webKey.isEmpty()) && jsSecurityKey != null && !jsSecurityKey.isEmpty()) {
+            url.append("&jscode=").append(jsSecurityKey);
+        }
+        return url.toString();
     }
 }

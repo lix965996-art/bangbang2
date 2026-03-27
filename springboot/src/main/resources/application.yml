@@ -1,108 +1,53 @@
 server:
-  port: 9094
+  port: 9090
   servlet:
     context-path: /
+  tomcat:
+    max-threads: 200
+    min-spare-threads: 10
+  # 外部访问地址，生产环境需要配置为实际域名
+  domain: ${SERVER_DOMAIN:http://localhost:9090}
 
 spring:
   application:
-    name: smart-agriculture-platform
-  mvc:
-    pathmatch:
-      matching-strategy: ant_path_matcher
-  cloud:
-    bus:
-      enabled: false
-    config:
-      enabled: false
-    function:
-      scan:
-        enabled: false
-      ineligible-definitions: inMemorySwaggerResourcesProvider
-    stream:
-      function:
-        autodetect: false
-    service-registry:
-      auto-registration:
-        enabled: false
-    nacos:
-      discovery:
-        server-addr: 127.0.0.1:8848
-      config:
-        server-addr: 127.0.0.1:8848
-        file-extension: yml
-        namespace: agriculture
-        group: DEFAULT_GROUP
-    gateway:
-      enabled: true
-      routes:
-        - id: user-service
-          uri: lb://user-service
-          predicates:
-            - Path=/api/user/**
-        - id: device-service
-          uri: lb://device-service
-          predicates:
-            - Path=/api/device/**
-        - id: purchase-service
-          uri: lb://purchase-service
-          predicates:
-            - Path=/api/purchase/**
-        - id: sales-service
-          uri: lb://sales-service
-          predicates:
-            - Path=/api/sales/**
-        - id: inventory-service
-          uri: lb://inventory-service
-          predicates:
-            - Path=/api/inventory/**
-        - id: online-sale-service
-          uri: lb://online-sale-service
-          predicates:
-            - Path=/api/online-sale/**
-        - id: ai-service
-          uri: lb://ai-service
-          predicates:
-            - Path=/api/ai/**
-        - id: monitoring-service
-          uri: lb://monitoring-service
-          predicates:
-            - Path=/api/monitoring/**
+    name: smart-agriculture
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
+    # 云端部署时修改为实际数据库地址
     url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:smart-agriculture}?characterEncoding=utf8&useSSL=false&serverTimezone=UTC&rewriteBatchedStatements=true&allowPublicKeyRetrieval=true
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:123456}
     hikari:
-      maximum-pool-size: 20
-      minimum-idle: 10
+      maximum-pool-size: 50      # 从10改为50，支持更多并发
+      minimum-idle: 10           # 从5改为10，保持更多空闲连接
       connection-timeout: 30000
-      idle-timeout: 600000
+      idle-timeout: 300000       # 从600000改为300000（5分钟），更快释放空闲连接
       max-lifetime: 1800000
-  jpa:
-    hibernate:
-      ddl-auto: update
-    show-sql: true
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.MySQL8Dialect
-  redis:
-    host: ${REDIS_HOST:localhost}
-    port: ${REDIS_PORT:6379}
-    password: ${REDIS_PASSWORD:}
-    database: 0
-    lettuce:
-      pool:
-        max-active: 20
-        max-idle: 10
-        min-idle: 5
-        max-wait: 30000
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
+      enabled: true
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: GMT+8
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.farmland.intel.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    cache-enabled: true
+    lazy-loading-enabled: true
 
 mybatis-plus:
   configuration:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
-    map-underscore-to-camel-case: true
-    cache-enabled: true
-    lazy-loading-enabled: true
+  global-config:
+    db-config:
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
 
 # 日志配置
 logging:
@@ -114,14 +59,16 @@ logging:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
     file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
   file:
-    name: logs/smart-agriculture.log
+    name: ../logs/smart-agriculture.log  # 改到项目根目录的 logs 文件夹
     max-size: 10MB
     max-history: 30
 
 # 文件上传配置
 files:
   upload:
-    path: ${UPLOAD_PATH:./uploads}
+    # 使用用户主目录下的uploads文件夹
+    # 会自动创建在 C:/Users/Swift/smart-agriculture-uploads/
+    path: ${UPLOAD_PATH:${user.home}/smart-agriculture-uploads/}
     allowed-types: jpg,jpeg,png,gif,pdf,doc,docx,xls,xlsx
     max-size: 100MB
 
@@ -129,95 +76,25 @@ files:
 amap:
   js-key: ${AMAP_JS_KEY:}
   web-key: ${AMAP_WEB_KEY:}
+  js-security-key: ${AMAP_JS_SECURITY_KEY:}
   city: ${AMAP_CITY:430800}
-
-# CORS配置
-cors:
-  allowed-origins: "http://localhost:8080,http://127.0.0.1:8080,http://localhost:8087,http://127.0.0.1:8087"
 
 # 通义千问AI配置（智能Agent）
 qwen:
   api-key: ${QWEN_API_KEY:}
-  api-url: ${QWEN_API_URL:https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation}
-  model: ${QWEN_MODEL:qwen-max}
+  api-url: https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation
+  model: qwen-max
+
+# Python检测服务配置
+python:
+  api-url: ${PYTHON_API_URL:http://localhost:5000}
 
 # OneNET物联网平台配置（STM32硬件）
 onenet:
-  api-url: ${ONENET_API_URL:https://iot-api.heclouds.com}
-  author-key: ${ONENET_AUTHOR_KEY:}
-  user-id: ${ONENET_USER_ID:470386}
-  version: ${ONENET_VERSION:2022-05-01}
-  product-id: ${ONENET_PRODUCT_ID:CzL61ga8FI}
-  device-name: ${ONENET_DEVICE_NAME:d1}
-  enabled: ${ONENET_ENABLED:true}
-
-websocket:
-  enabled: ${WEBSOCKET_ENABLED:true}
-
-fruit-detect:
-  api-url: ${FRUIT_DETECT_API_URL:http://localhost:5000/api/detect}
-  health-url: ${FRUIT_DETECT_HEALTH_URL:http://localhost:5000/api/health}
-
-# Eureka配置
-eureka:
-  client:
-    service-url:
-      defaultZone: ${EUREKA_SERVER:http://localhost:8761/eureka}
-    register-with-eureka: true
-    fetch-registry: true
-  instance:
-    hostname: ${EUREKA_HOST:localhost}
-    prefer-ip-address: true
-
-# 网关配置
-zuul:
-  routes:
-    user-service:
-      path: /api/user/**
-      serviceId: user-service
-    device-service:
-      path: /api/device/**
-      serviceId: device-service
-    purchase-service:
-      path: /api/purchase/**
-      serviceId: purchase-service
-    sales-service:
-      path: /api/sales/**
-      serviceId: sales-service
-    inventory-service:
-      path: /api/inventory/**
-      serviceId: inventory-service
-    online-sale-service:
-      path: /api/online-sale/**
-      serviceId: online-sale-service
-    ai-service:
-      path: /api/ai/**
-      serviceId: ai-service
-    monitoring-service:
-      path: /api/monitoring/**
-      serviceId: monitoring-service
-
-# 安全配置
-security:
-  oauth2:
-    resource:
-      jwt:
-        key-value: ${JWT_SECRET:your-secret-key}
-        authorities-key: authorities
-        user-name-key: user_name
-
-# 监控配置
-management:
-  endpoints:
-    web:
-      exposure:
-        include: "*"
-  endpoint:
-    health:
-      show-details: always
-    metrics:
-      enabled: true
-    prometheus:
-      enabled: true
-    serviceregistry:
-      enabled: false
+  api-url: https://iot-api.heclouds.com
+  author-key: 2eb8177d8aef4736a03d004ac8538238  # 使用与index(1).vue相同的密钥
+  user-id: 470386
+  version: 2022-05-01
+  product-id: CzL61ga8FI
+  device-name: d1
+  enabled: true

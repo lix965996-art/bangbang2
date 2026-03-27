@@ -11,11 +11,14 @@ import com.farmland.intel.entity.Statistic;
 import com.farmland.intel.entity.Sales;
 import com.farmland.intel.entity.Purchase;
 import com.farmland.intel.entity.Inventory;
+import com.farmland.intel.entity.Notice;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+
+import javax.annotation.PostConstruct;
 
 import java.math.BigDecimal;
 import java.util.*;
@@ -31,6 +34,12 @@ public class AgentService {
 
     @Value("${qwen.api-key:}")
     private String apiKey;
+
+    @PostConstruct
+    public void init() {
+        log.info("🔑 AgentService 初始化，API Key: {}", 
+                 StringUtils.hasText(apiKey) ? "已配置 (长度:" + apiKey.length() + ")" : "未配置");
+    }
 
     @Value("${qwen.api-url:https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation}")
     private String apiUrl;
@@ -69,7 +78,7 @@ public class AgentService {
     private ModelCallLogger modelCallLogger;
     
     // 最大工具调用轮次，防止无限循环
-    private static final int MAX_TOOL_ROUNDS = 5;
+    private static final int MAX_TOOL_ROUNDS = 8;  // 增加到8轮，支持更复杂的分析
 
     /**
      * 使用 Function Calling 构建智能计划
@@ -82,31 +91,41 @@ public class AgentService {
             return plan;
         }
 
+        log.info("🔍 API Key 检查: {}", StringUtils.hasText(apiKey) ? "已配置" : "未配置");
         if (!StringUtils.hasText(apiKey)) {
             log.warn("通义千问 API Key 未配置，使用规则兜底计划");
             return fallbackPlan(userQuestion);
         }
 
         try {
+            log.info("🚀 开始调用通义千问 Function Calling");
             // 使用 Function Calling 进行多轮对话
             String result = callQwenWithFunctionCalling(userQuestion);
+            log.info("📝 通义千问返回结果: {}", result != null ? "有内容" : "空结果");
+            
             if (StringUtils.hasText(result)) {
                 AgentPlan parsed = parsePlan(result);
                 if (parsed != null && parsed.getAdvice() != null) {
                     String advice = parsed.getAdvice();
+                    log.info("✅ 解析成功，advice 长度: {}", advice.length());
                     // 检查AI是否只是说"正在调用"或"将调用"而没有返回实际数据
                     if (advice.contains("正在") || advice.contains("将调用") || advice.contains("我将") || 
                         advice.contains("跳转") || advice.length() < 50) {
-                        log.info("AI回答不完整，使用兜底逻辑");
+                        log.info("⚠️ AI回答不完整，使用兜底逻辑");
                         return fallbackPlan(userQuestion);
                     }
                     return parsed;
+                } else {
+                    log.warn("❌ 解析失败，parsed 为空");
                 }
+            } else {
+                log.warn("❌ 通义千问返回空结果");
             }
         } catch (Exception e) {
-            log.error("调用通义千问生成计划失败，使用兜底逻辑", e);
+            log.error("💥 调用通义千问生成计划失败，使用兜底逻辑", e);
         }
 
+        log.info("🔄 使用兜底逻辑");
         return fallbackPlan(userQuestion);
     }
     
@@ -233,7 +252,8 @@ public class AgentService {
         payload.put("input", input);
         
         JSONObject parameters = new JSONObject();
-        parameters.put("temperature", 0.3);
+        parameters.put("temperature", 0.7);  // 提高创造性和分析能力
+        parameters.put("top_p", 0.9);        // 增加多样性
         parameters.put("result_format", "message");
         payload.put("parameters", parameters);
         
@@ -315,6 +335,30 @@ public class AgentService {
                     
                 case "get_comprehensive_report":
                     return getComprehensiveReport();
+                
+                // ========== 执行工具实现 ==========
+                
+                case "control_irrigation":
+                    String irrigationAction = args.getStr("action");
+                    String irrigationFarm = args.getStr("farm_name", "默认农田");
+                    return controlIrrigation(irrigationAction, irrigationFarm);
+                
+                case "control_led":
+                    String ledAction = args.getStr("action");
+                    String ledFarm = args.getStr("farm_name", "默认农田");
+                    return controlLed(ledAction, ledFarm);
+                
+                case "create_purchase_order":
+                    return createPurchaseOrder(args);
+                
+                case "create_sales_order":
+                    return createSalesOrder(args);
+                
+                case "update_inventory":
+                    return updateInventory(args);
+                
+                case "send_notification":
+                    return sendNotification(args);
                     
                 default:
                     return "{\"error\": \"未知工具: " + functionName + "\"}";
@@ -645,66 +689,67 @@ public class AgentService {
      * 构建系统提示词
      */
     private String buildSystemPrompt() {
-        return "你是一个专业的智能农业助手，拥有20年农业经验和数据分析能力。你的职责是：\n" +
-               "1. 主动调用工具获取农田实时数据、财务数据、系统运营数据\n" +
-               "2. 基于真实数据进行专业分析，给出详细、有数据支撑的深度洞察\n" +
-               "3. 从多个维度综合评估，提供战略性建议和优化方案\n" +
-               "4. 在必要时生成设备控制指令\n\n" +
-               "【核心数据工具 - 基础数据获取】\n" +
-               "1. get_all_farms - 获取所有农田环境数据（温湿度、光照、pH等）\n" +
-               "2. get_sales_data - 获取销售记录和收入数据\n" +
-               "3. get_purchase_data - 获取采购记录和成本支出\n" +
-               "4. get_inventory_data - 获取仓库库存和物资情况\n" +
-               "5. get_profit_analysis - ★核心★ 自动计算利润（收入-成本=利润）\n" +
-               "6. get_device_status - 获取IoT设备状态（水泵、补光灯等）\n" +
-               "7. get_environment_data - 获取环境监测汇总数据\n\n" +
-               "【系统管理工具 - 全局运营数据】\n" +
-               "8. get_user_statistics - 获取用户统计（总用户数、角色分布）\n" +
-               "9. get_system_overview - ★推荐★ 获取系统全局概览（农田、用户、销售、库存、公告等全局统计）\n" +
-               "10. get_online_sale_data - 获取在线销售平台的订单和收入数据\n\n" +
-               "【深度分析工具 - AI智能分析】\n" +
-               "11. get_business_health_score - ★强大★ 综合评估农场经营健康度（利润率、库存、资金流、环境4大维度打分）\n" +
-               "12. get_trend_analysis - 分析历史趋势并预测未来走向\n" +
-               "13. get_comprehensive_report - ★最全面★ 生成完整的经营分析报告（整合所有数据的深度洞察）\n\n" +
-               "【智能工具选择策略】\n" +
-               "- 用户问\"整体情况\"、\"经营如何\"、\"系统概况\" → 优先调用 get_system_overview 或 get_comprehensive_report\n" +
-               "- 用户问\"经营健康度\"、\"评分\"、\"诊断\" → 调用 get_business_health_score\n" +
-               "- 用户问\"趋势\"、\"预测\"、\"未来\" → 调用 get_trend_analysis\n" +
-               "- 用户问\"利润\"、\"赚了多少\" → 调用 get_profit_analysis\n" +
-               "- 用户问\"用户\"、\"系统管理\" → 调用 get_user_statistics\n" +
-               "- 用户需要全面分析 → 调用 get_comprehensive_report（整合财务+运营+环境+库存）\n\n" +
-               "【重要规则 - 必须遵守！】\n" +
-               "- ★核心原则：用户问数据相关问题时，必须先调用工具获取真实数据，然后在advice中给出分析结果\n" +
-               "- 多使用深度分析工具（health_score, trend_analysis, comprehensive_report）提供更有价值的洞察\n" +
-               "- 当用户询问库存、物资、预警时 → 必须调用 get_inventory_data\n" +
-               "- 当用户询问成本、采购、支出时 → 必须调用 get_purchase_data\n" +
-               "- advice 字段必须包含从工具获取的真实数据和分析，不要只说\"正在跳转\"或\"请查看\"\n" +
-               "- 只有当用户明确说\"打开XX页面\"、\"跳转到XX\"时才使用 navigate 动作\n\n" +
-               "【输出格式】必须是 JSON：\n" +
+        return "你是一个智能农业 AI Agent，具有数据分析和自主执行能力。\n\n" +
+               "【核心原则 - 必须遵守！】\n" +
+               "1. ⚠️ 禁止使用 navigate 跳转页面！用户问数据问题时，必须调用工具获取数据并在 advice 中回答\n" +
+               "2. 🎯 理解用户真实意图：\n" +
+               "   - \"农田环境怎么样\" = 调用 get_all_farms 查询数据\n" +
+               "   - \"帮我采购XX\" = 调用 create_purchase_order 创建订单\n" +
+               "   - \"库存情况\" = 调用 get_inventory_data 查询库存\n" +
+               "   - 只有用户明确说\"打开XX页面\"、\"跳转到XX\"时才能使用 navigate\n" +
+               "3. 💪 主动执行操作：发现问题时自动解决，不要只给建议\n\n" +
+               "【工作流程】\n" +
+               "步骤1：分析用户意图 → 是查询数据？执行操作？还是跳转页面？\n" +
+               "步骤2：调用工具获取数据或执行操作\n" +
+               "步骤3：在 advice 中详细说明结果和建议\n\n" +
+               "【查询工具】\n" +
+               "• get_all_farms - 查询所有农田环境数据（温湿度、光照等）\n" +
+               "• get_environment_data - 查询环境监测汇总\n" +
+               "• get_sales_data - 查询销售收入\n" +
+               "• get_purchase_data - 查询采购成本\n" +
+               "• get_inventory_data - 查询库存物资\n" +
+               "• get_profit_analysis - 利润分析\n" +
+               "• get_business_health_score - 经营健康度评分\n" +
+               "• get_comprehensive_report - 综合分析报告\n\n" +
+               "【执行工具】\n" +
+               "• control_irrigation(action='on'/'off', farm_name) - 控制灌溉\n" +
+               "• control_led(action='on'/'off', farm_name) - 控制补光灯\n" +
+               "• create_purchase_order(product, number, provider, price) - 创建采购订单\n" +
+               "• create_sales_order(product, number, buyer, price) - 创建销售订单\n" +
+               "• update_inventory(product, change, reason) - 更新库存\n" +
+               "• send_notification(title, content, level) - 发送通知\n\n" +
+               "【意图识别示例】\n" +
+               "用户说：\"农田环境怎么样\"\n" +
+               "✅ 正确：调用 get_all_farms，返回环境数据和分析\n" +
+               "❌ 错误：返回 navigate 跳转到环境监测页面\n\n" +
+               "用户说：\"帮我采购50公斤有机肥料，供应商是绿源农资，单价15元\"\n" +
+               "✅ 正确：调用 create_purchase_order(product='有机肥料', number=50, provider='绿源农资', price=15)\n" +
+               "❌ 错误：只说\"建议您去采购页面创建订单\"\n\n" +
+               "用户说：\"打开环境监测页面\"\n" +
+               "✅ 正确：返回 navigate 跳转\n" +
+               "❌ 错误：调用 get_environment_data\n\n" +
+               "【自动执行规则】\n" +
+               "1. 环境异常 → 自动控制设备\n" +
+               "   - 土壤湿度 < 30% → control_irrigation(action='on')\n" +
+               "   - 光照 < 1000lux → control_led(action='on')\n" +
+               "2. 库存不足 → 自动创建采购订单\n" +
+               "3. 用户明确要求操作 → 立即执行\n\n" +
+               "【自动执行规则】\n" +
+               "1. 环境异常 → 自动控制设备\n" +
+               "   - 土壤湿度 < 30% → control_irrigation(action='on')\n" +
+               "   - 光照 < 1000lux → control_led(action='on')\n" +
+               "2. 库存不足 → 自动创建采购订单\n" +
+               "3. 用户明确要求操作 → 立即执行\n\n" +
+               "【输出格式】JSON：\n" +
                "{\n" +
-               "  \"advice\": \"详细的分析结果和建议（必须包含从工具获取的真实数据）\",\n" +
-               "  \"actions\": [{\"id\": \"action_1\", \"type\": \"irrigation_on\", \"title\": \"开启灌溉\", \"description\": \"描述\", \"riskLevel\": \"medium\"}]\n" +
+               "  \"advice\": \"详细说明：①调用了什么工具 ②获取的数据 ③分析结果 ④执行的操作（如果有）⑤建议\",\n" +
+               "  \"actions\": []  // 通常为空，因为已通过工具执行\n" +
                "}\n\n" +
-               "【可用动作类型】\n" +
-               "- irrigation_on: 开启灌溉（当土壤湿度<30%时建议）\n" +
-               "- irrigation_off: 关闭灌溉\n" +
-               "- led_on: 开启补光灯（当光照<1000lux时建议）\n" +
-               "- led_off: 关闭补光灯\n" +
-               "- navigate: 页面跳转，route 必须以 / 开头\n\n" +
-               "【页面路由映射表】\n" +
-               "- /fruit-detect: 果蔬双检、果蔬检测、AI识别、病虫害检测\n" +
-               "- /farmmap3d: 3D沙盘、3D界面、三维地图\n" +
-               "- /dashbordnew: 环境监测、传感器数据、温湿度\n" +
-               "- /home: 首页、主页\n" +
-               "- /bigscreen: 大屏、可视化大屏\n" +
-               "- /statistic: 农田信息、农田统计\n" +
-               "- /farm-map-gaode: 地理地图、高德地图、GIS地图\n" +
-               "- /purchase: 物资采购、采购管理\n" +
-               "- /inventory: 物资库存、仓库管理\n" +
-               "- /sales: 出售账单、销售记录\n" +
-               "- /online-sale: 在线销售、农作物销售\n\n" +
-               "【示例】用户问：今年赚了多少钱？\n" +
-               "正确做法：调用get_profit_analysis工具，返回：{\"advice\": \"根据财务数据分析：销售总收入46025元，采购成本10750元，毛利润35275元，利润率76.64%。经营状况良好！\", \"actions\": []}";
+               "【重要提醒】\n" +
+               "- 用户问数据问题 → 调用工具查询，在 advice 中详细回答，不要用 navigate\n" +
+               "- 用户要求操作 → 调用执行工具，在 advice 中说明结果\n" +
+               "- 只有用户明确说\"打开XX页面\" → 才用 navigate\n" +
+               "- advice 必须包含具体数据和分析，不要只说\"正在跳转\"";
     }
     
     /**
@@ -867,6 +912,125 @@ public class AgentService {
                 .put("type", "object")
                 .put("properties", new JSONObject())
                 .put("required", new JSONArray())
+        ));
+        
+        // ========== 执行工具（Action Tools）- AI 可以自主操作系统 ==========
+        
+        // 工具16: 控制灌溉系统
+        tools.add(buildTool(
+            "control_irrigation",
+            "控制农田灌溉系统（水泵）的开关。当检测到土壤湿度过低时可以自动开启灌溉",
+            new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                    .put("action", new JSONObject()
+                        .put("type", "string")
+                        .put("enum", new JSONArray().put("on").put("off"))
+                        .put("description", "操作类型：on=开启灌溉，off=关闭灌溉"))
+                    .put("farm_name", new JSONObject()
+                        .put("type", "string")
+                        .put("description", "目标农田名称（可选）")))
+                .put("required", new JSONArray().put("action"))
+        ));
+        
+        // 工具17: 控制补光灯
+        tools.add(buildTool(
+            "control_led",
+            "控制农田补光灯的开关。当检测到光照不足时可以自动开启补光",
+            new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                    .put("action", new JSONObject()
+                        .put("type", "string")
+                        .put("enum", new JSONArray().put("on").put("off"))
+                        .put("description", "操作类型：on=开启补光灯，off=关闭补光灯"))
+                    .put("farm_name", new JSONObject()
+                        .put("type", "string")
+                        .put("description", "目标农田名称（可选）")))
+                .put("required", new JSONArray().put("action"))
+        ));
+        
+        // 工具18: 创建采购订单
+        tools.add(buildTool(
+            "create_purchase_order",
+            "创建物资采购订单。当检测到库存不足时，AI可以自动创建采购订单补充物资",
+            new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                    .put("product", new JSONObject()
+                        .put("type", "string")
+                        .put("description", "采购物资名称，如：有机肥料、农药、种子等"))
+                    .put("number", new JSONObject()
+                        .put("type", "integer")
+                        .put("description", "采购数量"))
+                    .put("provider", new JSONObject()
+                        .put("type", "string")
+                        .put("description", "供应商名称"))
+                    .put("price", new JSONObject()
+                        .put("type", "number")
+                        .put("description", "单价（元）")))
+                .put("required", new JSONArray().put("product").put("number").put("provider").put("price"))
+        ));
+        
+        // 工具19: 创建销售订单
+        tools.add(buildTool(
+            "create_sales_order",
+            "创建农产品销售订单。记录农产品销售信息",
+            new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                    .put("product", new JSONObject()
+                        .put("type", "string")
+                        .put("description", "销售产品名称"))
+                    .put("number", new JSONObject()
+                        .put("type", "integer")
+                        .put("description", "销售数量"))
+                    .put("buyer", new JSONObject()
+                        .put("type", "string")
+                        .put("description", "买家名称"))
+                    .put("price", new JSONObject()
+                        .put("type", "number")
+                        .put("description", "单价（元）")))
+                .put("required", new JSONArray().put("product").put("number").put("buyer").put("price"))
+        ));
+        
+        // 工具20: 更新库存
+        tools.add(buildTool(
+            "update_inventory",
+            "更新仓库库存数量。可以增加或减少库存",
+            new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                    .put("product", new JSONObject()
+                        .put("type", "string")
+                        .put("description", "物资名称"))
+                    .put("change", new JSONObject()
+                        .put("type", "integer")
+                        .put("description", "库存变化量（正数=增加，负数=减少）"))
+                    .put("reason", new JSONObject()
+                        .put("type", "string")
+                        .put("description", "变更原因，如：采购入库、销售出库、损耗等")))
+                .put("required", new JSONArray().put("product").put("change").put("reason"))
+        ));
+        
+        // 工具21: 发送系统通知
+        tools.add(buildTool(
+            "send_notification",
+            "向系统用户发送通知消息。当发现重要问题或需要提醒时使用",
+            new JSONObject()
+                .put("type", "object")
+                .put("properties", new JSONObject()
+                    .put("title", new JSONObject()
+                        .put("type", "string")
+                        .put("description", "通知标题"))
+                    .put("content", new JSONObject()
+                        .put("type", "string")
+                        .put("description", "通知内容"))
+                    .put("level", new JSONObject()
+                        .put("type", "string")
+                        .put("enum", new JSONArray().put("info").put("warning").put("urgent"))
+                        .put("description", "通知级别：info=普通，warning=警告，urgent=紧急")))
+                .put("required", new JSONArray().put("title").put("content").put("level"))
         ));
         
         return tools;
@@ -2778,5 +2942,273 @@ public class AgentService {
         }
         
         return false;
+    }
+    
+    // ==================== AI Agent 执行工具实现 ====================
+    
+    /**
+     * 控制灌溉系统
+     */
+    private String controlIrrigation(String action, String farmName) {
+        JSONObject result = new JSONObject();
+        try {
+            if (oneNetService == null) {
+                result.put("success", false);
+                result.put("message", "OneNET 服务不可用");
+                return result.toString();
+            }
+            
+            boolean turnOn = "on".equalsIgnoreCase(action);
+            boolean success = oneNetService.controlBump(turnOn);
+            
+            if (success) {
+                result.put("success", true);
+                result.put("message", "已" + (turnOn ? "开启" : "关闭") + "【" + farmName + "】的灌溉系统");
+                result.put("action", turnOn ? "irrigation_on" : "irrigation_off");
+                result.put("farm", farmName);
+                log.info("AI Agent 控制灌溉: {} - {}", farmName, action);
+            } else {
+                result.put("success", false);
+                result.put("message", "灌溉系统控制失败");
+            }
+        } catch (Exception e) {
+            result.put("success", false);
+            result.put("message", "控制异常: " + e.getMessage());
+            log.error("AI Agent 控制灌溉失败", e);
+        }
+        return result.toString();
+    }
+    
+    /**
+     * 控制补光灯
+     */
+    private String controlLed(String action, String farmName) {
+        JSONObject result = new JSONObject();
+        try {
+            if (oneNetService == null) {
+                result.put("success", false);
+                result.put("message", "OneNET 服务不可用");
+                return result.toString();
+            }
+            
+            boolean turnOn = "on".equalsIgnoreCase(action);
+            boolean success = oneNetService.controlLed(turnOn);
+            
+            if (success) {
+                result.put("success", true);
+                result.put("message", "已" + (turnOn ? "开启" : "关闭") + "【" + farmName + "】的补光灯");
+                result.put("action", turnOn ? "led_on" : "led_off");
+                result.put("farm", farmName);
+                log.info("AI Agent 控制补光灯: {} - {}", farmName, action);
+            } else {
+                result.put("success", false);
+                result.put("message", "补光灯控制失败");
+            }
+        } catch (Exception e) {
+            result.put("success", false);
+            result.put("message", "控制异常: " + e.getMessage());
+            log.error("AI Agent 控制补光灯失败", e);
+        }
+        return result.toString();
+    }
+    
+    /**
+     * 创建采购订单
+     */
+    private String createPurchaseOrder(JSONObject args) {
+        JSONObject result = new JSONObject();
+        try {
+            if (purchaseService == null) {
+                result.put("success", false);
+                result.put("message", "采购服务不可用");
+                return result.toString();
+            }
+            
+            Purchase purchase = new Purchase();
+            purchase.setProduct(args.getStr("product"));
+            purchase.setNumber(args.getInt("number"));
+            purchase.setProvider(args.getStr("provider"));
+            purchase.setPrice(new BigDecimal(args.getStr("price")));
+            purchase.setPurchaser("AI智能助手");
+            
+            boolean success = purchaseService.save(purchase);
+            
+            if (success) {
+                BigDecimal totalCost = purchase.getPrice().multiply(new BigDecimal(purchase.getNumber()));
+                result.put("success", true);
+                result.put("message", "采购订单创建成功");
+                result.put("order_id", purchase.getId());
+                result.put("product", purchase.getProduct());
+                result.put("number", purchase.getNumber());
+                result.put("total_cost", totalCost);
+                log.info("AI Agent 创建采购订单: {} x{} = {}元", purchase.getProduct(), purchase.getNumber(), totalCost);
+            } else {
+                result.put("success", false);
+                result.put("message", "订单创建失败");
+            }
+        } catch (Exception e) {
+            result.put("success", false);
+            result.put("message", "创建异常: " + e.getMessage());
+            log.error("AI Agent 创建采购订单失败", e);
+        }
+        return result.toString();
+    }
+    
+    /**
+     * 创建销售订单
+     */
+    private String createSalesOrder(JSONObject args) {
+        JSONObject result = new JSONObject();
+        try {
+            if (salesService == null) {
+                result.put("success", false);
+                result.put("message", "销售服务不可用");
+                return result.toString();
+            }
+            
+            Sales sales = new Sales();
+            sales.setProduct(args.getStr("product"));
+            sales.setNumber(args.getInt("number"));
+            sales.setBuyer(args.getStr("buyer"));
+            sales.setPrice(new BigDecimal(args.getStr("price")));
+            sales.setShipper("AI智能助手");
+            
+            boolean success = salesService.save(sales);
+            
+            if (success) {
+                BigDecimal totalIncome = sales.getPrice().multiply(new BigDecimal(sales.getNumber()));
+                result.put("success", true);
+                result.put("message", "销售订单创建成功");
+                result.put("order_id", sales.getId());
+                result.put("product", sales.getProduct());
+                result.put("number", sales.getNumber());
+                result.put("total_income", totalIncome);
+                log.info("AI Agent 创建销售订单: {} x{} = {}元", sales.getProduct(), sales.getNumber(), totalIncome);
+            } else {
+                result.put("success", false);
+                result.put("message", "订单创建失败");
+            }
+        } catch (Exception e) {
+            result.put("success", false);
+            result.put("message", "创建异常: " + e.getMessage());
+            log.error("AI Agent 创建销售订单失败", e);
+        }
+        return result.toString();
+    }
+    
+    /**
+     * 更新库存
+     */
+    private String updateInventory(JSONObject args) {
+        JSONObject result = new JSONObject();
+        try {
+            if (inventoryService == null) {
+                result.put("success", false);
+                result.put("message", "库存服务不可用");
+                return result.toString();
+            }
+            
+            String product = args.getStr("product");
+            int change = args.getInt("change");
+            String reason = args.getStr("reason");
+            
+            // 查找库存记录
+            List<Inventory> inventoryList = inventoryService.list();
+            Inventory targetInventory = null;
+            for (Inventory inv : inventoryList) {
+                if (inv.getProduce() != null && inv.getProduce().contains(product)) {
+                    targetInventory = inv;
+                    break;
+                }
+            }
+            
+            if (targetInventory == null) {
+                result.put("success", false);
+                result.put("message", "未找到物资: " + product);
+                return result.toString();
+            }
+            
+            int oldNumber = targetInventory.getNumber() != null ? targetInventory.getNumber() : 0;
+            int newNumber = oldNumber + change;
+            
+            if (newNumber < 0) {
+                result.put("success", false);
+                result.put("message", "库存不足，无法减少");
+                result.put("current_stock", oldNumber);
+                result.put("requested_change", change);
+                return result.toString();
+            }
+            
+            targetInventory.setNumber(newNumber);
+            targetInventory.setRemark(reason);
+            boolean success = inventoryService.updateById(targetInventory);
+            
+            if (success) {
+                result.put("success", true);
+                result.put("message", "库存更新成功");
+                result.put("product", product);
+                result.put("old_stock", oldNumber);
+                result.put("change", change);
+                result.put("new_stock", newNumber);
+                result.put("reason", reason);
+                log.info("AI Agent 更新库存: {} {} -> {} ({})", product, oldNumber, newNumber, reason);
+            } else {
+                result.put("success", false);
+                result.put("message", "库存更新失败");
+            }
+        } catch (Exception e) {
+            result.put("success", false);
+            result.put("message", "更新异常: " + e.getMessage());
+            log.error("AI Agent 更新库存失败", e);
+        }
+        return result.toString();
+    }
+    
+    /**
+     * 发送系统通知
+     */
+    private String sendNotification(JSONObject args) {
+        JSONObject result = new JSONObject();
+        try {
+            if (noticeService == null) {
+                result.put("success", false);
+                result.put("message", "通知服务不可用");
+                return result.toString();
+            }
+            
+            Notice notice = new Notice();
+            notice.setName(args.getStr("title"));
+            notice.setContent(args.getStr("content"));
+            
+            String level = args.getStr("level", "info");
+            String levelText = "普通";
+            if ("warning".equals(level)) {
+                levelText = "警告";
+            } else if ("urgent".equals(level)) {
+                levelText = "紧急";
+            }
+            
+            notice.setContent("[" + levelText + "] " + notice.getContent());
+            notice.setUser("全体用户");
+            
+            boolean success = noticeService.save(notice);
+            
+            if (success) {
+                result.put("success", true);
+                result.put("message", "通知发送成功");
+                result.put("notice_id", notice.getId());
+                result.put("title", notice.getName());
+                result.put("level", level);
+                log.info("AI Agent 发送通知: {} - {}", notice.getName(), level);
+            } else {
+                result.put("success", false);
+                result.put("message", "通知发送失败");
+            }
+        } catch (Exception e) {
+            result.put("success", false);
+            result.put("message", "发送异常: " + e.getMessage());
+            log.error("AI Agent 发送通知失败", e);
+        }
+        return result.toString();
     }
 }

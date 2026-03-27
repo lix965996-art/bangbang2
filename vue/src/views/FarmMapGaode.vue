@@ -103,7 +103,6 @@
       <div class="error-content">
         <i class="el-icon-warning-outline"></i>
         <p>地图资源加载失败</p>
-        <p class="error-detail">{{ mapErrorMessage }}</p>
         <el-button type="primary" size="medium" @click="retryLoadMap" icon="el-icon-refresh">重新加载</el-button>
       </div>
     </div>
@@ -180,45 +179,53 @@
 </template>
 
 <script>
-import { loadAmapSdk, resetAmapLoader } from '@/utils/amapLoader'
+import mapConfig from '@/config/map.config.js'
 
 export default {
   name: 'FarmMapGaode',
   data() {
     return {
       map: null,
-      amapKey: process.env.VUE_APP_AMAP_JS_KEY || '',
-      securityCode: process.env.VUE_APP_AMAP_SECURITY_CODE || '',
+      // 高德地图 JS API 2.0 配置（必须同时设置 Key 和 SecurityCode）
+      amapKey: mapConfig.amap.jsKey,
+      securityCode: mapConfig.amap.securityCode,
+      
       allFarms: [],
       searchKeyword: '',
       currentFarm: null,
-      mapPitch: 60,
+      mapPitch: 60, 
       mapError: false,
-      mapErrorMessage: '',
       userMarker: null,
       expandedRegions: {
-        Jishou: true,
-        Wulingyuan: true,
-        Yongding: true
+        '吉首市': true,
+        '武陵源区': true,
+        '永定区': true
       },
+      
+      // 图层控制
       layers: {
-        satellite: false,
-        underground: false,
-        drone: false
+        satellite: false,  // 卫星光谱
+        underground: false, // 地下管网
+        drone: false       // 无人机空域
       },
+      
+      // 地下管网数据（天空蓝水流）
       undergroundPipes: [
         { path: [[110.478, 29.116], [110.479, 29.117], [110.480, 29.118]], color: '#0ea5e9' },
         { path: [[110.477, 29.115], [110.479, 29.116], [110.481, 29.117]], color: '#0ea5e9' }
       ],
+      
+      // 无人机路径
       dronePath: [
         [110.478, 29.120],
         [110.480, 29.119],
         [110.482, 29.118],
         [110.481, 29.116]
       ],
-      pipeLines: [],
-      droneMarker: null,
-      dronePathLine: null
+      
+      pipeLines: [],  // 管网覆盖物
+      droneMarker: null, // 无人机标记
+      dronePathLine: null // 无人机路径线
     }
   },
   computed: {
@@ -266,7 +273,7 @@ export default {
       return sortedGroups;
     },
     warningCount() {
-      return this.allFarms.filter(f => this.getFarmStatus(f).type !== 'success').length;
+      return this.allFarms.filter(f => this.getFarmStatus(f).type === 'warning').length;
     },
     currentFarmStatus() {
       return this.currentFarm ? this.getFarmStatus(this.currentFarm) : {};
@@ -349,25 +356,19 @@ export default {
     
     retryLoadMap() {
       this.mapError = false;
-      this.mapErrorMessage = '';
       // 清理旧实例
       this.cleanupMap();
-      resetAmapLoader();
+      // 移除旧脚本防止重复
+      const oldScript = document.getElementById('amap-script');
+      if(oldScript) oldScript.remove();
       this.loadAmapScript();
     },
     
     getFarmStatus(farm) {
-      const temperature = Number(farm.temperature || 0);
-      const humidity = Number(farm.soilhumidity || 0);
-      const stateText = String(farm.state || farm.status || '').toLowerCase();
-
-      if (stateText.includes('warning') || stateText.includes('error') || stateText.includes('abnormal') || temperature >= 35) {
-        return { type: 'danger', color: '#F56C6C', label: 'ALERT' };
-      }
-      if ((humidity > 0 && humidity < 20) || (temperature > 0 && temperature >= 30) || stateText.includes('pending')) {
-        return { type: 'warning', color: '#E6A23C', label: 'WATCH' };
-      }
-      return { type: 'success', color: '#67C23A', label: 'OK' };
+      const random = (farm.id || 0) % 3;
+      if (random === 1) return { type: 'warning', color: '#E6A23C', label: '缺水' };
+      if (random === 2 && farm.area > 50) return { type: 'danger', color: '#F56C6C', label: '告警' };
+      return { type: 'success', color: '#67C23A', label: '正常' };
     },
 
     getRegionByFarm(farm) {
@@ -456,43 +457,92 @@ export default {
       }
     },
 
-    async loadAmapScript() {
-      this.mapError = false;
-      this.mapErrorMessage = '';
-
-      try {
-        console.log('🔄 开始加载高德地图 SDK...');
-        await loadAmapSdk({
-          key: this.amapKey,
-          securityCode: this.securityCode,
-          plugins: ['AMap.Scale', 'AMap.ToolBar', 'AMap.Geolocation']
-        });
-        this.initMap();
-      } catch (error) {
-        console.error('❌ 高德地图脚本加载失败:', error);
+    loadAmapScript() {
+      if (!this.amapKey || !this.securityCode) {
         this.mapError = true;
-        this.mapErrorMessage = this.resolveMapErrorMessage(error);
-        this.$message.error(this.mapErrorMessage);
+        this.$message.error('请配置 VUE_APP_AMAP_JS_KEY 和 VUE_APP_AMAP_SECURITY_CODE');
+        return;
       }
-    },
 
-    resolveMapErrorMessage(error) {
-      if (!this.amapKey) {
-        return '未配置 VUE_APP_AMAP_JS_KEY，地图无法初始化';
+      // 1. 设置安全密钥（高德地图 2.0 必须设置）
+      if (!window._AMapSecurityConfig) {
+        window._AMapSecurityConfig = {
+          securityJsCode: this.securityCode,
+        };
+        console.log('🔐 安全密钥已设置');
       }
-      if (!this.securityCode) {
-        return '未配置 VUE_APP_AMAP_SECURITY_CODE，地图无法初始化';
+
+      // 2. 检查是否已加载
+      if (window.AMap && window.AMap.Map) {
+        console.log('✅ 高德地图 SDK 已存在，直接初始化');
+        setTimeout(() => {
+          this.initMap();
+        }, 100);
+        return;
       }
-      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-        return '当前浏览器处于离线状态，请先恢复网络连接';
+      
+      // 3. 检查脚本是否正在加载
+      const existingScript = document.getElementById('amap-script');
+      if (existingScript) {
+        console.log('⏳ 地图脚本正在加载中，等待完成...');
+        
+        // 设置超时机制，避免永久等待
+        const timeout = setTimeout(() => {
+          console.warn('⚠️ 脚本加载超时，尝试重新加载');
+          existingScript.remove();
+          this.loadAmapScript();
+        }, 10000);
+        
+        // 监听加载完成
+        const onLoad = () => {
+          clearTimeout(timeout);
+          console.log('✅ 已存在的脚本加载完成');
+          if (window.AMap && window.AMap.Map) {
+            this.initMap();
+          }
+        };
+        
+        if (existingScript.complete || existingScript.readyState === 'complete') {
+          onLoad();
+        } else {
+          existingScript.addEventListener('load', onLoad, { once: true });
+        }
+        return;
       }
-      if (error && error.message === 'AMAP_NETWORK_ERROR') {
-        return '高德地图资源请求被网络、代理或防火墙拦截，请检查本机网络环境';
-      }
-      if (error && error.message === 'AMAP_SDK_UNAVAILABLE') {
-        return '高德地图脚本已返回，但 SDK 未初始化，请检查 Key、SecurityCode 和域名白名单';
-      }
-      return '高德地图加载失败，请检查网络环境以及 Key/SecurityCode 配置';
+
+      console.log('🔄 开始加载高德地图 SDK...');
+      console.log('Key:', this.amapKey);
+
+      // 4. 加载新脚本
+      const script = document.createElement('script');
+      script.id = 'amap-script';
+      script.type = 'text/javascript';
+      script.async = true;
+      script.src = `https://webapi.amap.com/maps?v=2.0&key=${this.amapKey}&plugin=AMap.Scale,AMap.ToolBar`;
+      
+      script.onload = () => {
+        console.log('✅ 地图脚本加载成功');
+        this.mapError = false;
+        setTimeout(() => {
+          if (window.AMap && window.AMap.Map) {
+            this.initMap();
+          } else {
+            console.error('❌ AMap 对象未正确加载');
+            this.mapError = true;
+          }
+        }, 300);
+      };
+      
+      script.onerror = (e) => {
+        console.error('❌ 高德地图脚本加载失败:', e);
+        console.error('可能原因: 1.网络问题 2.Key无效 3.Key和SecurityCode不匹配 4.域名未配置白名单');
+        this.mapError = true;
+        this.$message.error('地图连接失败，请检查API Key配置和域名白名单');
+        // 移除失败的脚本
+        script.remove();
+      };
+      
+      document.head.appendChild(script);
     },
 
     initMap() {
@@ -1779,13 +1829,6 @@ export default {
 .error-content { text-align: center; color: #909399; }
 .error-content i { font-size: 48px; margin-bottom: 16px; color: #F56C6C; }
 .error-content p { margin-bottom: 20px; font-size: 16px; }
-.error-detail {
-  max-width: 420px;
-  margin: 0 auto 20px;
-  font-size: 13px !important;
-  line-height: 1.6;
-  color: #6b7280;
-}
 
 .tool-btn {
   width: 44px; height: 44px; background: white; border-radius: 50%;

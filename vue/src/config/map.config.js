@@ -8,9 +8,9 @@ const mapConfig = {
   amap: {
     // JavaScript API Key（前端地图使用）
     jsKey: process.env.VUE_APP_AMAP_JS_KEY || '',
-    
-    // Web服务API Key（后端REST API使用）- 备用
-    webKey: process.env.VUE_APP_AMAP_WEB_KEY || '',
+
+    // 高德地图安全码（前端地图使用）
+    securityCode: process.env.VUE_APP_AMAP_SECURITY_CODE || '',
     
     // API版本
     version: '2.0',
