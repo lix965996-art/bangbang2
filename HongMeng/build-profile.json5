@@ -1,12 +1,12 @@
 {
   "app": {
     "signingConfigs": [],
-    "compileSdkVersion": 20,
-    "compatibleSdkVersion": 20,
     "products": [
       {
         "name": "default",
-        "signingConfig": "default"
+        "signingConfig": "default",
+        "compileSdkVersion": 20,
+        "compatibleSdkVersion": 20
       }
     ]
   },
@@ -17,9 +17,7 @@
       "targets": [
         {
           "name": "default",
-          "applyToProducts": [
-            "default"
-          ]
+          "applyToProducts": ["default"]
         }
       ]
     }

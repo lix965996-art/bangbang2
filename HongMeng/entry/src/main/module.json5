@@ -5,7 +5,7 @@
     "description": "智慧农场管理系统",
     "mainElement": "EntryAbility",
     "deviceTypes": [
-      "phone",
+      "default",
       "tablet"
     ],
     "deliveryWithInstall": true,
@@ -36,12 +36,12 @@
     "requestPermissions": [
       {
         "name": "ohos.permission.INTERNET",
-        "reason": "需要网络访问来获取农场数据",
+        "reason": "$string:internet_permission_reason",
         "usedScene": {
           "abilities": [
             "EntryAbility"
           ],
-          "when": "inuse"
+          "when": "always"
         }
       }
     ]
