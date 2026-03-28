@@ -1,7 +1,12 @@
+interface TabItem {
+  icon: string;
+  label: string;
+}
+
 @Component
-export default class TabBar {
+export default struct TabBar {
   @Link currentTab: number;
-  private tabs: Array<{ icon: string; label: string }> = [
+  private tabs: TabItem[] = [
     { icon: '🏠', label: '首页' },
     { icon: '🌾', label: '农田' },
     { icon: '📦', label: '库存' },
@@ -11,7 +16,7 @@ export default class TabBar {
 
   build() {
     Row() {
-      ForEach(this.tabs, (tab: { icon: string; label: string }, index: number) => {
+      ForEach(this.tabs, (tab: TabItem, index: number) => {
         Column() {
           Text(tab.icon)
             .fontSize(22)

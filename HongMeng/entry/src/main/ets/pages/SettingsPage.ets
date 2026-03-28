@@ -1,6 +1,12 @@
 import router from '@ohos.router';
 import HeaderBar from '../components/HeaderBar';
-import { HttpClient, StorageUtil } from '../common/HttpClient';
+import { HttpClient } from '../common/HttpClient';
+import { StorageUtil } from '../common/StorageUtil';
+
+interface UserInfo {
+  username?: string;
+  token?: string;
+}
 
 @Entry
 @Component
@@ -131,7 +137,7 @@ struct SettingsPage {
           .fontColor('#999999')
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .maxWidth(150)
+          .constraintSize({ maxWidth: 150 })
       }
 
       Text('>')
@@ -148,7 +154,7 @@ struct SettingsPage {
     try {
       const userInfoStr = await StorageUtil.getString(StorageUtil.KEYS.USER_INFO);
       if (userInfoStr) {
-        const userInfo = JSON.parse(userInfoStr);
+        const userInfo: UserInfo = JSON.parse(userInfoStr) as UserInfo;
         this.username = userInfo.username || '';
       }
     } catch (error) {

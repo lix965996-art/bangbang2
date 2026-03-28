@@ -2,6 +2,10 @@ import router from '@ohos.router';
 import HeaderBar from '../components/HeaderBar';
 import { HttpClient, ApiResponse, Farmland } from '../common/HttpClient';
 
+interface RouterParams {
+  id?: number;
+}
+
 @Entry
 @Component
 struct FarmlandDetailPage {
@@ -27,7 +31,7 @@ struct FarmlandDetailPage {
   private httpClient: HttpClient = HttpClient.getInstance();
 
   aboutToAppear() {
-    const params = router.getParams() as { id?: number };
+    const params = router.getParams() as RouterParams;
     if (params && params.id) {
       this.farmlandId = params.id;
       this.isEditing = true;

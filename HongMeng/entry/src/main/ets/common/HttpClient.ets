@@ -1,190 +1,11 @@
 import http from '@ohos.net.http';
 import { ApiConfig } from './ApiConfig';
 
-// HTTP请求工具类
-export class HttpClient {
-  private static instance: HttpClient;
-  private token: string = '';
-
-  private constructor() {}
-
-  static getInstance(): HttpClient {
-    if (!HttpClient.instance) {
-      HttpClient.instance = new HttpClient();
-    }
-    return HttpClient.instance;
-  }
-
-  // 设置Token
-  setToken(token: string) {
-    this.token = token;
-  }
-
-  // 获取Token
-  getToken(): string {
-    return this.token;
-  }
-
-  // 清除Token
-  clearToken() {
-    this.token = '';
-  }
-
-  // 构建完整URL
-  private buildUrl(endpoint: string): string {
-    return ApiConfig.BASE_URL + endpoint;
-  }
-
-  // GET请求
-  async get<T>(endpoint: string, params?: Record<string, string | number>): Promise<T> {
-    let url = this.buildUrl(endpoint);
-    if (params) {
-      const queryString = Object.entries(params)
-        .map(([key, value]) => `${key}=${encodeURIComponent(String(value))}`)
-        .join('&');
-      url += `?${queryString}`;
-    }
-
-    const httpRequest = http.createHttp();
-    try {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json'
-      };
-      if (this.token) {
-        headers['token'] = this.token;
-      }
-
-      const response = await httpRequest.request(url, {
-        method: http.RequestMethod.GET,
-        header: headers,
-        connectTimeout: 30000,
-        readTimeout: 30000
-      });
-
-      if (response.responseCode === 200) {
-        const result = JSON.parse(response.result as string);
-        return result as T;
-      } else {
-        throw new Error(`HTTP Error: ${response.responseCode}`);
-      }
-    } finally {
-      httpRequest.destroy();
-    }
-  }
-
-  // POST请求
-  async post<T>(endpoint: string, data?: object): Promise<T> {
-    const url = this.buildUrl(endpoint);
-    const httpRequest = http.createHttp();
-
-    try {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json'
-      };
-      if (this.token) {
-        headers['token'] = this.token;
-      }
-
-      const response = await httpRequest.request(url, {
-        method: http.RequestMethod.POST,
-        header: headers,
-        extraData: data ? JSON.stringify(data) : undefined,
-        connectTimeout: 30000,
-        readTimeout: 30000
-      });
-
-      if (response.responseCode === 200) {
-        const result = JSON.parse(response.result as string);
-        return result as T;
-      } else {
-        throw new Error(`HTTP Error: ${response.responseCode}`);
-      }
-    } finally {
-      httpRequest.destroy();
-    }
-  }
-
-  // DELETE请求
-  async delete<T>(endpoint: string, id: number): Promise<T> {
-    const url = this.buildUrl(`${endpoint}/${id}`);
-    const httpRequest = http.createHttp();
-
-    try {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json'
-      };
-      if (this.token) {
-        headers['token'] = this.token;
-      }
-
-      const response = await httpRequest.request(url, {
-        method: http.RequestMethod.DELETE,
-        header: headers,
-        connectTimeout: 30000,
-        readTimeout: 30000
-      });
-
-      if (response.responseCode === 200) {
-        const result = JSON.parse(response.result as string);
-        return result as T;
-      } else {
-        throw new Error(`HTTP Error: ${response.responseCode}`);
-      }
-    } finally {
-      httpRequest.destroy();
-    }
-  }
-
-  // 上传文件
-  async uploadFile(endpoint: string, filePath: string): Promise<ApiResponse<object>> {
-    const url = this.buildUrl(endpoint);
-    const httpRequest = http.createHttp();
-
-    try {
-      const headers: Record<string, string> = {
-        'Content-Type': 'multipart/form-data'
-      };
-      if (this.token) {
-        headers['token'] = this.token;
-      }
-
-      const response = await httpRequest.request(url, {
-        method: http.RequestMethod.POST,
-        header: headers,
-        extraData: {
-          file: filePath
-        },
-        connectTimeout: 60000,
-        readTimeout: 60000
-      });
-
-      if (response.responseCode === 200) {
-        const result = JSON.parse(response.result as string);
-        return result as ApiResponse<object>;
-      } else {
-        return {
-          code: '500',
-          msg: `HTTP Error: ${response.responseCode}`,
-          data: null
-        };
-      }
-    } catch (error) {
-      return {
-        code: '500',
-        msg: error.message || '网络请求失败',
-        data: null
-      };
-    } finally {
-      httpRequest.destroy();
-    }
-  }
-}
-
 // 通用响应类型
 export interface ApiResponse<T> {
   code: string;
   msg?: string;
-  data: T;
+  data?: T;
 }
 
 // 用户信息
@@ -272,4 +93,231 @@ export interface FruitDetectResult {
   confidence: number;
   ripeness: string;
   bbox?: number[];
+}
+
+// 分页记录响应
+export interface PaginatedRecords<T> {
+  records: T[];
+}
+
+// 查询参数项
+export interface QueryParam {
+  key: string;
+  value: string;
+}
+
+// 请求头对象
+interface HeaderObject {
+  'Content-Type': string;
+  'token'?: string;
+}
+
+// HTTP请求头类
+export class HttpHeaders {
+  private contentType: string = 'application/json';
+  private token: string = '';
+
+  setContentType(type: string): void {
+    this.contentType = type;
+  }
+
+  getContentType(): string {
+    return this.contentType;
+  }
+
+  setToken(token: string): void {
+    this.token = token;
+  }
+
+  getToken(): string {
+    return this.token;
+  }
+
+  hasToken(): boolean {
+    return this.token.length > 0;
+  }
+
+  // 转换为请求头对象
+  toHeaderObject(): HeaderObject {
+    if (this.hasToken()) {
+      const headerWithToken: HeaderObject = {
+        'Content-Type': this.contentType,
+        'token': this.token
+      };
+      return headerWithToken;
+    }
+    const headerWithoutToken: HeaderObject = {
+      'Content-Type': this.contentType
+    };
+    return headerWithoutToken;
+  }
+}
+
+// HTTP请求工具类
+export class HttpClient {
+  private static instance: HttpClient;
+  private token: string = '';
+
+  private constructor() {}
+
+  static getInstance(): HttpClient {
+    if (!HttpClient.instance) {
+      HttpClient.instance = new HttpClient();
+    }
+    return HttpClient.instance;
+  }
+
+  setToken(token: string): void {
+    this.token = token;
+  }
+
+  getToken(): string {
+    return this.token;
+  }
+
+  clearToken(): void {
+    this.token = '';
+  }
+
+  private buildUrl(endpoint: string): string {
+    return ApiConfig.BASE_URL + endpoint;
+  }
+
+  private buildQueryParams(params: QueryParam[]): string {
+    if (params.length === 0) {
+      return '';
+    }
+    const parts: string[] = [];
+    for (let i = 0; i < params.length; i++) {
+      const p = params[i];
+      parts.push(p.key + '=' + encodeURIComponent(p.value));
+    }
+    return '?' + parts.join('&');
+  }
+
+  private createHeaders(contentType?: string): HttpHeaders {
+    const headers = new HttpHeaders();
+    if (contentType) {
+      headers.setContentType(contentType);
+    }
+    if (this.token) {
+      headers.setToken(this.token);
+    }
+    return headers;
+  }
+
+  async get<T>(endpoint: string, params?: QueryParam[]): Promise<T> {
+    let url = this.buildUrl(endpoint);
+    if (params && params.length > 0) {
+      url += this.buildQueryParams(params);
+    }
+
+    const httpRequest = http.createHttp();
+    try {
+      const headers = this.createHeaders();
+      const response = await httpRequest.request(url, {
+        method: http.RequestMethod.GET,
+        header: headers.toHeaderObject(),
+        connectTimeout: 30000,
+        readTimeout: 30000
+      });
+
+      if (response.responseCode === 200) {
+        const result = JSON.parse(response.result as string) as T;
+        return result;
+      } else {
+        throw new Error('HTTP Error: ' + response.responseCode);
+      }
+    } finally {
+      httpRequest.destroy();
+    }
+  }
+
+  async post<T>(endpoint: string, data?: object): Promise<T> {
+    const url = this.buildUrl(endpoint);
+    const httpRequest = http.createHttp();
+
+    try {
+      const headers = this.createHeaders();
+      const response = await httpRequest.request(url, {
+        method: http.RequestMethod.POST,
+        header: headers.toHeaderObject(),
+        extraData: data ? JSON.stringify(data) : undefined,
+        connectTimeout: 30000,
+        readTimeout: 30000
+      });
+
+      if (response.responseCode === 200) {
+        const result = JSON.parse(response.result as string) as T;
+        return result;
+      } else {
+        throw new Error('HTTP Error: ' + response.responseCode);
+      }
+    } finally {
+      httpRequest.destroy();
+    }
+  }
+
+  async delete<T>(endpoint: string, id: number): Promise<T> {
+    const url = this.buildUrl(endpoint + '/' + id);
+    const httpRequest = http.createHttp();
+
+    try {
+      const headers = this.createHeaders();
+      const response = await httpRequest.request(url, {
+        method: http.RequestMethod.DELETE,
+        header: headers.toHeaderObject(),
+        connectTimeout: 30000,
+        readTimeout: 30000
+      });
+
+      if (response.responseCode === 200) {
+        const result = JSON.parse(response.result as string) as T;
+        return result;
+      } else {
+        throw new Error('HTTP Error: ' + response.responseCode);
+      }
+    } finally {
+      httpRequest.destroy();
+    }
+  }
+
+  async uploadFile(endpoint: string, filePath: string): Promise<ApiResponse<object>> {
+    const url = this.buildUrl(endpoint);
+    const httpRequest = http.createHttp();
+
+    try {
+      const headers = this.createHeaders('multipart/form-data');
+      const response = await httpRequest.request(url, {
+        method: http.RequestMethod.POST,
+        header: headers.toHeaderObject(),
+        extraData: {
+          file: filePath
+        },
+        connectTimeout: 60000,
+        readTimeout: 60000
+      });
+      if (response.responseCode === 200) {
+        const result = JSON.parse(response.result as string) as ApiResponse<object>;
+        return result;
+      } else {
+        const errorResponse: ApiResponse<object> = {
+          code: '500',
+          msg: 'HTTP Error: ' + response.responseCode,
+          data: undefined
+        };
+        return errorResponse;
+      }
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : '网络请求失败';
+      const errorResponse: ApiResponse<object> = {
+        code: '500',
+        msg: errorMsg,
+        data: undefined
+      };
+      return errorResponse;
+    } finally {
+      httpRequest.destroy();
+    }
+  }
 }

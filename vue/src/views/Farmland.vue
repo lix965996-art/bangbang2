@@ -2,8 +2,8 @@
   <div class="farmland-manage">
     <div class="toolbar-card">
       <div class="title-area">
-        <div class="main-title"> 农田资产管理</div>
-        <div class="sub-title">共管理 {{ total }} 块高标准农田 · 资产数字化率 100%</div>
+        <div class="main-title"> 地块资产图谱</div>
+        <div class="sub-title">共管理 {{ total }} 块地块资产 · 栽培档案与空间位置已完成数字建档</div>
       </div>
       <div class="action-area">
         <el-input 
@@ -70,7 +70,7 @@
            </template>
         </el-table-column>
 
-        <el-table-column label=" AI品质评级" width="180">
+        <el-table-column label=" 生长质量评分" width="180">
           <template #default="scope">
              <el-rate
               :value="getFakeScore(scope.row.id)"
@@ -113,7 +113,7 @@
     <!-- 适量的底部空间 -->
     <div style="height: 50px; opacity: 0; pointer-events: none;"></div>
 
-    <el-dialog title="农田信息录入" v-model="dialogFormVisible" width="500px" :close-on-click-modal="false" append-to-body :lock-scroll="false">
+    <el-dialog title="地块信息录入" v-model="dialogFormVisible" width="500px" :close-on-click-modal="false" append-to-body :lock-scroll="false">
       <el-form label-width="100px" size="medium" :model="form" :rules="rules" ref="farmForm" class="custom-form">
         <el-form-item label="农田名称" prop="farm">
           <el-input v-model="form.farm" placeholder="例如：A1号有机示范田"></el-input>
@@ -236,13 +236,13 @@
 
           <div class="h5-card ai-score-card">
             <div class="score-header">
-              <span class="brand"> AI 智脑认证</span>
+              <span class="brand"> 数据建档校验</span>
               <span class="date">{{ new Date().toLocaleDateString() }}</span>
             </div>
             <div class="score-body">
               <div class="score-left">
                 <div class="big-score">{{ traceData.score }}</div>
-                <div class="score-label">综合品质分</div>
+                <div class="score-label">生长质量分</div>
               </div>
               <div class="score-right">
                 <div class="level-badge">{{ traceData.level }}</div>
@@ -265,7 +265,7 @@
               <div class="env-item">
                 <div class="icon water"><i class="el-icon-heavy-rain"></i></div>
                 <div class="val">{{ traceData.waterCount || 45 }}次</div>
-                <div class="lbl">AI 智控灌溉</div>
+                <div class="lbl">智能灌溉次数</div>
               </div>
               <div class="env-item">
                 <div class="icon temp"><i class="el-icon-stopwatch"></i></div>
@@ -334,18 +334,18 @@ export default {
       // 表单验证规则
       rules: {
         farm: [
-          { required: true, message: 'Please enter farmland name', trigger: 'blur' },
-          { min: 2, max: 50, message: 'Length must be between 2 and 50 characters', trigger: 'blur' }
+          { required: true, message: '请输入地块名称', trigger: 'blur' },
+          { min: 2, max: 50, message: '长度需控制在 2 到 50 个字符之间', trigger: 'blur' }
         ],
         crop: [
-          { required: true, message: 'Please enter crop name', trigger: 'blur' }
+          { required: true, message: '请输入作物名称', trigger: 'blur' }
         ],
         area: [
-          { required: true, message: 'Please enter area', trigger: 'change' },
+          { required: true, message: '请完善地块面积', trigger: 'change' },
           { type: 'number', min: 0.1, max: 10000, message: 'Area must be between 0.1 and 10000 mu', trigger: 'change' }
         ],
         keeper: [
-          { required: true, message: 'Please enter manager name', trigger: 'blur' }
+          { required: true, message: '请输入负责人姓名', trigger: 'blur' }
         ]
       },
       
@@ -468,14 +468,14 @@ export default {
       this.traceData.sunlight = 1000 + (row.id * 50); 
       this.traceData.waterCount = 20 + (row.id % 10); 
 
-      // 3. 动态生成 AI 评语
-      this.traceData.desc = `该批次 ${row.crop} 种植于 ${row.address || '标准示范区'}。全周期生长环境数据完整，AI模型判定其成熟度完美。`;
+      // 3. 动态生成建档摘要
+      this.traceData.desc = `该批次 ${row.crop} 种植于 ${row.address || '标准示范区'}。全周期生长环境数据完整，水肥和巡检记录已完成归档校验。`;
 
       // 4. 生成时间轴
       this.traceData.timeline = this.generateTimeline(row.crop);
       
       this.traceVisible = true;
-      this.$message.success('🔗 区块链溯源数据校验通过');
+      this.$message.success('区块链溯源数据校验通过');
     },
 
     generateTimeline(crop) {
@@ -489,7 +489,7 @@ export default {
       if (crop && (crop.includes('果') || crop.includes('莓'))) {
         return [
           { color: '#67C23A', date: dateStr(90), title: '智能移栽', desc: '完成定植，成活率 99%' },
-          { color: '#409EFF', date: dateStr(60), title: '花期管控', desc: 'AI 控温 25°C，蜜蜂授粉' },
+          { color: '#409EFF', date: dateStr(60), title: '花期管控', desc: '温控 25°C，完成授粉保障' },
           { color: '#E6A23C', date: dateStr(15), title: '糖度检测', desc: '抽样检测糖度达 12%' },
           { color: '#67C23A', date: '刚刚', title: '数字建档', desc: '生成溯源码，准备上市' }
         ];

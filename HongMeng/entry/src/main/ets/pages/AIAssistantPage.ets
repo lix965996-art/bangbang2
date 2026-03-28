@@ -1,12 +1,24 @@
 import router from '@ohos.router';
 import HeaderBar from '../components/HeaderBar';
 import { HttpClient, ApiResponse } from '../common/HttpClient';
+import { ThemeColors } from '../common/ThemeColors';
+import GlassCard from '../components/glass/GlassCard';
+import AIAvatar from '../components/ai/AIAvatar';
+import TypewriterText from '../components/animated/TypewriterText';
 
 interface ChatMessage {
   id: number;
   type: 'user' | 'assistant';
   content: string;
   timestamp: number;
+}
+
+interface ChatRequest {
+  question: string;
+}
+
+interface ChatResponse {
+  answer: string;
 }
 
 @Entry
@@ -16,12 +28,67 @@ struct AIAssistantPage {
   @State inputText: string = '';
   @State isLoading: boolean = false;
   @State isTyping: boolean = false;
-  private scroller: Scroller = new Scroller();
+  @State displayText: string = '';
+  @State typingIndex: number = 0;
 
+  private scroller: Scroller = new Scroller();
   private httpClient: HttpClient = HttpClient.getInstance();
 
   build() {
     Column() {
+      // 深色背景头部
+      Column() {
+        // AI头像区域
+        Column() {
+          Stack() {
+            // 光晕效果
+            Column()
+              .width(80)
+              .height(80)
+              .borderRadius(40)
+              .linearGradient({
+                angle: 135,
+                colors: [['rgba(139, 92, 246, 0.3)', 0.0], ['rgba(59, 130, 246, 0.3)', 1.0]]
+              })
+              .blur(20)
+
+            Column() {
+              Text('🤖')
+                .fontSize(36)
+            }
+            .width(64)
+            .height(64)
+            .borderRadius(32)
+            .justifyContent(FlexAlign.Center)
+            .linearGradient({
+              angle: 135,
+              colors: [['#8B5CF6', 0.0], ['#3B82F6', 1.0]]
+            })
+          }
+          .width(80)
+          .height(80)
+
+          Text('AI农业助手')
+            .fontSize(24)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Color.White)
+            .margin({ top: 16 })
+
+          Text('智能问答 · 专业建议')
+            .fontSize(12)
+            .fontColor('rgba(255,255,255,0.6)')
+            .margin({ top: 4 })
+        }
+        .width('100%')
+        .padding(24)
+      }
+      .width('100%')
+      .linearGradient({
+        angle: 180,
+        colors: [['#0F172A', 0.0], ['#1E293B', 1.0]]
+      })
+      .borderRadius({ bottomLeft: 24, bottomRight: 24 })
+
       HeaderBar({
         title: 'AI农业助手',
         showBack: true,
@@ -34,132 +101,102 @@ struct AIAssistantPage {
       List({ scroller: this.scroller }) {
         ForEach(this.messages, (message: ChatMessage) => {
           ListItem() {
-            this.MessageBubble(message)
+            Row() {
+              if (message.type === 'user') {
+                Blank()
+              }
+
+              Column() {
+                if (message.type === 'assistant') {
+                  AIAvatar({ size: 32 })
+                    .margin({ bottom: 8 })
+                }
+
+                if (this.isTyping && message.type === 'assistant') {
+                  TypewriterText({
+                    fullText: message.content,
+                    speed: 30
+                  })
+                } else {
+                  Text(message.content)
+                    .fontSize(15)
+                    .fontColor(message.type === 'user' ? Color.White : ThemeColors.TEXT_PRIMARY)
+                    .lineHeight(22)
+                }
+              }
+              .constraintSize({ maxWidth: '75%' })
+              .backgroundColor(message.type === 'user' ? '#3B82F6' : 'rgba(255,255,255,0.95)')
+              .borderRadius(message.type === 'user' ?
+                { topLeft: 16, topRight: 16, bottomLeft: 4, bottomRight: 16 } :
+                { topLeft: 4, topRight: 16, bottomLeft: 16, bottomRight: 16 })
+              .padding(16)
+              .shadow({
+                radius: 8,
+                color: 'rgba(0,0,0,0.15)',
+                offsetX: 0,
+                offsetY: 2
+              })
+
+              if (message.type === 'assistant') {
+                Blank()
+              }
+            }
+            .width('100%')
+            .padding({ left: 16, right: 16, top: 8, bottom: 8 })
           }
         })
-
-        // 正在输入提示
-        if (this.isTyping) {
-          ListItem() {
-            Row() {
-              LoadingProgress()
-                .width(20)
-                .height(20)
-                .color('#4CAF50')
-
-              Text('AI正在思考...')
-                .fontSize(12)
-                .fontColor('#999999')
-                .margin({ left: 8 })
-            }
-            .padding(12)
-          }
-        }
       }
       .layoutWeight(1)
       .width('100%')
-      .padding({ left: 16, right: 16, top: 12, bottom: 12 })
-      .scrollBar(BarState.Off)
-      .edgeEffect(EdgeEffect.Spring)
-
-      // 快捷问题
-      if (this.messages.length === 0) {
-        Column() {
-          Text('你可以问我:')
-            .fontSize(14)
-            .fontColor('#999999')
-            .margin({ bottom: 12 })
-
-          Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start }) {
-            this.QuickQuestion('🌡️ 温度过高怎么办?')
-            this.QuickQuestion('💧 湿度太低怎么处理?')
-            this.QuickQuestion('🐛 如何防治病虫害?')
-            this.QuickQuestion('🌱 什么时候适合播种?')
-            this.QuickQuestion('📈 如何提高产量?')
-            this.QuickQuestion('💊 农药使用建议?')
-          }
-        }
-        .width('100%')
-        .padding({ left: 16, right: 16, bottom: 12 })
-      }
+      .padding({ left: 16, right: 16, bottom: 80 })
 
       // 输入区域
-      Row() {
-        TextInput({ placeholder: '请输入农业问题...', text: this.inputText })
-          .layoutWeight(1)
-          .height(44)
-          .backgroundColor('#F5F5F5')
-          .borderRadius(22)
-          .padding({ left: 16, right: 16 })
-          .onChange((value: string) => {
-            this.inputText = value;
-          })
+      Column() {
+        Row() {
+          TextInput({ placeholder: '输入农业问题...', text: this.inputText })
+            .layoutWeight(1)
+            .height(48)
+            .backgroundColor('rgba(30,41,59,0.8)')
+            .borderRadius(24)
+            .padding({ left: 16, right: 16 })
+            .border({ width: 1, color: 'rgba(255,255,255,0.2)' })
+            .fontColor(Color.White)
+            .placeholderColor('rgba(255,255,255,0.5)')
+            .onChange((value: string) => {
+              this.inputText = value;
+            })
 
-        Button('发送')
-          .fontSize(14)
-          .backgroundColor('#4CAF50')
-          .borderRadius(22)
-          .height(44)
-          .margin({ left: 12 })
+          Button() {
+            Text('发送')
+              .fontSize(14)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(Color.White)
+          }
+          .width(60)
+          .height(48)
+          .borderRadius(24)
+          .linearGradient({
+            angle: 135,
+            colors: [['#3B82F6', 0.0], ['#8B5CF6', 1.0]]
+          })
           .enabled(this.inputText.trim().length > 0 && !this.isLoading)
+          .margin({ left: 12 })
           .onClick(() => {
             this.sendMessage();
           })
+        }
+        .width('100%')
       }
       .width('100%')
-      .padding(16)
-      .backgroundColor(Color.White)
-      .border({ width: { top: 1 }, color: '#E0E0E0' })
+      .padding({ left: 16, right: 16, top: 12, bottom: 12 })
+      .backgroundColor('#1E293B')
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#F5F5F5')
-  }
-
-  @Builder
-  MessageBubble(message: ChatMessage) {
-    Row() {
-      if (message.type === 'user') {
-        Blank()
-      }
-
-      Column() {
-        Text(message.content)
-          .fontSize(14)
-          .fontColor(message.type === 'user' ? Color.White : '#333333')
-      }
-      .maxWidth('75%')
-      .backgroundColor(message.type === 'user' ? '#4CAF50' : Color.White)
-      .borderRadius(12)
-      .padding(12)
-      .shadow({
-        radius: message.type === 'user' ? 0 : 4,
-        color: 'rgba(0,0,0,0.05)',
-        offsetX: 0,
-        offsetY: 2
-      })
-
-      if (message.type === 'assistant') {
-        Blank()
-      }
-    }
-    .width('100%')
-    .margin({ bottom: 12 })
-  }
-
-  @Builder
-  QuickQuestion(question: string) {
-    Text(question)
-      .fontSize(12)
-      .fontColor('#4CAF50')
-      .backgroundColor('#E8F5E9')
-      .borderRadius(16)
-      .padding({ left: 12, right: 12, top: 6, bottom: 6 })
-      .margin({ right: 8, bottom: 8 })
-      .onClick(() => {
-        this.inputText = question.replace(/^[^\s]+\s/, ''); // 移除表情
-        this.sendMessage();
-      })
+    .linearGradient({
+      angle: 180,
+      colors: [['#0F172A', 0.0], ['#1E293B', 1.0]]
+    })
   }
 
   private async sendMessage() {
@@ -174,10 +211,11 @@ struct AIAssistantPage {
       timestamp: Date.now()
     };
     this.messages = [...this.messages, userMessage];
-
     this.inputText = '';
     this.isLoading = true;
     this.isTyping = true;
+    this.typingIndex = 0;
+    this.displayText = '';
 
     // 滚动到底部
     setTimeout(() => {
@@ -185,9 +223,8 @@ struct AIAssistantPage {
     }, 100);
 
     try {
-      const response = await this.httpClient.post<ApiResponse<{ answer: string }>>('/api/chat/ask', {
-        question: question
-      });
+      const requestData: ChatRequest = { question: question };
+      const response = await this.httpClient.post<ApiResponse<ChatResponse>>('/api/chat/ask', requestData);
 
       let answer = '抱歉，我无法回答这个问题。';
       if (response.code === '200' && response.data) {
@@ -196,17 +233,22 @@ struct AIAssistantPage {
 
       // 添加AI回复
       const assistantMessage: ChatMessage = {
-        id: Date.now() + 1,
+        id: Date.now(),
         type: 'assistant',
         content: answer,
         timestamp: Date.now()
       };
       this.messages = [...this.messages, assistantMessage];
+      this.typingIndex = 0;
+      this.displayText = '';
+
+      // 开始打字机效果
+      this.startTypewriter();
     } catch (error) {
       const errorMessage: ChatMessage = {
-        id: Date.now() + 1,
+        id: Date.now(),
         type: 'assistant',
-        content: '抱歉，网络连接失败，请稍后再试。',
+        content: '抱歉，网络连接失败，请稍后再试',
         timestamp: Date.now()
       };
       this.messages = [...this.messages, errorMessage];
@@ -219,5 +261,20 @@ struct AIAssistantPage {
         this.scroller.scrollToIndex(this.messages.length - 1);
       }, 100);
     }
+  }
+
+  private startTypewriter() {
+    this.isTyping = true;
+    const text = this.displayText;
+    const length = text.length;
+    const interval = setInterval(() => {
+      if (this.typingIndex < length) {
+        this.typingIndex++;
+        this.displayText = text.substring(0, this.typingIndex);
+      } else {
+        clearInterval(interval);
+        this.isTyping = false;
+      }
+    }, 30);
   }
 }

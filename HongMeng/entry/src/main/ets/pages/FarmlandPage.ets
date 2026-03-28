@@ -1,6 +1,6 @@
 import router from '@ohos.router';
 import HeaderBar from '../components/HeaderBar';
-import { HttpClient, ApiResponse, Farmland } from '../common/HttpClient';
+import { HttpClient, ApiResponse, Farmland, QueryParam, PaginatedRecords } from '../common/HttpClient';
 
 @Entry
 @Component
@@ -283,11 +283,12 @@ struct FarmlandPage {
   private async loadFarmlands() {
     this.isLoading = true;
     try {
-      const response = await this.httpClient.get<ApiResponse<{ records: Farmland[] }>>('/statistic/page', {
-        pageNum: this.pageNum,
-        pageSize: this.pageSize,
-        farm: this.searchKeyword
-      });
+      const params: QueryParam[] = [
+        { key: 'pageNum', value: String(this.pageNum) },
+        { key: 'pageSize', value: String(this.pageSize) },
+        { key: 'farm', value: this.searchKeyword }
+      ];
+      const response = await this.httpClient.get<ApiResponse<PaginatedRecords<Farmland>>>('/statistic/page', params);
 
       if (response.code === '200' && response.data) {
         if (this.pageNum === 1) {

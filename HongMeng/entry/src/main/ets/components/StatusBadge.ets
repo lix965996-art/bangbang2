@@ -1,5 +1,5 @@
 @Component
-export default class StatusBadge {
+export default struct StatusBadge {
   @Prop status: string = '';
   @Prop type: 'success' | 'warning' | 'error' | 'info' = 'info';
 

@@ -1,169 +1,249 @@
-﻿<template>
-  <div class="jd-logistics-page">
-    <!-- 顶部 KPI 看板 -->
-    <div class="kpi-dashboard">
-      <div class="kpi-card primary">
-        <div class="kpi-icon">📦</div>
-        <div class="kpi-content">
-          <div class="kpi-label">物资总数</div>
-          <div class="kpi-value">{{ total }}</div>
-          <div class="kpi-trend">库存管理</div>
+<template>
+  <div class="showcase-page inventory-radar-page">
+    <section class="inventory-radar-hero">
+      <div class="inventory-radar-intro">
+        <div class="inventory-radar-badge">
+          <i class="el-icon-box"></i>
+          仓储雷达
+        </div>
+        <h2>把库存页改成“仓区健康监测”，而不是一张静态仓库表。</h2>
+        <p>
+          当前仓储页面重点讲三件事：哪个仓区压力最大、哪些物资需要立即补货、温湿度是否会影响保存质量。
+          录入、编辑、报废和导出能力继续保留，但主画面先展示仓储判断，再展示台账。
+        </p>
+        <div class="inventory-radar-tags">
+          <span class="inventory-radar-tag">安全达标率 {{ inventoryHealthRate }}%</span>
+          <span class="inventory-radar-tag">紧急补货 {{ lowStockCount }} 项</span>
+          <span class="inventory-radar-tag">覆盖仓区 {{ warehouseCount }} 处</span>
         </div>
       </div>
-      
-      <div class="kpi-card warning">
-        <div class="kpi-icon"></div>
-        <div class="kpi-content">
-          <div class="kpi-label">库存预警</div>
-          <div class="kpi-value">{{ lowStockCount }}</div>
-          <div class="kpi-trend">低于安全库存</div>
-        </div>
-      </div>
-      
-      <div class="kpi-card success">
-        <div class="kpi-icon">✓</div>
-        <div class="kpi-content">
-          <div class="kpi-label">充足库存</div>
-          <div class="kpi-value">{{ sufficientStockCount }}</div>
-          <div class="kpi-trend">库存健康</div>
-        </div>
-      </div>
-      
-      <div class="kpi-card info">
-        <div class="kpi-icon">🌡</div>
-        <div class="kpi-content">
-          <div class="kpi-label">仓库环境</div>
-          <div class="kpi-value">{{ warehouseTemp.toFixed(1) }}°C</div>
-          <div class="kpi-trend">湿度 {{ warehouseHumidity.toFixed(0) }}%</div>
-        </div>
-      </div>
-    </div>
 
-    <!-- 主内容区 -->
-    <div class="main-content">
-      <!-- 数据表格卡片 -->
-      <div class="data-table-card">
-        <!-- 工具栏 -->
-        <div class="table-toolbar">
-          <div class="toolbar-left">
-            <h3 class="table-title">库存列表</h3>
-            <div class="data-count">共 {{ total }} 项物资</div>
+      <div class="inventory-radar-climate">
+        <div class="inventory-radar-climate__label">仓储气候</div>
+        <div class="inventory-radar-climate__state">{{ environmentStatus }}</div>
+        <div class="inventory-radar-climate__metrics">
+          <div class="inventory-radar-climate__metric">
+            <span>仓温</span>
+            <strong>{{ warehouseTemp.toFixed(1) }}°C</strong>
           </div>
-          <div class="toolbar-right">
-            <div class="search-box">
-              <input 
-                type="text" 
-                class="jd-input" 
-                v-model="produce" 
-                placeholder="搜索物资名称"
-                @keyup.enter="load"
-              />
-              <button class="jd-btn" @click="load">搜索</button>
+          <div class="inventory-radar-climate__metric">
+            <span>湿度</span>
+            <strong>{{ warehouseHumidity.toFixed(0) }}%</strong>
+          </div>
+        </div>
+        <p>{{ heroInsight }}</p>
+      </div>
+    </section>
+
+    <section class="inventory-radar-grid">
+      <div class="inventory-radar-board">
+        <div class="inventory-radar-board__head">
+          <div>
+            <div class="inventory-radar-board__title">仓区热区图</div>
+            <div class="inventory-radar-board__desc">先看仓区状态，再看具体物资。这样这页的角色才像调度中枢。</div>
+          </div>
+          <div class="inventory-radar-summary">
+            <div class="inventory-radar-summary__label">当前判断</div>
+            <div class="inventory-radar-summary__value">{{ heroHeadline }}</div>
+          </div>
+        </div>
+
+        <div class="inventory-zone-list">
+          <article
+            v-for="zone in warehouseSnapshots"
+            :key="zone.name"
+            class="inventory-zone-card"
+          >
+            <div class="inventory-zone-card__top">
+              <div>
+                <div class="inventory-zone-card__name">{{ zone.name }}</div>
+                <div class="inventory-zone-card__meta">{{ zone.itemCount }} 类物资 · 当前库存 {{ zone.quantity }}</div>
+              </div>
+              <span :class="['inventory-zone-card__state', getZoneStateClass(zone)]">
+                {{ getZoneStateText(zone) }}
+              </span>
             </div>
-            <button class="jd-btn primary" @click="handleAdd">
-              <span>+ 入库登记</span>
-            </button>
-            <button class="jd-btn" @click="exp">
-              <span>↓ 导出报表</span>
-            </button>
+
+            <div class="inventory-zone-card__progress">
+              <div class="inventory-zone-card__progress-row">
+                <span>安全达标率</span>
+                <strong>{{ zone.safeRate }}%</strong>
+              </div>
+              <el-progress :percentage="zone.safeRate" :stroke-width="8" :show-text="false" color="#1f8a63"></el-progress>
+            </div>
+
+            <div class="inventory-zone-card__footer">
+              <div class="inventory-zone-card__metric">
+                <span>预警项</span>
+                <strong>{{ zone.riskCount }}</strong>
+              </div>
+              <div class="inventory-zone-card__metric">
+                <span>主保管人</span>
+                <strong>{{ zone.keeper }}</strong>
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+
+      <div class="inventory-priority-panel">
+        <div class="inventory-priority-panel__title">补货序列</div>
+        <div class="inventory-priority-panel__desc">右侧只保留最值得处理的事项，不再堆一排同质化 KPI。</div>
+
+        <div v-if="restockCandidates.length" class="inventory-priority-list">
+          <div
+            v-for="(item, index) in restockCandidates"
+            :key="item.id"
+            class="inventory-priority-item"
+          >
+            <div class="inventory-priority-item__rank">0{{ index + 1 }}</div>
+            <div class="inventory-priority-item__content">
+              <div class="inventory-priority-item__title">{{ item.produce }}</div>
+              <div class="inventory-priority-item__meta">
+                {{ item.warehouse || '默认仓区' }} · 当前 {{ item.number || 0 }} / 安全线 {{ getSafeStock(item) }}
+              </div>
+            </div>
+            <div class="inventory-priority-item__gap">补 {{ getRestockGap(item) }}</div>
+          </div>
+        </div>
+        <div v-else class="inventory-priority-empty">全部物资高于安全线，当前可转入成本优化观察。</div>
+
+        <div class="inventory-priority-note">
+          <div class="inventory-priority-note__label">周转观察</div>
+          <p>{{ turnoverHint }}</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="showcase-panel inventory-ledger-panel">
+      <div class="showcase-panel__header">
+        <div>
+          <div class="showcase-panel__title">仓储台账</div>
+          <div class="showcase-panel__desc">台账退到第二层，用于核验细节和执行动作，不再占整个页面主舞台。</div>
+        </div>
+      </div>
+      <div class="showcase-panel__body">
+        <div class="showcase-toolbar">
+          <div class="showcase-toolbar__filters">
+            <el-input
+              v-model="produce"
+              clearable
+              prefix-icon="el-icon-search"
+              placeholder="搜索物资名称"
+              @clear="load"
+              @keyup.enter.native="load"
+            />
+          </div>
+          <div class="showcase-toolbar__actions">
+            <el-button type="primary" icon="el-icon-plus" @click="handleAdd">入库登记</el-button>
+            <el-button plain icon="el-icon-refresh" @click="load">刷新</el-button>
+            <el-button plain icon="el-icon-download" @click="exp">导出报表</el-button>
           </div>
         </div>
 
-        <!-- 数据表格 -->
-        <div v-if="loading" class="table-loading">
-          <div class="loading-spinner"></div>
-          <div>加载中...</div>
-        </div>
-        
-        <div v-else class="inventory-table">
-          <!-- 表格头部 -->
-          <div class="table-header">
-            <div class="th" style="width: 50px">序号</div>
-            <div class="th" style="width: 200px">物资名称</div>
-            <div class="th" style="width: 100px">仓库位置</div>
-            <div class="th" style="width: 150px">库存状态</div>
-            <div class="th" style="width: 80px">当前库存</div>
-            <div class="th" style="width: 100px">库存占比</div>
-            <div class="th" style="width: 80px">保管员</div>
-            <div class="th" style="flex: 1">备注</div>
-            <div class="th" style="width: 150px">操作</div>
-          </div>
-          
-          <!-- 表格体 -->
-          <div class="table-body">
-            <div 
-              v-for="(item, index) in tableData" 
-              :key="item.id" 
-              class="table-row"
-            >
-              <div class="td" style="width: 50px">{{ (pageNum - 1) * pageSize + index + 1 }}</div>
-              <div class="td" style="width: 200px">
-                <div class="item-name-cell">
-                  <img :src="getItemImage(item.produce)" class="item-thumb" :alt="item.produce" />
-                  <span class="item-name-text">{{ item.produce }}</span>
-                </div>
-              </div>
-              <div class="td" style="width: 100px">
-                <div class="location-cell">
-                  <div>{{ item.warehouse }}</div>
-                  <div class="location-sub">{{ item.region }}</div>
-                </div>
-              </div>
-              <div class="td" style="width: 150px">
-                <div class="stock-bar-cell">
-                  <div class="stock-bar-bg">
-                    <div 
-                      class="stock-bar-fill" 
-                      :class="getStockLevelClass(item)"
-                      :style="{ width: getStockPercentage(item) + '%' }"
-                    ></div>
+        <el-table
+          :data="tableData"
+          v-loading="loading"
+          style="width: 100%"
+          :empty-text="produce ? '未找到匹配物资' : '暂无库存数据'"
+        >
+          <el-table-column label="物资信息" min-width="240">
+            <template slot-scope="scope">
+              <div class="inventory-material">
+                <img :src="getItemImage(scope.row.produce)" :alt="scope.row.produce" class="inventory-material__thumb">
+                <div>
+                  <div class="inventory-material__name">{{ scope.row.produce }}</div>
+                  <div class="inventory-material__meta">
+                    {{ scope.row.remark || '已完成仓储建档，可联动补货与出库。' }}
                   </div>
-                  <span class="stock-percent">{{ getStockPercentage(item) }}%</span>
                 </div>
               </div>
-              <div class="td" style="width: 80px">
-                <span class="stock-number" :class="getStockLevelClass(item)">{{ item.number }}</span>
-              </div>
-              <div class="td" style="width: 100px">
-                <span class="stock-ratio">{{ item.number }}/{{ item.maxStock }}</span>
-              </div>
-              <div class="td" style="width: 80px">{{ item.keeper }}</div>
-              <div class="td" style="flex: 1">{{ item.remark || '-' }}</div>
-              <div class="td" style="width: 150px">
-                <div class="action-btns">
-                  <button class="action-link" @click="handleEdit(item)">编辑</button>
-                  <span class="action-sep">|</span>
-                  <button class="action-link danger" @click="del(item.id)">报废</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+            </template>
+          </el-table-column>
 
-    <!-- 入库对话框 -->
-    <el-dialog title="📦 物资入库登记" :visible.sync="dialogFormVisible" width="500px" :close-on-click-modal="false">
-      <el-form label-width="100px" size="small" :model="form">
+          <el-table-column label="仓区" width="120" align="center">
+            <template slot-scope="scope">
+              {{ scope.row.warehouse || '默认仓区' }}
+            </template>
+          </el-table-column>
+
+          <el-table-column label="库位" width="130" align="center">
+            <template slot-scope="scope">
+              {{ scope.row.region || '待补充' }}
+            </template>
+          </el-table-column>
+
+          <el-table-column label="状态" width="120" align="center">
+            <template slot-scope="scope">
+              <span :class="['showcase-status-tag', getStockTagClass(scope.row)]">
+                {{ getStockText(scope.row) }}
+              </span>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="当前库存" width="100" align="center">
+            <template slot-scope="scope">
+              {{ scope.row.number || 0 }}
+            </template>
+          </el-table-column>
+
+          <el-table-column label="安全线" width="100" align="center">
+            <template slot-scope="scope">
+              {{ getSafeStock(scope.row) }}
+            </template>
+          </el-table-column>
+
+          <el-table-column label="覆盖天数" width="110" align="center">
+            <template slot-scope="scope">
+              {{ getCoverageDays(scope.row) }}
+            </template>
+          </el-table-column>
+
+          <el-table-column prop="keeper" label="保管员" width="100" align="center"></el-table-column>
+
+          <el-table-column label="操作" width="150" align="center" fixed="right">
+            <template slot-scope="scope">
+              <el-button type="text" @click="handleEdit(scope.row)">编辑</el-button>
+              <el-button type="text" class="inventory-delete" @click="del(scope.row.id)">报废</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+    </section>
+
+    <el-dialog
+      title="仓储建档"
+      :visible.sync="dialogFormVisible"
+      width="520px"
+      :close-on-click-modal="false"
+    >
+      <el-form label-width="96px" size="small" :model="form">
         <el-form-item label="物资名称">
           <el-input v-model="form.produce" autocomplete="off"></el-input>
         </el-form-item>
         <el-form-item label="所属仓库">
-          <el-select v-model="form.warehouse" placeholder="请选择" style="width:100%">
+          <el-select v-model="form.warehouse" placeholder="请选择" style="width: 100%">
             <el-option label="1号综合农资库" value="1号仓"></el-option>
             <el-option label="2号设备仓" value="2号仓"></el-option>
+            <el-option label="冷链保鲜仓" value="冷链仓"></el-option>
           </el-select>
         </el-form-item>
         <el-form-item label="存放区域">
-          <el-input v-model="form.region" placeholder="例如：A-01货架"></el-input>
+          <el-input v-model="form.region" placeholder="例如 A-01 货架"></el-input>
         </el-form-item>
-        <el-form-item label="入库数量">
-          <el-input-number v-model="form.number" :min="1" style="width:100%"></el-input-number>
+        <el-form-item label="当前库存">
+          <el-input-number v-model="form.number" :min="1" style="width: 100%"></el-input-number>
+        </el-form-item>
+        <el-form-item label="安全库存">
+          <el-input-number v-model="form.safeStock" :min="1" style="width: 100%"></el-input-number>
         </el-form-item>
         <el-form-item label="最大库存">
-          <el-input-number v-model="form.maxStock" :min="1" placeholder="100" style="width:100%"></el-input-number>
+          <el-input-number v-model="form.maxStock" :min="1" style="width: 100%"></el-input-number>
         </el-form-item>
-        <el-form-item label="管理员">
+        <el-form-item label="日均消耗">
+          <el-input-number v-model="form.dailyConsumption" :min="0" :precision="1" style="width: 100%"></el-input-number>
+        </el-form-item>
+        <el-form-item label="保管员">
           <el-input v-model="form.keeper"></el-input>
         </el-form-item>
         <el-form-item label="备注">
@@ -171,52 +251,131 @@
         </el-form-item>
       </el-form>
       <div slot="footer" class="dialog-footer">
-        <el-button @click="dialogFormVisible = false">取 消</el-button>
-        <el-button type="primary" @click="save">确 定</el-button>
+        <el-button @click="dialogFormVisible = false">取消</el-button>
+        <el-button type="primary" @click="save">确认</el-button>
       </div>
     </el-dialog>
   </div>
 </template>
 
 <script>
-import apiConfig from '@/config/api.config';
+import apiConfig from '@/config/api.config'
 
 export default {
-  name: "Inventory",
+  name: 'Inventory',
   data() {
     return {
-      apiConfig, // 引入API配置
+      apiConfig,
       tableData: [],
       total: 0,
       pageNum: 1,
       pageSize: 12,
-      produce: "",
+      produce: '',
       form: {},
       dialogFormVisible: false,
-      multipleSelection: [],
-      user: localStorage.getItem("user") ? JSON.parse(localStorage.getItem("user")) : {},
+      user: localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')) : {},
       loading: false,
-      hoveredItem: null,
-      // 仓库环境数据
       warehouseTemp: 24,
       warehouseHumidity: 45,
-      expiringCount: 2
+      envTimer: null
     }
   },
   computed: {
-    // 低库存物资数量
     lowStockCount() {
-      return this.tableData.filter(item => {
-        const percentage = this.getStockPercentage(item)
-        return percentage < 20
-      }).length
+      return this.tableData.filter(item => (item.number || 0) < this.getSafeStock(item)).length
     },
-    // 充足库存物资数量
-    sufficientStockCount() {
-      return this.tableData.filter(item => {
-        const percentage = this.getStockPercentage(item)
-        return percentage >= 50
-      }).length
+    totalUnits() {
+      return this.tableData.reduce((sum, item) => sum + (Number(item.number) || 0), 0)
+    },
+    warehouseCount() {
+      const warehouses = new Set()
+      this.tableData.forEach(item => {
+        if (item.warehouse) {
+          warehouses.add(item.warehouse)
+        }
+      })
+      return warehouses.size || 1
+    },
+    inventoryHealthRate() {
+      if (!this.tableData.length) {
+        return 100
+      }
+      const safeCount = this.tableData.filter(item => (item.number || 0) >= this.getSafeStock(item)).length
+      return Math.round((safeCount / this.tableData.length) * 100)
+    },
+    heroHeadline() {
+      if (this.lowStockCount >= 4) {
+        return '补货窗口已开启'
+      }
+      if (this.lowStockCount > 0) {
+        return '库存总体可控'
+      }
+      return '仓储状态稳定'
+    },
+    heroInsight() {
+      if (this.lowStockCount >= 4) {
+        return '当前低库存物资较多，建议先保障肥料、药剂和高频器材的补给，避免春耕高峰出现断档。'
+      }
+      if (this.lowStockCount > 0) {
+        return '大部分物资仍处于安全区间，但个别品类接近阈值，适合按缺口大小逐步补齐。'
+      }
+      return '当前仓储状态较稳，可以把精力从应急补货转到损耗控制与周转优化。'
+    },
+    environmentStatus() {
+      const tempNormal = this.warehouseTemp >= 20 && this.warehouseTemp <= 26
+      const humidityNormal = this.warehouseHumidity >= 40 && this.warehouseHumidity <= 60
+      if (tempNormal && humidityNormal) {
+        return '稳定'
+      }
+      if (this.warehouseTemp > 30 || this.warehouseHumidity > 70 || this.warehouseHumidity < 35) {
+        return '关注'
+      }
+      return '轻微波动'
+    },
+    restockCandidates() {
+      return this.tableData
+        .filter(item => this.getRestockGap(item) > 0)
+        .sort((a, b) => this.getRestockGap(b) - this.getRestockGap(a))
+        .slice(0, 5)
+    },
+    turnoverHint() {
+      const topItem = this.tableData
+        .slice()
+        .sort((a, b) => (Number(b.number) || 0) - (Number(a.number) || 0))[0]
+      if (!topItem) {
+        return '暂无物资周转数据，建议完成首轮仓储建档后再做补给节奏分析。'
+      }
+      return `${topItem.produce} 当前库存最高，建议复核是否存在积压或采购过量。`
+    },
+    warehouseSnapshots() {
+      const map = {}
+      this.tableData.forEach(item => {
+        const name = item.warehouse || '默认仓区'
+        if (!map[name]) {
+          map[name] = {
+            name,
+            itemCount: 0,
+            quantity: 0,
+            riskCount: 0,
+            safeCount: 0,
+            keeper: item.keeper || '待指定'
+          }
+        }
+        map[name].itemCount += 1
+        map[name].quantity += Number(item.number) || 0
+        if ((item.number || 0) < this.getSafeStock(item)) {
+          map[name].riskCount += 1
+        } else {
+          map[name].safeCount += 1
+        }
+        if (!map[name].keeper && item.keeper) {
+          map[name].keeper = item.keeper
+        }
+      })
+      return Object.values(map).map(zone => ({
+        ...zone,
+        safeRate: zone.itemCount ? Math.round((zone.safeCount / zone.itemCount) * 100) : 0
+      }))
     }
   },
   created() {
@@ -229,205 +388,195 @@ export default {
     }
   },
   methods: {
-    // Mock 数据生成（仅在 API 失败时使用）
     generateMockData() {
-      console.warn('使用 Mock 数据演示，请检查后端 API 连接')
       const materials = [
-        { name: '复合肥(NPK 15-15-15)', maxStock: 500, current: 450 },
-        { name: '尿素(含氮46%)', maxStock: 300, current: 180 },
-        { name: '草甘膦除草剂', maxStock: 200, current: 35 },
-        { name: '吡虫啉杀虫剂', maxStock: 150, current: 120 },
-        { name: '锄头(加厚型)', maxStock: 50, current: 8 },
-        { name: '喷雾器(电动)', maxStock: 30, current: 25 },
-        { name: '有机肥(腐熟鸡粪)', maxStock: 400, current: 380 },
-        { name: '水溶肥(速效型)', maxStock: 100, current: 12 },
-        { name: '地膜(0.01mm)', maxStock: 200, current: 190 },
-        { name: '滴灌管(PE)', maxStock: 500, current: 420 },
-        { name: '种子(玉米)', maxStock: 100, current: 5 },
-        { name: '防虫网(40目)', maxStock: 150, current: 135 }
+        { name: '复合肥（NPK 15-15-15）', maxStock: 500, current: 450, dailyConsumption: 8.5 },
+        { name: '尿素（含氮 46%）', maxStock: 300, current: 180, dailyConsumption: 5.6 },
+        { name: '草甘膦除草剂', maxStock: 200, current: 35, dailyConsumption: 2.3 },
+        { name: '吡虫啉杀虫剂', maxStock: 150, current: 120, dailyConsumption: 1.2 },
+        { name: '锄头（加厚型）', maxStock: 50, current: 8, dailyConsumption: 0.4 },
+        { name: '喷雾器（电动）', maxStock: 30, current: 25, dailyConsumption: 0.2 },
+        { name: '有机肥（腐熟鸡粪）', maxStock: 400, current: 380, dailyConsumption: 6.5 },
+        { name: '水溶肥（速效型）', maxStock: 100, current: 12, dailyConsumption: 3.8 }
       ]
-      
-      const warehouses = ['1号仓', '2号仓']
+
+      const warehouses = ['1号仓', '2号仓', '冷链仓']
       const regions = ['A-01', 'A-02', 'B-01', 'B-02', 'C-01']
       const keepers = ['张三', '李四', '王五', '赵六']
-      
-      return materials.map((mat, index) => ({
+
+      return materials.map((item, index) => ({
         id: index + 1,
-        produce: mat.name,
-        warehouse: warehouses[index % 2],
+        produce: item.name,
+        warehouse: warehouses[index % warehouses.length],
         region: regions[index % regions.length] + '货架',
-        number: mat.current,
-        maxStock: mat.maxStock,
+        number: item.current,
+        safeStock: Math.round(item.maxStock * 0.2),
+        maxStock: item.maxStock,
+        dailyConsumption: item.dailyConsumption,
         keeper: keepers[index % keepers.length],
-        remark: mat.current < mat.maxStock * 0.2 ? '需要补货' : '库存充足'
+        remark: item.current < item.maxStock * 0.2 ? '建议优先补给' : '库存处于安全区间'
       }))
     },
-    
-    // 数据加载 - 优先使用真实 API
     load() {
-      this.loading = true;
-      
-      this.request.get("/inventory/page", {
+      this.loading = true
+      this.request.get('/inventory/page', {
         params: {
           pageNum: this.pageNum,
           pageSize: this.pageSize,
           produce: this.produce
         }
       }).then(res => {
-        this.loading = false;
-        
-        if (res.data && res.data.records) {
-          // 使用真实数据
-          this.tableData = res.data.records.map(item => ({
-            ...item,
-            maxStock: item.maxStock || 100 // 设置默认最大库存
-          }))
-          this.total = res.data.total
+        if (res && res.data && res.data.records) {
+          this.tableData = res.data.records.map(item => {
+            const maxStock = Number(item.maxStock) || 100
+            const safeStock = Number(item.safeStock) || Math.max(10, Math.round(maxStock * 0.2))
+            return Object.assign({}, item, {
+              maxStock,
+              safeStock,
+              dailyConsumption: Number(item.dailyConsumption) || 0
+            })
+          })
+          this.total = res.data.total || this.tableData.length
         } else {
-          // 降级到 Mock 数据
           this.loadMockData()
         }
-      }).catch(err => {
-        console.error('API 调用失败:', err)
-        this.loading = false;
+      }).catch(() => {
         this.loadMockData()
+      }).finally(() => {
+        this.loading = false
       })
     },
-    
-    // Mock 数据降级方案
     loadMockData() {
       const mockData = this.generateMockData()
-      
-      if (this.produce) {
-        this.tableData = mockData.filter(item => 
-          item.produce.includes(this.produce)
-        )
-      } else {
-        this.tableData = mockData
-      }
+      this.tableData = this.produce
+        ? mockData.filter(item => item.produce.indexOf(this.produce) !== -1)
+        : mockData
       this.total = this.tableData.length
-      this.loading = false
     },
     save() {
-      this.request.post("/inventory", this.form).then(res => {
+      const payload = Object.assign({}, this.form, {
+        safeStock: this.form.safeStock || Math.max(10, Math.round((Number(this.form.maxStock) || 100) * 0.2))
+      })
+      this.request.post('/inventory', payload).then(res => {
         if (res.code === '200') {
-          this.$message.success("操作成功")
+          this.$message.success('操作成功')
           this.dialogFormVisible = false
           this.load()
         } else {
-          this.$message.error("操作失败")
+          this.$message.error('操作失败')
         }
       })
     },
-    
     handleAdd() {
       this.dialogFormVisible = true
-      this.form = { maxStock: 100 }
+      this.form = {
+        maxStock: 100,
+        safeStock: 20,
+        dailyConsumption: 0
+      }
     },
-    
     handleEdit(row) {
       this.form = JSON.parse(JSON.stringify(row))
       this.dialogFormVisible = true
     },
-    
     del(id) {
       this.$confirm('确认报废此物资？', '警告', {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
         type: 'warning'
       }).then(() => {
-        this.request.delete("/inventory/" + id).then(res => {
+        this.request.delete('/inventory/' + id).then(res => {
           if (res.code === '200') {
-            this.$message.success("已报废出库")
+            this.$message.success('已报废出库')
             this.load()
           } else {
-            this.$message.error("操作失败")
+            this.$message.error('操作失败')
           }
         })
       }).catch(() => {})
     },
-    
     exp() {
       window.open(this.apiConfig.inventoryExport)
     },
-    
-    // 计算库存百分比
-    getStockPercentage(item) {
-      const max = item.maxStock || 100
-      const current = item.number || 0
-      return Math.min(100, Math.round((current / max) * 100))
+    getSafeStock(item) {
+      const maxStock = Number(item.maxStock) || 100
+      return Number(item.safeStock) || Math.max(10, Math.round(maxStock * 0.2))
     },
-    
-    // 获取库存水位等级
-    getStockLevelClass(item) {
-      const percentage = this.getStockPercentage(item)
-      if (percentage >= 50) return 'level-high'
-      if (percentage >= 20) return 'level-medium'
-      return 'level-low'
+    getRestockGap(item) {
+      return Math.max(0, this.getSafeStock(item) - (Number(item.number) || 0))
     },
-    
-    // 获取库存周转率（模拟）
-    getTurnoverRate(item) {
-      const rates = ['高', '中', '低']
-      const hash = (item.id || 0) % 3
-      return rates[hash]
+    getStockText(item) {
+      const current = Number(item.number) || 0
+      const safeStock = this.getSafeStock(item)
+      if (current < safeStock) {
+        return '需要补货'
+      }
+      if ((Number(item.number) || 0) / (Number(item.maxStock) || 100) > 0.8) {
+        return '储备充足'
+      }
+      return '状态平稳'
     },
-    
-    // 获取物资图标
+    getStockTagClass(item) {
+      const current = Number(item.number) || 0
+      const safeStock = this.getSafeStock(item)
+      if (current < safeStock) {
+        return 'showcase-status-tag--risk'
+      }
+      if ((Number(item.number) || 0) / (Number(item.maxStock) || 100) > 0.8) {
+        return 'showcase-status-tag--safe'
+      }
+      return 'showcase-status-tag--warn'
+    },
+    getCoverageDays(item) {
+      const dailyConsumption = Number(item.dailyConsumption) || 0
+      if (!dailyConsumption) {
+        return '待计算'
+      }
+      return Math.floor((Number(item.number) || 0) / dailyConsumption) + ' 天'
+    },
+    getZoneStateText(zone) {
+      if (zone.riskCount >= 2) {
+        return '高压'
+      }
+      if (zone.riskCount === 1) {
+        return '关注'
+      }
+      return '稳定'
+    },
+    getZoneStateClass(zone) {
+      if (zone.riskCount >= 2) {
+        return 'inventory-zone-card__state--danger'
+      }
+      if (zone.riskCount === 1) {
+        return 'inventory-zone-card__state--warn'
+      }
+      return 'inventory-zone-card__state--safe'
+    },
     getItemImage(name) {
       const imageMap = {
-        '复合肥': require('@/assets/moreng.png'),
-        '尿素': require('@/assets/yumi.png'),
-        '草甘膦': require('@/assets/xiaomai.png'),
-        '吡虫啉': require('@/assets/aiye.png'),
-        '锄头': require('@/assets/moreng.png'),
-        '喷雾器': require('@/assets/yumi.png'),
-        '有机肥': require('@/assets/moreng.png'),
-        '水溶肥': require('@/assets/xiaomai.png'),
-        '地膜': require('@/assets/aiye.png'),
-        '滴灌管': require('@/assets/yumi.png'),
-        '种子': require('@/assets/moreng.png'),
-        '防虫网': require('@/assets/aiye.png')
+        复合肥: require('@/assets/moreng.png'),
+        尿素: require('@/assets/yumi.png'),
+        草甘膦: require('@/assets/xiaomai.png'),
+        吡虫啉: require('@/assets/aiye.png'),
+        锄头: require('@/assets/moreng.png'),
+        喷雾器: require('@/assets/yumi.png'),
+        有机肥: require('@/assets/moreng.png'),
+        水溶肥: require('@/assets/xiaomai.png'),
+        地膜: require('@/assets/aiye.png'),
+        滴灌管: require('@/assets/yumi.png'),
+        种子: require('@/assets/moreng.png'),
+        防虫网: require('@/assets/aiye.png')
       }
-      
-      for (let key in imageMap) {
-        if (name && name.includes(key)) {
+
+      for (const key in imageMap) {
+        if (name && name.indexOf(key) !== -1) {
           return imageMap[key]
         }
       }
       return require('@/assets/moreng.png')
     },
-    
-    // 温度等级
-    getTempClass(temp) {
-      if (temp >= 20 && temp <= 26) return 'suitable'
-      if (temp > 26 && temp <= 30) return 'warning'
-      return 'danger'
-    },
-    
-    getTempLabel(temp) {
-      if (temp >= 20 && temp <= 26) return '适宜'
-      if (temp > 26 && temp <= 30) return '偏高'
-      return '异常'
-    },
-    
-    // 湿度等级
-    getHumidityClass(humidity) {
-      if (humidity >= 40 && humidity <= 60) return 'suitable'
-      if (humidity < 40) return 'warning'
-      return 'danger'
-    },
-    
-    getHumidityLabel(humidity) {
-      if (humidity >= 40 && humidity <= 60) return '正常'
-      if (humidity < 40) return '干燥'
-      return '潮湿'
-    },
-    
-    // 启动环境监控
     startEnvironmentMonitor() {
       this.envTimer = setInterval(() => {
-        // 模拟环境数据波动
         this.warehouseTemp = 22 + Math.random() * 6
         this.warehouseHumidity = 40 + Math.random() * 25
       }, 10000)
@@ -437,402 +586,354 @@ export default {
 </script>
 
 <style scoped>
-/* ========== 京东物流蓝白风格 - 库存管理系统 ========== */
-
-.jd-logistics-page {
-  min-height: 100vh;
-  background: #f5f5f5;
-  padding: 20px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Microsoft YaHei', 'PingFang SC', Arial, sans-serif;
+.inventory-radar-page {
+  background:
+    radial-gradient(circle at 8% 10%, rgba(31, 138, 99, 0.12), transparent 18%),
+    linear-gradient(180deg, #f6faf5 0%, #eef5ef 100%);
 }
 
-/* ===== 顶部 KPI 看板 ===== */
-.kpi-dashboard {
+.inventory-radar-hero {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-  margin-bottom: 20px;
+  grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.75fr);
+  gap: 18px;
+  margin-bottom: 18px;
 }
 
-.kpi-card {
-  background: #ffffff;
-  border-radius: 2px;
-  padding: 20px;
-  display: flex;
+.inventory-radar-intro,
+.inventory-radar-climate,
+.inventory-radar-board,
+.inventory-priority-panel {
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(31, 138, 99, 0.12);
+  box-shadow: 0 18px 48px rgba(38, 77, 63, 0.08);
+  backdrop-filter: blur(16px);
+}
+
+.inventory-radar-intro {
+  padding: 30px 32px;
+  border-radius: 34px;
+}
+
+.inventory-radar-intro h2 {
+  margin: 18px 0 12px;
+  color: #1f342c;
+  font-size: 34px;
+  line-height: 1.2;
+}
+
+.inventory-radar-intro p,
+.inventory-radar-climate p {
+  color: #687b72;
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.inventory-radar-badge {
+  display: inline-flex;
   align-items: center;
-  gap: 16px;
-  border-left: 4px solid #0066CC;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  gap: 8px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: rgba(31, 138, 99, 0.1);
+  color: #1f8a63;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
 }
 
-.kpi-card.primary {
-  border-left-color: #0066CC;
+.inventory-radar-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
 }
 
-.kpi-card.warning {
-  border-left-color: #FA8C16;
+.inventory-radar-tag {
+  padding: 9px 14px;
+  border-radius: 999px;
+  background: rgba(244, 248, 244, 0.92);
+  color: #345648;
+  font-size: 13px;
+  font-weight: 500;
 }
 
-.kpi-card.success {
-  border-left-color: #52C41A;
+.inventory-radar-climate {
+  padding: 26px 24px;
+  border-radius: 30px;
 }
 
-.kpi-card.info {
-  border-left-color: #1890FF;
+.inventory-radar-climate__label {
+  color: #7b8f86;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-.kpi-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 2px;
-  background: #E3F2FD;
+.inventory-radar-climate__state {
+  margin-top: 12px;
+  color: #1f342c;
+  font-size: 30px;
+  font-weight: 700;
+}
+
+.inventory-radar-climate__metrics {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin: 18px 0;
+}
+
+.inventory-radar-climate__metric {
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(242, 246, 241, 0.92);
+}
+
+.inventory-radar-climate__metric span {
+  display: block;
+  color: #6c7f76;
+  font-size: 12px;
+}
+
+.inventory-radar-climate__metric strong {
+  display: block;
+  margin-top: 8px;
+  color: #23372f;
+  font-size: 24px;
+}
+
+.inventory-radar-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(280px, 0.75fr);
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.inventory-radar-board {
+  padding: 24px;
+  border-radius: 30px;
+}
+
+.inventory-radar-board__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.inventory-radar-board__title,
+.inventory-priority-panel__title {
+  color: #1f342c;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.inventory-radar-board__desc,
+.inventory-priority-panel__desc,
+.inventory-radar-summary__label {
+  color: #6f8078;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.inventory-radar-summary {
+  min-width: 150px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(244, 248, 244, 0.92);
+}
+
+.inventory-radar-summary__value {
+  margin-top: 8px;
+  color: #1f8a63;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.inventory-zone-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.inventory-zone-card {
+  padding: 18px;
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(247, 250, 247, 0.96), rgba(239, 245, 240, 0.9));
+  border: 1px solid rgba(31, 138, 99, 0.08);
+}
+
+.inventory-zone-card__top,
+.inventory-zone-card__footer,
+.inventory-zone-card__progress-row,
+.inventory-priority-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.inventory-zone-card__name {
+  color: #20352d;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.inventory-zone-card__meta {
+  margin-top: 4px;
+  color: #71847b;
+  font-size: 12px;
+}
+
+.inventory-zone-card__state {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.inventory-zone-card__state--safe {
+  background: rgba(31, 138, 99, 0.12);
+  color: #1f8a63;
+}
+
+.inventory-zone-card__state--warn {
+  background: rgba(192, 139, 67, 0.16);
+  color: #9f6d2c;
+}
+
+.inventory-zone-card__state--danger {
+  background: rgba(200, 110, 82, 0.16);
+  color: #c86e52;
+}
+
+.inventory-zone-card__progress {
+  margin-top: 18px;
+}
+
+.inventory-zone-card__progress-row span,
+.inventory-zone-card__metric span,
+.inventory-priority-note__label {
+  color: #71847b;
+  font-size: 12px;
+}
+
+.inventory-zone-card__progress-row strong,
+.inventory-zone-card__metric strong {
+  color: #21362e;
+  font-size: 14px;
+}
+
+.inventory-zone-card__footer {
+  margin-top: 18px;
+}
+
+.inventory-zone-card__metric {
+  flex: 1;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.inventory-priority-panel {
+  padding: 24px 22px;
+  border-radius: 30px;
+}
+
+.inventory-priority-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.inventory-priority-item {
+  align-items: center;
+  padding: 14px;
+  border-radius: 20px;
+  background: rgba(244, 248, 244, 0.94);
+}
+
+.inventory-priority-item__rank {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: rgba(200, 110, 82, 0.12);
+  color: #c86e52;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 28px;
+  font-weight: 700;
   flex-shrink: 0;
 }
 
-.kpi-card.primary .kpi-icon {
-  background: #E3F2FD;
-}
-
-.kpi-card.warning .kpi-icon {
-  background: #FFF7E6;
-}
-
-.kpi-card.success .kpi-icon {
-  background: #F6FFED;
-}
-
-.kpi-card.info .kpi-icon {
-  background: #E6F7FF;
-}
-
-.kpi-content {
+.inventory-priority-item__content {
   flex: 1;
 }
 
-.kpi-label {
-  font-size: 13px;
-  color: #666;
-  margin-bottom: 6px;
-}
-
-.kpi-value {
-  font-size: 28px;
+.inventory-priority-item__title,
+.inventory-material__name {
+  color: #20352d;
+  font-size: 15px;
   font-weight: 600;
-  color: #333;
-  line-height: 1;
-  margin-bottom: 4px;
-  font-family: 'DIN', 'Roboto Mono', monospace;
 }
 
-.kpi-trend {
+.inventory-priority-item__meta,
+.inventory-priority-empty,
+.inventory-priority-note p,
+.inventory-material__meta {
+  color: #6d8077;
   font-size: 12px;
-  color: #999;
+  line-height: 1.7;
 }
 
-/* ===== 主内容区 ===== */
-.main-content {
-  width: 100%;
+.inventory-priority-item__gap {
+  color: #c86e52;
+  font-size: 18px;
+  font-weight: 700;
 }
 
-/* ===== 数据表格卡片 ===== */
-.data-table-card {
-  background: #ffffff;
-  border-radius: 2px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-  overflow: hidden;
+.inventory-priority-note {
+  margin-top: 18px;
+  padding: 16px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.7);
 }
 
-/* ===== 工具栏 ===== */
-.table-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 20px;
-  border-bottom: 1px solid #e8e8e8;
+.inventory-ledger-panel {
+  border-radius: 30px;
 }
 
-.toolbar-left {
+.inventory-material {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.table-title {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: #333;
+.inventory-material__thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  object-fit: cover;
+  box-shadow: 0 10px 18px rgba(31, 138, 99, 0.12);
+  background: rgba(31, 138, 99, 0.08);
 }
 
-.data-count {
-  font-size: 12px;
-  color: #999;
-  padding: 2px 8px;
-  background: #f5f5f5;
-  border-radius: 2px;
+.inventory-delete {
+  color: #c86e52;
 }
 
-.toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+.inventory-delete:hover {
+  color: #d17b62;
 }
 
-.search-box {
-  display: flex;
-  gap: 0;
-}
+@media (max-width: 1280px) {
+  .inventory-radar-hero,
+  .inventory-radar-grid {
+    grid-template-columns: 1fr;
+  }
 
-.jd-input {
-  width: 200px;
-  height: 32px;
-  padding: 0 12px;
-  border: 1px solid #d9d9d9;
-  border-right: none;
-  border-radius: 2px 0 0 2px;
-  font-size: 13px;
-  outline: none;
-  transition: border-color 0.2s;
-}
-
-.jd-input:focus {
-  border-color: #0066CC;
-}
-
-.jd-btn {
-  height: 32px;
-  padding: 0 16px;
-  background: #ffffff;
-  border: 1px solid #d9d9d9;
-  border-radius: 2px;
-  font-size: 13px;
-  color: #333;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-
-.search-box .jd-btn {
-  border-radius: 0 2px 2px 0;
-  border-left: none;
-}
-
-.jd-btn:hover {
-  color: #0066CC;
-  border-color: #0066CC;
-}
-
-.jd-btn.primary {
-  background: #0066CC;
-  border-color: #0066CC;
-  color: #ffffff;
-}
-
-.jd-btn.primary:hover {
-  background: #005AA0;
-  border-color: #005AA0;
-}
-
-/* ===== 加载状态 ===== */
-.table-loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 400px;
-  color: #999;
-}
-
-.loading-spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid #f0f0f0;
-  border-top-color: #0066CC;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  margin-bottom: 12px;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-/* ===== 数据表格 ===== */
-.inventory-table {
-  width: 100%;
-}
-
-.table-header {
-  display: flex;
-  background: #fafafa;
-  border-bottom: 2px solid #e8e8e8;
-}
-
-.th {
-  padding: 14px 16px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #666;
-  text-align: left;
-}
-
-.table-body {
-  max-height: calc(100vh - 320px);
-  overflow-y: auto;
-}
-
-.table-row {
-  display: flex;
-  border-bottom: 1px solid #f0f0f0;
-  transition: background 0.2s;
-}
-
-.table-row:hover {
-  background: #fafafa;
-}
-
-.td {
-  padding: 14px 16px;
-  font-size: 13px;
-  color: #333;
-  display: flex;
-  align-items: center;
-}
-
-/* 物资名称单元格 */
-.item-name-cell {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.item-thumb {
-  width: 36px;
-  height: 36px;
-  object-fit: contain;
-  border: 1px solid #e8e8e8;
-  border-radius: 2px;
-  padding: 4px;
-  background: #fafafa;
-}
-
-.item-name-text {
-  font-weight: 500;
-  color: #333;
-}
-
-/* 位置单元格 */
-.location-cell {
-  line-height: 1.4;
-}
-
-.location-sub {
-  font-size: 12px;
-  color: #999;
-  margin-top: 2px;
-}
-
-/* 库存进度条单元格 */
-.stock-bar-cell {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-}
-
-.stock-bar-bg {
-  flex: 1;
-  height: 8px;
-  background: #f0f0f0;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.stock-bar-fill {
-  height: 100%;
-  transition: width 0.3s;
-  border-radius: 4px;
-}
-
-.stock-bar-fill.level-high {
-  background: #52C41A;
-}
-
-.stock-bar-fill.level-medium {
-  background: #FA8C16;
-}
-
-.stock-bar-fill.level-low {
-  background: #F5222D;
-}
-
-.stock-percent {
-  font-size: 12px;
-  color: #666;
-  font-weight: 500;
-  min-width: 36px;
-  text-align: right;
-}
-
-/* 库存数量 */
-.stock-number {
-  font-weight: 600;
-  font-family: 'DIN', 'Roboto Mono', monospace;
-}
-
-.stock-number.level-high {
-  color: #52C41A;
-}
-
-.stock-number.level-medium {
-  color: #FA8C16;
-}
-
-.stock-number.level-low {
-  color: #F5222D;
-}
-
-.stock-ratio {
-  color: #999;
-  font-size: 12px;
-  font-family: 'DIN', 'Roboto Mono', monospace;
-}
-
-/* 操作按钮 */
-.action-btns {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.action-link {
-  background: none;
-  border: none;
-  color: #0066CC;
-  font-size: 13px;
-  cursor: pointer;
-  padding: 0;
-  transition: color 0.2s;
-}
-
-.action-link:hover {
-  color: #005AA0;
-}
-
-.action-link.danger {
-  color: #F5222D;
-}
-
-.action-link.danger:hover {
-  color: #D9001B;
-}
-
-.action-sep {
-  color: #d9d9d9;
+  .inventory-zone-list {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
-

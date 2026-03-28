@@ -1,11 +1,11 @@
 @Component
-export default class AlertCard {
+export default struct AlertCard {
   @Prop alertType: string = '';
   @Prop alertLevel: string = '';
   @Prop message: string = '';
   @Prop createTime: string = '';
   @Prop status: string = 'pending';
-  @Event onProcess: () => void = () => {};
+  onProcess: () => void = () => {};
 
   private getLevelColor(): string {
     switch (this.alertLevel) {

@@ -22,7 +22,7 @@
       router
       class="custom-menu"
     >
-      <div v-show="!isCollapse" class="menu-caption">核心能力</div>
+      <div v-show="!isCollapse" class="menu-caption">核心主线</div>
       <el-menu-item
         v-for="item in primaryMenus"
         :key="item.path"
@@ -59,15 +59,25 @@
       </el-submenu>
     </el-menu>
 
-    <div v-show="!isCollapse" class="aside-footer">
-      <span class="version">{{ footerText }}</span>
-    </div>
   </div>
 </template>
 
 <script>
+const operationsGroup = {
+  index: 'operations-support',
+  title: '产业链路',
+  icon: 'el-icon-collection-tag',
+  children: [
+    { path: '/farmland', icon: 'el-icon-location-outline', title: '地块资产图谱' },
+    { path: '/inventory', icon: 'el-icon-box', title: '仓储雷达' },
+    { path: '/purchase', icon: 'el-icon-shopping-cart-full', title: '供应协作网' },
+    { path: '/sales', icon: 'el-icon-s-order', title: '订单流向' },
+    { path: '/online-sale', icon: 'el-icon-sell', title: '现货联销' }
+  ]
+}
+
 export default {
-  name: "Aside",
+  name: 'Aside',
   props: {
     isCollapse: Boolean
   },
@@ -76,14 +86,11 @@ export default {
       return process.env.VUE_APP_SHOWCASE_MODE === 'competition'
     },
     supportCaption() {
-      return '扩展与管理'
-    },
-    footerText() {
-      return this.isCompetitionMode ? 'Bang Bang Agro · 国赛展示版' : 'Bang Bang Agro · 完整版'
+      return this.isCompetitionMode ? '业务延展' : '扩展与后台'
     },
     secondaryGroups() {
       if (this.isCompetitionMode) {
-        return []
+        return [operationsGroup]
       }
       return this.fullSecondaryGroups
     },
@@ -110,31 +117,20 @@ export default {
           title: '扩展展示',
           icon: 'el-icon-monitor',
           children: [
-            { path: '/bigscreen', icon: 'el-icon-data-board', title: '全局态势大屏' },
-            { path: '/dashbordnew', icon: 'el-icon-odometer', title: '农情监测推演' },
-            { path: '/statistic', icon: 'el-icon-pie-chart', title: '农情数据总览' }
+            { path: '/bigscreen', icon: 'el-icon-data-board', title: '全域态势大屏' },
+            { path: '/dashbordnew', icon: 'el-icon-odometer', title: '农情推演舱' },
+            { path: '/statistic', icon: 'el-icon-pie-chart', title: '农情总览' }
           ]
         },
-        {
-          index: 'operations-support',
-          title: '运营补充',
-          icon: 'el-icon-collection-tag',
-          children: [
-            { path: '/farmland', icon: 'el-icon-location-outline', title: '农田管理' },
-            { path: '/inventory', icon: 'el-icon-box', title: '物资库存' },
-            { path: '/purchase', icon: 'el-icon-shopping-cart-full', title: '物资采购' },
-            { path: '/sales', icon: 'el-icon-s-order', title: '出售账单' },
-            { path: '/online-sale', icon: 'el-icon-sell', title: '在线销售' }
-          ]
-        },
+        operationsGroup,
         {
           index: 'system-support',
-          title: '系统维护',
+          title: '后台运维',
           icon: 'el-icon-setting',
           children: [
             { path: '/user', icon: 'el-icon-user', title: '用户管理' },
             { path: '/role', icon: 'el-icon-lock', title: '角色管理' },
-            { path: '/notice', icon: 'el-icon-bell', title: '系统公告' }
+            { path: '/notice', icon: 'el-icon-bell', title: '通知中心' }
           ]
         }
       ]
@@ -238,120 +234,33 @@ export default {
   position: relative;
 }
 
+::v-deep .el-menu-item:hover,
+::v-deep .el-submenu__title:hover {
+  color: #0f766e !important;
+  background: rgba(15, 118, 110, 0.06) !important;
+}
+
+::v-deep .el-menu-item.is-active {
+  color: #059669 !important;
+  background: rgba(5, 150, 105, 0.08) !important;
+  font-weight: 600;
+}
+
+::v-deep .el-menu-item.is-active::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #059669, #34d399);
+}
+
 ::v-deep .el-menu-item i,
 ::v-deep .el-submenu__title i {
-  color: #94a3b8 !important;
-  margin-right: 5px;
-  font-size: 18px;
-  transition: color 0.3s;
+  margin-right: 10px;
+  color: inherit !important;
 }
 
-::v-deep .el-submenu__title .el-submenu__icon-arrow {
-  position: static !important;
-  margin-left: auto !important;
-  margin-top: 0 !important;
-  color: #cbd5e1 !important;
-  font-size: 12px;
-}
-
-::v-deep .el-submenu__title {
-  display: flex;
-  align-items: center;
-}
-
-::v-deep .support-submenu > .el-submenu__title {
-  height: 40px;
-  line-height: 40px;
-  margin-top: 6px;
-  color: #64748b !important;
-  font-size: 13px;
-  font-weight: 600;
-  opacity: 0.88;
-}
-
-::v-deep .support-submenu .el-menu-item {
-  color: #64748b !important;
-  font-size: 13px !important;
-}
-
-::v-deep .el-submenu__title:hover,
-::v-deep .el-menu-item:hover {
-  background: linear-gradient(to right, #f0fdf4, transparent) !important;
-  color: #059669 !important;
-}
-
-::v-deep .el-submenu__title:hover i,
-::v-deep .el-menu-item:hover i {
-  color: #059669 !important;
-}
-
-::v-deep .el-menu > .el-menu-item.is-active {
-  background: #ffffff !important;
-  color: #059669 !important;
-  font-weight: 600;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  border-left: 3px solid #059669 !important;
-}
-
-::v-deep .el-menu > .el-menu-item.is-active i {
-  color: #059669 !important;
-}
-
-::v-deep .el-submenu.is-opened > .el-submenu__title {
-  background: #ffffff !important;
-  color: #059669 !important;
-  font-weight: 600;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  border-left: 3px solid #059669 !important;
-}
-
-::v-deep .el-submenu.is-opened > .el-submenu__title i {
-  color: #059669 !important;
-}
-
-::v-deep .el-submenu .el-menu-item {
-  padding-left: 20px !important;
-  height: 40px;
-  line-height: 40px;
-  font-size: 13px !important;
-}
-
-::v-deep .el-submenu .el-menu-item i {
-  font-size: 15px !important;
-  margin-right: 5px;
-}
-
-::v-deep .el-submenu .el-menu-item.is-active {
-  background: transparent !important;
-  color: #059669 !important;
-  font-weight: 600;
-  box-shadow: none !important;
-  border-left: none !important;
-  border: none !important;
-}
-
-::v-deep .el-submenu .el-menu-item.is-active i {
-  color: #059669 !important;
-}
-
-.aside-footer {
-  height: 48px;
-  line-height: 48px;
-  text-align: center;
-  border-top: 1px solid #e8ebe8;
-  font-size: 11px;
-  color: #94a3b8;
-  background: #f8faf9;
-  flex-shrink: 0;
-}
-
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s;
-}
-
-.fade-enter,
-.fade-leave-to {
-  opacity: 0;
-}
 </style>

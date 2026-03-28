@@ -1,10 +1,10 @@
 @Component
-export default class HeaderBar {
+export default struct HeaderBar {
   @Prop title: string = '';
   @Prop showBack: boolean = false;
   @Prop rightIcon: string = '';
-  @Event onBackClick: () => void = () => {};
-  @Event onRightClick: () => void = () => {};
+  onBackClick: () => void = () => {};
+  onRightClick: () => void = () => {};
 
   build() {
     Row() {

@@ -1,8 +1,10 @@
 // API配置
 export class ApiConfig {
   // 后端服务器地址 - 请根据实际部署情况修改
-  static readonly BASE_URL: string = 'http://10.0.2.2:9090'; // 模拟器访问本机
-  // static readonly BASE_URL: string = 'http://192.168.1.100:9090'; // 真机访问
+  // HarmonyOS 本地模拟器使用 localhost 或 127.0.0.1
+  static readonly BASE_URL: string = 'http://127.0.0.1:9090';
+  // 真机测试时使用电脑局域网IP，例如：
+  // static readonly BASE_URL: string = 'http://192.168.1.100:9090';
 
   // API端点
   static readonly LOGIN: string = '/user/login';

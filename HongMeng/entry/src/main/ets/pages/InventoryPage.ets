@@ -1,6 +1,6 @@
 import router from '@ohos.router';
 import HeaderBar from '../components/HeaderBar';
-import { HttpClient, ApiResponse, Inventory } from '../common/HttpClient';
+import { HttpClient, ApiResponse, Inventory, QueryParam, PaginatedRecords } from '../common/HttpClient';
 
 @Entry
 @Component
@@ -182,11 +182,12 @@ struct InventoryPage {
   private async loadInventories() {
     this.isLoading = true;
     try {
-      const response = await this.httpClient.get<ApiResponse<{ records: Inventory[] }>>('/inventory/page', {
-        pageNum: this.pageNum,
-        pageSize: this.pageSize,
-        produce: this.searchKeyword
-      });
+      const params: QueryParam[] = [
+        { key: 'pageNum', value: String(this.pageNum) },
+        { key: 'pageSize', value: String(this.pageSize) },
+        { key: 'produce', value: this.searchKeyword }
+      ];
+      const response = await this.httpClient.get<ApiResponse<PaginatedRecords<Inventory>>>('/inventory/page', params);
 
       if (response.code === '200' && response.data) {
         if (this.pageNum === 1) {

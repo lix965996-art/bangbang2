@@ -1,8 +1,15 @@
 import router from '@ohos.router';
 import HeaderBar from '../components/HeaderBar';
-import { HttpClient, ApiResponse, HealthIndex, Farmland } from '../common/HttpClient';
+import { HttpClient, ApiResponse, Farmland } from '../common/HttpClient';
 
 interface HealthData {
+  farmlandId: number;
+  farmlandName: string;
+  healthIndex: number;
+  level: string;
+}
+
+interface HealthDataRecord {
   farmlandId: number;
   farmlandName: string;
   healthIndex: number;
@@ -12,7 +19,7 @@ interface HealthData {
 @Entry
 @Component
 struct HealthPage {
-  @State healthData: Map<string, HealthData> = new Map();
+  @State healthDataList: HealthData[] = [];
   @State farmlands: Farmland[] = [];
   @State isLoading: boolean = false;
 
@@ -67,7 +74,7 @@ struct HealthPage {
                 .fontWeight(FontWeight.Bold)
                 .margin({ bottom: 16 })
 
-              ForEach(Array.from(this.healthData.values()), (data: HealthData) => {
+              ForEach(this.healthDataList, (data: HealthData) => {
                 this.HealthItem(data)
               })
             }
@@ -184,7 +191,7 @@ struct HealthPage {
 
   private getCountByLevel(level: string): number {
     let count = 0;
-    this.healthData.forEach((data: HealthData) => {
+    this.healthDataList.forEach((data: HealthData) => {
       if (data.level === level) {
         count++;
       }
@@ -195,9 +202,9 @@ struct HealthPage {
   private async loadHealthData() {
     this.isLoading = true;
     try {
-      const response = await this.httpClient.get<ApiResponse<Map<string, HealthData>>>('/health-index/calculate/all');
+      const response = await this.httpClient.get<ApiResponse<HealthDataRecord[]>>('/health-index/calculate/all');
       if (response.code === '200' && response.data) {
-        this.healthData = response.data;
+        this.healthDataList = response.data;
       }
     } catch (error) {
       console.error('Load health data error:', error);

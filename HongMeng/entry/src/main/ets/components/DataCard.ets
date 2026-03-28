@@ -1,11 +1,11 @@
 @Component
-export default class DataCard {
+export default struct DataCard {
   @Prop title: string = '';
   @Prop value: string | number = '';
   @Prop unit: string = '';
   @Prop icon: string = '';
   @Prop color: string = '#4CAF50';
-  @Prop onClick?: () => void;
+  onCardClick?: () => void;
 
   build() {
     Column() {
@@ -47,8 +47,8 @@ export default class DataCard {
       offsetY: 2
     })
     .onClick(() => {
-      if (this.onClick) {
-        this.onClick();
+      if (this.onCardClick) {
+        this.onCardClick();
       }
     })
   }

@@ -25,6 +25,7 @@ HongMeng/.hvigor/
 HongMeng/.appanalyzer/
 HongMeng/local.properties
 HongMeng/entry/.preview/
+HongMeng/entry/build/
 
 .env
 .env.local

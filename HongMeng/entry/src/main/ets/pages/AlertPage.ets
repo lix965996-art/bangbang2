@@ -3,12 +3,16 @@ import HeaderBar from '../components/HeaderBar';
 import AlertCard from '../components/AlertCard';
 import { HttpClient, ApiResponse, Alert } from '../common/HttpClient';
 
+interface ProcessRequest {
+  processor: string;
+}
+
 @Entry
 @Component
 struct AlertPage {
   @State alerts: Alert[] = [];
   @State isLoading: boolean = false;
-  @State activeTab: number = 0; // 0: 今日任务, 1: 全部预警
+  @State activeTab: number = 0;
 
   private httpClient: HttpClient = HttpClient.getInstance();
 
@@ -137,9 +141,8 @@ struct AlertPage {
 
   private async processAlert(alert: Alert) {
     try {
-      const response = await this.httpClient.post<ApiResponse<null>>(`/alert/${alert.id}/process`, {
-        processor: '鸿蒙端用户'
-      });
+      const requestData: ProcessRequest = { processor: '鸿蒙端用户' };
+      const response = await this.httpClient.post<ApiResponse<null>>(`/alert/${alert.id}/process`, requestData);
 
       if (response.code === '200') {
         this.loadAlerts();

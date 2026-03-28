@@ -1,5 +1,5 @@
 @Component
-export default class LoadingDialog {
+export default struct LoadingDialog {
   @Prop message: string = '加载中...';
   @Prop visible: boolean = false;
 
