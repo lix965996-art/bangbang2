@@ -1640,21 +1640,6 @@ export default {
   animation: none !important;
 }
 
-/* 隐藏所有滚动条 */
-.aether-monitor {
-  overflow: hidden !important;
-}
-
-.aether-monitor ::-webkit-scrollbar {
-  display: none !important;
-  width: 0 !important;
-}
-
-.aether-monitor * {
-  scrollbar-width: none !important;
-  -ms-overflow-style: none !important;
-}
-
 .alert-list {
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -1662,28 +1647,6 @@ export default {
 
 .alert-list::-webkit-scrollbar {
   display: none;
-}
-</style>
-
-<style>
-/* 全局隐藏滚动条 */
-.el-main {
-  overflow: hidden !important;
-}
-.el-main::-webkit-scrollbar {
-  display: none !important;
-}
-html, body {
-  overflow: hidden !important;
-}
-
-/* KPI卡片边框样式 - 非scoped覆盖Element UI */
-.aether-monitor .kpi-row .el-card {
-  border: 2px solid rgba(76, 175, 80, 0.5) !important;
-  background: rgba(255, 255, 255, 0.55) !important;
-}
-.aether-monitor .kpi-row .el-card .el-card__body {
-  background: transparent !important;
 }
 </style>
 

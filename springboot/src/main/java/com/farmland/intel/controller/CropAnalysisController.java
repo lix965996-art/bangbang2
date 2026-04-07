@@ -30,6 +30,17 @@ public class CropAnalysisController {
     
     private final RestTemplate restTemplate = new RestTemplate();
 
+    private String buildPythonApiUrl(String path) {
+        String baseUrl = pythonApiUrl == null ? "http://localhost:5000" : pythonApiUrl.trim();
+        if (baseUrl.endsWith("/")) {
+            baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
+        }
+        if (!baseUrl.endsWith("/api")) {
+            baseUrl = baseUrl + "/api";
+        }
+        return baseUrl + path;
+    }
+
     /**
      * 果蔬成熟度检测
      * @param file 上传的图片文件
@@ -68,7 +79,7 @@ public class CropAnalysisController {
 
             // 调用Python成熟度检测API
             ResponseEntity<Map> response = restTemplate.exchange(
-                    pythonApiUrl + "/detect/ripeness",
+                    buildPythonApiUrl("/detect/ripeness"),
                     HttpMethod.POST,
                     requestEntity,
                     Map.class
@@ -133,7 +144,7 @@ public class CropAnalysisController {
 
             // 调用Python病虫害检测API
             ResponseEntity<Map> response = restTemplate.exchange(
-                    pythonApiUrl + "/detect/disease",
+                    buildPythonApiUrl("/detect/disease"),
                     HttpMethod.POST,
                     requestEntity,
                     Map.class
@@ -198,7 +209,7 @@ public class CropAnalysisController {
 
             // 调用Python双检分析API
             ResponseEntity<Map> response = restTemplate.exchange(
-                    pythonApiUrl + "/detect/both",
+                    buildPythonApiUrl("/detect/both"),
                     HttpMethod.POST,
                     requestEntity,
                     Map.class
@@ -225,7 +236,7 @@ public class CropAnalysisController {
     @GetMapping("/models")
     public Result getModels() {
         try {
-            ResponseEntity<Map> response = restTemplate.getForEntity(pythonApiUrl + "/models", Map.class);
+            ResponseEntity<Map> response = restTemplate.getForEntity(buildPythonApiUrl("/models"), Map.class);
             Map responseBody = response.getBody();
             if (responseBody != null && "200".equals(responseBody.get("code"))) {
                 return Result.success(responseBody.get("data"));
@@ -242,7 +253,7 @@ public class CropAnalysisController {
     @GetMapping("/health")
     public Result healthCheck() {
         try {
-            ResponseEntity<Map> response = restTemplate.getForEntity(pythonApiUrl + "/health", Map.class);
+            ResponseEntity<Map> response = restTemplate.getForEntity(buildPythonApiUrl("/health"), Map.class);
             Map responseBody = response.getBody();
             if (responseBody != null && "200".equals(responseBody.get("code"))) {
                 return Result.success(responseBody.get("data"));

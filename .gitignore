@@ -36,3 +36,11 @@ uploads/
 temp/
 tmp/
 *.tmp
+
+TomatoDetection/.git/
+TomatoDetection/.git_local_backup/
+TomatoDetection/.idea/
+TomatoDetection/.venv/
+TomatoDetection/api_uploads/
+TomatoDetection/api_results/
+TomatoDetection/*.log

@@ -33,6 +33,8 @@ public class AetherDeviceController {
     private static Double currentTemperature = 25.5;
     private static Double currentHumidity = 60.0;
     private static Integer currentLed = 0;
+    private static boolean currentFan = false;
+    private static boolean currentPump = false;
     private static boolean deviceOnline = true;
     
     /**
@@ -56,6 +58,9 @@ public class AetherDeviceController {
                     currentHumidity = (Double) data.get("humidity");
                     currentLed = (Integer) data.get("led");
                     deviceOnline = (Boolean) data.get("online");
+                    syncPumpStateFromOneNet();
+                    data.put("fan", currentFan);
+                    data.put("pump", currentPump);
                     
                     // 【新增】实时存储到数据库
                     try {
@@ -92,6 +97,8 @@ public class AetherDeviceController {
                 data.put("temperature", currentTemperature);
                 data.put("humidity", currentHumidity);
                 data.put("led", currentLed);
+                data.put("fan", currentFan);
+                data.put("pump", currentPump);
                 data.put("device_name", latest.getDeviceName());
                 data.put("source", "Database"); // 标记数据来源
                 
@@ -108,6 +115,8 @@ public class AetherDeviceController {
         data.put("temperature", currentTemperature);
         data.put("humidity", currentHumidity);
         data.put("led", currentLed);
+        data.put("fan", currentFan);
+        data.put("pump", currentPump);
         data.put("device_name", "STM32-001");
         data.put("source", "Cache"); // 标记数据来源
         
@@ -167,6 +176,39 @@ public class AetherDeviceController {
         data.put("message", led == 1 ? "LED已开启" : "LED已关闭");
         data.put("oneNetControlled", oneNetSuccess); // 标记是否成功控制硬件
         
+        return Result.success(data);
+    }
+
+    /**
+     * 控制风扇开关（当前以本地状态为主，便于展示完整联动链路）
+     */
+    @PostMapping("/device/control/fan")
+    public Result controlFan(@RequestBody Map<String, Object> params) {
+        if (params == null || params.isEmpty()) {
+            return Result.error("400", "请求参数不能为空");
+        }
+
+        Boolean fan = null;
+        Object fanObj = params.get("fan");
+        if (fanObj instanceof Boolean) {
+            fan = (Boolean) fanObj;
+        } else if (fanObj instanceof Integer) {
+            fan = ((Integer) fanObj) == 1;
+        } else if (fanObj instanceof String) {
+            fan = "true".equalsIgnoreCase((String) fanObj) || "1".equals(fanObj);
+        }
+
+        if (fan == null) {
+            return Result.error("400", "fan参数必须为布尔值或0/1");
+        }
+
+        currentFan = fan;
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("success", true);
+        data.put("fan", currentFan);
+        data.put("message", currentFan ? "风扇已开启" : "风扇已关闭");
+        data.put("oneNetControlled", false);
         return Result.success(data);
     }
     
@@ -254,6 +296,7 @@ public class AetherDeviceController {
         }
         
         boolean oneNetSuccess = false;
+        currentPump = bump;
         
         // 控制OneNET硬件
         if (oneNetService != null) {
@@ -288,6 +331,10 @@ public class AetherDeviceController {
                 Map<String, Object> oneNetData = oneNetService.getNewDeviceData();
                 if ((Boolean) oneNetData.getOrDefault("success", false)) {
                     data = oneNetData;
+                    Object bumpState = data.get("bump");
+                    if (bumpState instanceof Boolean) {
+                        currentPump = (Boolean) bumpState;
+                    }
                     data.put("device_name", "STM32-PUMP");
                     data.put("source", "OneNET");
                     return Result.success(data);
@@ -302,7 +349,7 @@ public class AetherDeviceController {
         data.put("online", false);
         data.put("temperature", 25.0);
         data.put("humidity", 50.0);
-        data.put("bump", false);
+        data.put("bump", currentPump);
         data.put("device_name", "STM32-PUMP");
         data.put("source", "Default");
         
@@ -333,6 +380,27 @@ public class AetherDeviceController {
         
         log.info("模拟数据生成成功: 温度={}℃, 湿度={}%", currentTemperature, currentHumidity);
         return Result.success("模拟数据已生成");
+    }
+
+    private void syncPumpStateFromOneNet() {
+        if (oneNetService == null) {
+            return;
+        }
+        try {
+            Map<String, Object> pumpData = oneNetService.getNewDeviceData();
+            if ((Boolean) pumpData.getOrDefault("success", false)) {
+                Object bumpState = pumpData.get("bump");
+                if (bumpState instanceof Boolean) {
+                    currentPump = (Boolean) bumpState;
+                } else if (bumpState instanceof Integer) {
+                    currentPump = ((Integer) bumpState) == 1;
+                } else if (bumpState instanceof String) {
+                    currentPump = "true".equalsIgnoreCase((String) bumpState) || "1".equals(bumpState);
+                }
+            }
+        } catch (Exception e) {
+            log.debug("同步水泵状态失败: {}", e.getMessage());
+        }
     }
 }
 

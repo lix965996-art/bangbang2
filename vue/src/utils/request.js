@@ -10,7 +10,11 @@ const request = axios.create({
 // 可以自请求发送前对请求做一些处理
 // 比如统一加token，对请求参数统一加密
 request.interceptors.request.use(config => {
-    config.headers['Content-Type'] = 'application/json;charset=utf-8';
+    if (!(config.data instanceof FormData)) {
+        config.headers['Content-Type'] = 'application/json;charset=utf-8';
+    } else {
+        delete config.headers['Content-Type'];
+    }
     let user = null;
     try {
         const userStr = localStorage.getItem("user");
@@ -100,4 +104,3 @@ request.interceptors.response.use(
 
 
 export default request
-

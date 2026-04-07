@@ -1,1193 +1,665 @@
 <template>
-  <div class="fintech-page">
-    <!-- 页面头部 -->
-    <div class="page-header">
-      <div class="header-left">
-        <h1 class="page-title">
-          <span class="title-icon">🧠</span>
-          AI 经营决策大脑
-        </h1>
-        <div class="ai-status-badge">
-          <span class="pulse-dot"></span>
-          <span>智能体模型实时运算中</span>
-        </div>
+  <div class="analysis-center">
+    <section class="hero-panel">
+      <div>
+        <p class="hero-kicker">研判中心</p>
+        <h1>预警与研判中心</h1>
+        <p class="hero-summary">
+          汇总环境采集、视觉巡检和处置记录，完成异常发现、关联定位、执行处置与结果留痕。
+        </p>
       </div>
-      <div class="header-right">
-        <button class="period-btn" :class="{ active: period === 'week' }" @click="period = 'week'">本周</button>
-        <button class="period-btn" :class="{ active: period === 'month' }" @click="period = 'month'">本月</button>
-        <button class="period-btn" :class="{ active: period === 'year' }" @click="period = 'year'">全年</button>
-        <button class="export-btn" @click="exportReport">
-          📥 导出研报
-        </button>
+      <div class="hero-actions">
+        <el-button size="mini" icon="el-icon-refresh" @click="refreshAll">刷新数据</el-button>
+        <el-button type="primary" size="mini" icon="el-icon-map-location" @click="$router.push('/farm-map-gaode')">
+          GIS 定位
+        </el-button>
       </div>
-    </div>
+    </section>
 
-    <!-- KPI 指标卡片（带 CountUp 和 Sparkline） -->
-    <div class="kpi-cards-grid">
-      <div class="kpi-card profit-card">
-        <div class="kpi-icon">💰</div>
-        <div class="kpi-content">
-          <div class="kpi-label">总营收预测</div>
-          <div class="kpi-value">
-            <span class="currency">¥</span>
-            <span class="number" ref="revenueNumber">{{ formatNumber(totalRevenue) }}</span>
-          </div>
-          <div class="kpi-trend up">
-            <span>↗</span> 同比 +12.5%
-          </div>
-        </div>
-        <svg class="sparkline" viewBox="0 0 100 30">
-          <polyline :points="sparklineRevenue" fill="none" stroke="rgba(16, 185, 129, 0.3)" stroke-width="1.5"/>
-        </svg>
-      </div>
+    <section class="metric-grid">
+      <article class="metric-card">
+        <span class="metric-label">待处理预警</span>
+        <strong class="metric-value warning">{{ pendingAlerts.length }}</strong>
+        <span class="metric-meta">来自环境监测与视觉巡检</span>
+      </article>
+      <article class="metric-card">
+        <span class="metric-label">采集链路</span>
+        <strong class="metric-value">{{ sensorStatus.online ? '在线' : '离线' }}</strong>
+        <span class="metric-meta">用于承接环境数据与联动指令</span>
+      </article>
+      <article class="metric-card">
+        <span class="metric-label">环境快照</span>
+        <strong class="metric-value">{{ environmentText }}</strong>
+        <span class="metric-meta">当前温湿度实时回传</span>
+      </article>
+      <article class="metric-card">
+        <span class="metric-label">本页记录</span>
+        <strong class="metric-value">{{ actionLogs.length }}</strong>
+        <span class="metric-meta">包含执行动作与处理留痕</span>
+      </article>
+    </section>
 
-      <div class="kpi-card">
-        <div class="kpi-icon">💎</div>
-        <div class="kpi-content">
-          <div class="kpi-label">净利润</div>
-          <div class="kpi-value">
-            <span class="currency">¥</span>
-            <span class="number">{{ formatNumber(totalProfit) }}</span>
-          </div>
-          <div class="kpi-trend up">
-            <span>↗</span> 利润率 32%
+    <section class="content-grid">
+      <article class="panel list-panel">
+        <div class="panel-head">
+          <div>
+            <p class="panel-kicker">待办队列</p>
+            <h2>预警列表</h2>
           </div>
         </div>
-        <svg class="sparkline" viewBox="0 0 100 30">
-          <polyline :points="sparklineProfit" fill="none" stroke="rgba(99, 102, 241, 0.3)" stroke-width="1.5"/>
-        </svg>
-      </div>
 
-      <div class="kpi-card">
-        <div class="kpi-icon">🤖</div>
-        <div class="kpi-content">
-          <div class="kpi-label">AI 降本增效</div>
-          <div class="kpi-value">
-            <span class="currency">¥</span>
-            <span class="number">{{ formatNumber(aiSavedCost) }}</span>
-          </div>
-          <div class="kpi-trend down">
-            <span>↘</span> 成本 -8.3%
-          </div>
-        </div>
-        <svg class="sparkline" viewBox="0 0 100 30">
-          <polyline :points="sparklineSaving" fill="none" stroke="rgba(244, 63, 94, 0.3)" stroke-width="1.5"/>
-        </svg>
-      </div>
-
-      <div class="kpi-card">
-        <div class="kpi-icon">📊</div>
-        <div class="kpi-content">
-          <div class="kpi-label">投资回报率 (ROI)</div>
-          <div class="kpi-value roi-value">{{ roiDisplay }}</div>
-          <div class="kpi-trend flat">
-            评级：S级优选
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ===== AI 推演沙盘 (核心功能) ===== -->
-    <div class="simulator-panel">
-      <div class="panel-header">
-        <h2 class="panel-title">
-          <span class="icon">🎯</span>
-          AI 推演沙盘 (Scenario Simulator)
-        </h2>
-        <div class="panel-hint">拖动因子滑块，实时预测利润变化</div>
-      </div>
-      
-      <div class="simulator-body">
-        <!-- 左侧：关键因子控制台 -->
-        <div class="factor-console">
-          <div class="console-title">关键因子控制台</div>
-          
-          <div class="factor-item">
-            <div class="factor-header">
-              <span class="factor-name">成本波动率</span>
-              <span class="factor-value">{{ costFluctuation }}%</span>
+        <div v-if="pendingAlerts.length" class="alert-list">
+          <button
+            v-for="alert in pendingAlerts"
+            :key="alert.id"
+            type="button"
+            class="alert-item"
+            :class="{ active: selectedAlert && selectedAlert.id === alert.id }"
+            @click="selectAlert(alert)"
+          >
+            <div class="alert-top">
+              <span class="level-pill" :class="alert.alertLevel || 'medium'">
+                {{ levelLabel(alert.alertLevel) }}
+              </span>
+              <span class="time-text">{{ formatTime(alert.createTime) }}</span>
             </div>
-            <input 
-              type="range" 
-              class="factor-slider" 
-              v-model.number="costFluctuation" 
-              min="-30" 
-              max="30" 
-              step="1"
-            />
-            <div class="factor-scale">
-              <span>-30%</span>
-              <span>0</span>
-              <span>+30%</span>
+            <strong>{{ alert.farmlandName || '监测点位' }}</strong>
+            <p>{{ alert.message }}</p>
+          </button>
+        </div>
+        <el-empty v-else description="当前没有待处理预警" :image-size="72"></el-empty>
+      </article>
+
+      <article class="panel detail-panel">
+        <div class="panel-head">
+          <div>
+            <p class="panel-kicker">处置面板</p>
+            <h2>{{ selectedAlert ? (selectedAlert.farmlandName || '预警详情') : '选择一条预警' }}</h2>
+          </div>
+          <span class="status-chip" :class="selectedAlertLevel">
+            {{ selectedAlert ? levelLabel(selectedAlert.alertLevel) : '待选择' }}
+          </span>
+        </div>
+
+        <template v-if="selectedAlert">
+          <div class="detail-grid">
+            <div class="detail-card">
+              <span>预警类型</span>
+              <strong>{{ typeLabel(selectedAlert.alertType) }}</strong>
+            </div>
+            <div class="detail-card">
+              <span>当前数值</span>
+              <strong>{{ valueText(selectedAlert.currentValue) }}</strong>
+            </div>
+            <div class="detail-card">
+              <span>阈值范围</span>
+              <strong>{{ thresholdText }}</strong>
             </div>
           </div>
 
-          <div class="factor-item">
-            <div class="factor-header">
-              <span class="factor-name">产量预期</span>
-              <span class="factor-value">{{ yieldExpectation }}%</span>
-            </div>
-            <input 
-              type="range" 
-              class="factor-slider yield" 
-              v-model.number="yieldExpectation" 
-              min="-20" 
-              max="40" 
-              step="1"
-            />
-            <div class="factor-scale">
-              <span>-20%</span>
-              <span>0</span>
-              <span>+40%</span>
-            </div>
+          <div class="message-card">
+            <h3>研判说明</h3>
+            <p>{{ selectedAlert.message || '暂无描述' }}</p>
+            <ul class="suggestion-list">
+              <li v-for="item in selectedSuggestions" :key="item">{{ item }}</li>
+            </ul>
           </div>
 
-          <div class="ai-prediction-box">
-            <div class="prediction-label">AI 预测结果</div>
-            <div class="prediction-value">利润变化: <strong :class="{ positive: predictedProfit >= 0, negative: predictedProfit < 0 }">{{ predictedProfit >= 0 ? '+' : '' }}{{ predictedProfit.toFixed(1) }}%</strong></div>
+          <div class="action-grid">
+            <button type="button" class="action-btn fan" @click="executeDeviceAction('fan', true)">
+              启动风扇
+            </button>
+            <button type="button" class="action-btn led" @click="executeDeviceAction('led', true)">
+              打开补光
+            </button>
+            <button type="button" class="action-btn pump" @click="executeDeviceAction('pump', true)">
+              启动水泵
+            </button>
+            <button type="button" class="action-btn neutral" @click="$router.push('/fruit-detect')">
+              视觉复核
+            </button>
           </div>
-        </div>
 
-        <!-- 右侧：实时推演图表 -->
-        <div class="simulator-chart">
-          <div ref="simulatorChart" class="chart-container"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ===== 资金流向桑基图 ===== -->
-    <div class="charts-row">
-      <div class="chart-panel sankey-panel">
-        <div class="panel-header">
-          <h3 class="panel-title">
-            <span class="icon">💸</span>
-            资金流向桑基图 (Cost Flow)
-          </h3>
-          <div class="panel-hint">可视化资金流动路径</div>
-        </div>
-        <div ref="sankeyChart" class="chart-container"></div>
-      </div>
-
-      <div class="chart-panel">
-        <div class="panel-header">
-          <h3 class="panel-title">
-            <span class="icon">⚠️</span>
-            经营风险评估
-          </h3>
-        </div>
-        <div ref="radarChart" class="chart-container"></div>
-      </div>
-    </div>
-
-    <!-- ===== 智能决策卡片（消息流）===== -->
-    <div class="insights-panel">
-      <div class="panel-header">
-        <h2 class="panel-title">
-          <span class="icon">💡</span>
-          智能决策建议 (Actionable Insights)
-        </h2>
-      </div>
-
-      <div class="insights-stream">
-        <div class="insight-card warning">
-          <div class="insight-header">
-            <span class="badge">AI 预警</span>
-            <span class="time">2分钟前</span>
+          <div class="footer-actions">
+            <el-button @click="$router.push('/farmmap3d')">查看 3D 场景</el-button>
+            <el-button type="primary" icon="el-icon-check" @click="markProcessed">标记已处理</el-button>
           </div>
-          <div class="insight-body">
-            <p class="insight-text">
-              检测到<strong>玉米期货价格倒挂</strong>（现货 ¥2.8/kg，期货 ¥2.6/kg），预计 7 天内价差收窄，存在<span class="highlight-risk">价格下跌风险 15%</span>。
-            </p>
-            <div class="insight-actions">
-              <button class="action-btn primary" @click="handleAction('adjust_plan')">
-                📉 调整种植计划
-              </button>
-              <button class="action-btn secondary" @click="handleAction('lock_contract')">
-                🔒 锁定远期合同
-              </button>
-            </div>
+        </template>
+
+        <el-empty v-else description="从左侧选择一条预警开始研判" :image-size="80"></el-empty>
+      </article>
+
+      <article class="panel log-panel">
+        <div class="panel-head">
+          <div>
+            <p class="panel-kicker">执行记录</p>
+            <h2>处置留痕</h2>
           </div>
         </div>
 
-        <div class="insight-card success">
-          <div class="insight-header">
-            <span class="badge">AI 机会</span>
-            <span class="time">15分钟前</span>
-          </div>
-          <div class="insight-body">
-            <p class="insight-text">
-              预测<strong>草莓价格峰值</strong>将在 15 天后到达（约 ¥42/kg），建议 A2 地块成熟批次<span class="highlight-profit">暂缓采摘 3 天</span>，预计额外获利 15%。
-            </p>
-            <div class="insight-actions">
-              <button class="action-btn primary" @click="handleAction('delay_harvest')">
-                ⏱️ 延迟采摘计划
-              </button>
-              <button class="action-btn secondary" @click="handleAction('view_detail')">
-                📊 查看详细分析
-              </button>
-            </div>
+        <div v-if="actionLogs.length" class="log-list">
+          <div v-for="item in actionLogs" :key="item.id" class="log-item">
+            <strong>{{ item.title }}</strong>
+            <p>{{ item.message }}</p>
+            <span>{{ item.time }}</span>
           </div>
         </div>
-
-        <div class="insight-card info">
-          <div class="insight-header">
-            <span class="badge">AI 建议</span>
-            <span class="time">1小时前</span>
-          </div>
-          <div class="insight-body">
-            <p class="insight-text">
-              根据气象局数据，未来 10 天<strong>降水量偏多 30%</strong>，建议提前采购排水设备，并调整灌溉计划，预防<span class="highlight-warning">涝害风险</span>。
-            </p>
-            <div class="insight-actions">
-              <button class="action-btn primary" @click="handleAction('adjust_irrigation')">
-                💧 调整灌溉计划
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
+        <el-empty v-else description="本页还没有新的处置记录" :image-size="72"></el-empty>
+      </article>
+    </section>
   </div>
 </template>
 
 <script>
-import * as echarts from 'echarts';
+const controlMeta = {
+  fan: {
+    endpoint: '/aether/device/control/fan',
+    payload: value => ({ fan: value }),
+    title: '风扇联动'
+  },
+  led: {
+    endpoint: '/aether/device/control/led',
+    payload: value => ({ led: value ? 1 : 0 }),
+    title: '补光联动'
+  },
+  pump: {
+    endpoint: '/aether/device/control/bump',
+    payload: value => ({ bump: value }),
+    title: '灌溉联动'
+  }
+};
 
 export default {
   name: 'BusinessAnalysis',
   data() {
     return {
-      period: 'month',
-      totalRevenue: 46025,
-      totalProfit: 14728,
-      aiSavedCost: 3850,
-      roiDisplay: '1 : 3.2',
-      
-      // AI 推演沙盘参数
-      costFluctuation: 0,
-      yieldExpectation: 0,
-      predictedProfit: 0,
-      
-      // Sparkline 数据
-      sparklineRevenue: '0,20 15,12 30,18 45,8 60,15 75,5 90,10 100,0',
-      sparklineProfit: '0,15 15,8 30,20 45,5 60,12 75,18 90,3 100,8',
-      sparklineSaving: '0,25 15,20 30,15 45,18 60,10 75,12 90,8 100,5',
-      
-      // ECharts 实例
-      simulatorChart: null,
-      sankeyChart: null,
-      radarChart: null
+      pendingAlerts: [],
+      selectedAlertId: null,
+      sensorStatus: {
+        online: false,
+        temperature: null,
+        humidity: null
+      },
+      actionLogs: []
+    };
+  },
+  computed: {
+    selectedAlert() {
+      return this.pendingAlerts.find(item => item.id === this.selectedAlertId) || null;
+    },
+    selectedAlertLevel() {
+      return this.selectedAlert ? (this.selectedAlert.alertLevel || 'medium') : 'steady';
+    },
+    environmentText() {
+      const temp = this.sensorStatus.temperature;
+      const humi = this.sensorStatus.humidity;
+      if (temp === null || temp === undefined || humi === null || humi === undefined) {
+        return '--';
+      }
+      return `${Math.round(Number(temp))}℃ / ${Math.round(Number(humi))}%`;
+    },
+    thresholdText() {
+      if (!this.selectedAlert) {
+        return '--';
+      }
+      const min = this.valueText(this.selectedAlert.thresholdMin);
+      const max = this.valueText(this.selectedAlert.thresholdMax);
+      if (min === '--' && max === '--') {
+        return '未配置';
+      }
+      return `${min} - ${max}`;
+    },
+    selectedSuggestions() {
+      if (!this.selectedAlert) {
+        return [];
+      }
+
+      const items = [];
+      if (this.selectedAlert.suggestion) {
+        items.push(this.selectedAlert.suggestion);
+      }
+
+      const type = String(this.selectedAlert.alertType || '').toLowerCase();
+      const message = String(this.selectedAlert.message || '').toLowerCase();
+
+      if (type.includes('humidity') || message.includes('湿')) {
+        items.push('建议优先检查灌溉链路，并确认土壤补水是否完成');
+      }
+      if (type.includes('temperature') || message.includes('温')) {
+        items.push('建议优先检查通风状态，确认风扇联动是否已生效');
+      }
+      if (type.includes('visual') || message.includes('视觉')) {
+        items.push('建议前往视觉巡检页面复核图像，再结合 GIS 页面确认异常位置');
+      }
+
+      if (!items.length) {
+        items.push('建议先复核现场状态，再决定是否执行联动处置');
+      }
+      return Array.from(new Set(items));
     }
   },
   mounted() {
-    this.$nextTick(() => {
-      this.initSimulatorChart();
-      this.initSankeyChart();
-      this.initRadarChart();
-      this.startCountUp();
-    });
-    window.addEventListener('resize', this.handleResize);
-  },
-  watch: {
-    costFluctuation() {
-      this.updatePrediction();
-      this.updateSimulatorChart();
-    },
-    yieldExpectation() {
-      this.updatePrediction();
-      this.updateSimulatorChart();
-    }
-  },
-  beforeDestroy() {
-    window.removeEventListener('resize', this.handleResize);
-    if(this.simulatorChart && !this.simulatorChart.isDisposed()) this.simulatorChart.dispose();
-    if(this.sankeyChart && !this.sankeyChart.isDisposed()) this.sankeyChart.dispose();
-    if(this.radarChart && !this.radarChart.isDisposed()) this.radarChart.dispose();
+    this.refreshAll();
   },
   methods: {
-    // Count-up 动画
-    startCountUp() {
-      const animateNumber = (start, end, duration, callback) => {
-        const startTime = performance.now();
-        const step = (currentTime) => {
-          const elapsed = currentTime - startTime;
-          const progress = Math.min(elapsed / duration, 1);
-          const current = start + (end - start) * this.easeOutCubic(progress);
-          callback(current);
-          if (progress < 1) {
-            requestAnimationFrame(step);
+    levelLabel(level) {
+      const map = {
+        high: '高风险',
+        medium: '中风险',
+        low: '提示'
+      };
+      return map[level] || '提示';
+    },
+    typeLabel(type) {
+      const map = {
+        temperature: '温度预警',
+        humidity: '湿度预警',
+        visual: '视觉预警'
+      };
+      return map[type] || (type || '通用预警');
+    },
+    valueText(value) {
+      if (value === null || value === undefined || value === '') {
+        return '--';
+      }
+      if (Number.isNaN(Number(value))) {
+        return String(value);
+      }
+      return Number(value).toFixed(1);
+    },
+    formatTime(value) {
+      if (!value) {
+        return '--';
+      }
+      return String(value).replace('T', ' ').slice(0, 16);
+    },
+    selectAlert(alert) {
+      this.selectedAlertId = alert.id;
+    },
+    async refreshAll() {
+      await Promise.allSettled([
+        this.fetchAlerts(),
+        this.fetchDeviceStatus()
+      ]);
+    },
+    async fetchAlerts() {
+      const res = await this.request.get('/alert/pending');
+      if (res.code === '200' && Array.isArray(res.data)) {
+        this.pendingAlerts = res.data;
+        if (this.pendingAlerts.length) {
+          if (!this.selectedAlertId || !this.pendingAlerts.some(item => item.id === this.selectedAlertId)) {
+            this.selectedAlertId = this.pendingAlerts[0].id;
           }
+        } else {
+          this.selectedAlertId = null;
+        }
+      } else {
+        this.pendingAlerts = [];
+        this.selectedAlertId = null;
+      }
+    },
+    async fetchDeviceStatus() {
+      const res = await this.request.get('/aether/device/status');
+      if (res.code === '200' && res.data) {
+        this.sensorStatus = {
+          online: res.data.online !== false,
+          temperature: res.data.temperature,
+          humidity: res.data.humidity
         };
-        requestAnimationFrame(step);
-      };
+      }
+    },
+    async executeDeviceAction(key, value) {
+      const config = controlMeta[key];
+      if (!config) {
+        return;
+      }
 
-      // 这里可以添加数字动画逻辑，但由于 Vue 2 的限制，我们保持简单
+      try {
+        const res = await this.request.post(config.endpoint, config.payload(value));
+        if (res.code !== '200') {
+          throw new Error(res.msg || '联动执行失败');
+        }
+        this.pushLog(config.title, `${config.title}已执行，当前目标为${value ? '开启' : '关闭'}状态`);
+        this.$message.success(`${config.title}执行成功`);
+      } catch (error) {
+        this.$message.error(error.message || '联动执行失败');
+      }
     },
-    
-    easeOutCubic(t) {
-      return 1 - Math.pow(1 - t, 3);
-    },
+    async markProcessed() {
+      if (!this.selectedAlert) {
+        return;
+      }
 
-    // 更新预测结果
-    updatePrediction() {
-      // 简单的线性模型：利润变化 = 产量影响 - 成本影响
-      const yieldImpact = this.yieldExpectation * 0.8;
-      const costImpact = this.costFluctuation * 0.6;
-      this.predictedProfit = yieldImpact - costImpact;
+      try {
+        const res = await this.request.post(`/alert/${this.selectedAlert.id}/process`, {
+          processor: 'web-center'
+        });
+        if (res.code !== '200') {
+          throw new Error(res.msg || '处理失败');
+        }
+        this.pushLog('闭环处理', `预警 ${this.selectedAlert.id} 已标记为处理完成`);
+        this.$message.success('已标记为处理完成');
+        await this.fetchAlerts();
+      } catch (error) {
+        this.$message.error(error.message || '处理失败');
+      }
     },
-
-    // 初始化推演图表
-    initSimulatorChart() {
-      this.simulatorChart = echarts.init(this.$refs.simulatorChart);
-      this.updateSimulatorChart();
-    },
-
-    // 更新推演图表（响应滑块变化）
-    updateSimulatorChart() {
-      const baseProfit = [32, 35, 33, 36, 38, 40, 42, 45];
-      const factor = 1 + this.predictedProfit / 100;
-      const predictedData = baseProfit.map(v => v * factor);
-
-      const option = {
-        tooltip: {
-          trigger: 'axis',
-          backgroundColor: 'rgba(255, 255, 255, 0.98)',
-          borderColor: '#e5e7eb',
-          borderWidth: 1,
-          textStyle: { color: '#111827', fontSize: 12 },
-          padding: [8, 12]
-        },
-        grid: { top: '10%', left: '3%', right: '3%', bottom: '8%', containLabel: true },
-        xAxis: {
-          type: 'category',
-          data: ['Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6', 'Q7', 'Q8'],
-          axisLine: { lineStyle: { color: '#e5e7eb' } },
-          axisLabel: { color: '#6b7280', fontSize: 11 },
-          axisTick: { show: false }
-        },
-        yAxis: {
-          type: 'value',
-          name: '利润 (万元)',
-          nameTextStyle: { color: '#6b7280', fontSize: 11, padding: [0, 0, 0, -10] },
-          splitLine: { lineStyle: { type: 'dashed', color: '#f3f4f6' } },
-          axisLabel: { color: '#6b7280', fontSize: 11 },
-          axisLine: { show: false },
-          axisTick: { show: false }
-        },
-        series: [
-          {
-            name: '历史利润',
-            type: 'line',
-            data: baseProfit,
-            smooth: false,
-            itemStyle: { color: '#94a3b8' },
-            lineStyle: { width: 2, color: '#94a3b8' },
-            symbol: 'circle',
-            symbolSize: 4,
-            showSymbol: false
-          },
-          {
-            name: 'AI 预测利润',
-            type: 'line',
-            data: predictedData,
-            smooth: false,
-            lineStyle: { 
-              type: [5, 5], 
-              width: 2.5,
-              color: this.predictedProfit >= 0 ? '#059669' : '#dc2626'
-            },
-            itemStyle: { 
-              color: this.predictedProfit >= 0 ? '#059669' : '#dc2626'
-            },
-            symbol: 'circle',
-            symbolSize: 5
-          }
-        ]
-      };
-      this.simulatorChart.setOption(option, true);
-    },
-
-    // 初始化桑基图
-    initSankeyChart() {
-      this.sankeyChart = echarts.init(this.$refs.sankeyChart);
-      const option = {
-        tooltip: {
-          trigger: 'item',
-          backgroundColor: 'rgba(255, 255, 255, 0.98)',
-          borderColor: '#e5e7eb',
-          borderWidth: 1,
-          textStyle: { color: '#111827', fontSize: 12 },
-          padding: [8, 12],
-          formatter: function(params) {
-            if (params.dataType === 'edge') {
-              return `${params.data.source} → ${params.data.target}<br/>金额: ¥${params.data.value.toLocaleString()}`;
-            }
-            return `${params.name}`;
-          }
-        },
-        series: [
-          {
-            type: 'sankey',
-            layout: 'none',
-            emphasis: { focus: 'adjacency' },
-            nodeWidth: 20,
-            nodeGap: 12,
-            data: [
-              { name: '总营收', itemStyle: { color: '#3b82f6' } },
-              { name: '种子成本', itemStyle: { color: '#f59e0b' } },
-              { name: '农药成本', itemStyle: { color: '#dc2626' } },
-              { name: '人工成本', itemStyle: { color: '#ec4899' } },
-              { name: '设备折旧', itemStyle: { color: '#8b5cf6' } },
-              { name: '其他支出', itemStyle: { color: '#6b7280' } },
-              { name: '净利润', itemStyle: { color: '#059669' } }
-            ],
-            links: [
-              { source: '总营收', target: '种子成本', value: 8200 },
-              { source: '总营收', target: '农药成本', value: 6500 },
-              { source: '总营收', target: '人工成本', value: 12000 },
-              { source: '总营收', target: '设备折旧', value: 4500 },
-              { source: '总营收', target: '其他支出', value: 2100 },
-              { source: '总营收', target: '净利润', value: 14728 }
-            ],
-            lineStyle: { 
-              color: 'gradient', 
-              curveness: 0.5, 
-              opacity: 0.4
-            },
-            label: { 
-              fontSize: 11, 
-              color: '#374151',
-              fontWeight: 500
-            }
-          }
-        ]
-      };
-      this.sankeyChart.setOption(option);
-    },
-
-    // 初始化雷达图
-    initRadarChart() {
-      this.radarChart = echarts.init(this.$refs.radarChart);
-      const option = {
-        tooltip: {
-          backgroundColor: 'rgba(255, 255, 255, 0.98)',
-          borderColor: '#e5e7eb',
-          borderWidth: 1,
-          textStyle: { color: '#111827', fontSize: 12 },
-          padding: [8, 12]
-        },
-        radar: {
-          indicator: [
-            { name: '市场波动', max: 100 },
-            { name: '气候灾害', max: 100 },
-            { name: '病虫害', max: 100 },
-            { name: '库存积压', max: 100 },
-            { name: '资金流', max: 100 }
-          ],
-          radius: '65%',
-          splitArea: { show: false },
-          axisLine: { lineStyle: { color: '#e5e7eb' } },
-          splitLine: { lineStyle: { color: '#f3f4f6' } },
-          name: { textStyle: { color: '#6b7280', fontSize: 11 } }
-        },
-        series: [{
-          type: 'radar',
-          data: [
-            {
-              value: [30, 60, 20, 40, 30],
-              name: '当前风险',
-              areaStyle: { color: 'rgba(5, 150, 105, 0.15)' },
-              itemStyle: { color: '#059669' },
-              lineStyle: { width: 2, color: '#059669' }
-            }
-          ]
-        }]
-      };
-      this.radarChart.setOption(option);
-    },
-
-    handleResize() {
-      this.simulatorChart && this.simulatorChart.resize();
-      this.sankeyChart && this.sankeyChart.resize();
-      this.radarChart && this.radarChart.resize();
-    },
-
-    // 处理操作按钮点击
-    handleAction(action) {
-      const messages = {
-        'adjust_plan': '📋 正在调整种植计划...',
-        'lock_contract': '🔒 正在锁定远期合同...',
-        'delay_harvest': '⏱️ 已延迟采摘计划 3 天',
-        'view_detail': '📊 正在加载详细分析...',
-        'adjust_irrigation': '💧 灌溉计划已调整'
-      };
-      this.$message.success(messages[action] || '指令已下发');
-    },
-    formatNumber(num) {
-      return num.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
-    },
-    exportReport() {
-      this.$message.success('正在生成 AI 经营研报...');
-      
-      setTimeout(() => {
-        this.$message.success('AI 经营研报已导出！');
-      }, 500);
+    pushLog(title, message) {
+      this.actionLogs.unshift({
+        id: `${Date.now()}-${Math.random()}`,
+        title,
+        message,
+        time: new Date().toLocaleTimeString('zh-CN', { hour12: false })
+      });
+      this.actionLogs = this.actionLogs.slice(0, 10);
     }
   }
-}
+};
 </script>
 
 <style scoped>
-/* ========== Modern Eco-Tech 风格 ========== */
-/* 配色：白底 + 翡翠绿(#10b981) + 珊瑚红(#f43f5e) + 靛青蓝(#6366f1) */
-
-.fintech-page {
-  min-height: 100vh;
-  background: #f5f7fa;
-  padding: 16px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+.analysis-center {
+  min-height: calc(100vh - 60px);
+  padding: 20px;
+  background:
+    radial-gradient(circle at top left, rgba(234, 88, 12, 0.1), transparent 18%),
+    linear-gradient(180deg, #f8f7f3 0%, #eef3f8 100%);
 }
 
-/* ===== 页面头部 ===== */
-.page-header {
+.hero-panel,
+.metric-card,
+.panel {
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(203, 213, 225, 0.78);
+  border-radius: 22px;
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.06);
+}
+
+.hero-panel {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
+  gap: 20px;
+  padding: 24px 28px;
+  margin-bottom: 18px;
 }
 
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.page-title {
-  font-size: 20px;
+.hero-kicker,
+.panel-kicker {
+  margin: 0 0 8px;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #c2410c;
   font-weight: 700;
-  color: #1e293b;
+}
+
+.hero-panel h1,
+.panel-head h2 {
   margin: 0;
+  color: #14213d;
+}
+
+.hero-summary {
+  max-width: 700px;
+  margin: 10px 0 0;
+  color: #475569;
+  line-height: 1.7;
+}
+
+.hero-actions {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  gap: 10px;
+  align-items: flex-start;
 }
 
-.title-icon {
-  font-size: 20px;
-}
-
-.ai-status-badge {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: #ffffff;
-  padding: 4px 10px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 500;
-  color: #059669;
-  border: 1px solid #d1fae5;
-}
-
-.pulse-dot {
-  width: 8px;
-  height: 8px;
-  background: #10b981;
-  border-radius: 50%;
-  animation: pulse 2s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.5; transform: scale(1.3); }
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.period-btn {
-  background: #ffffff;
-  border: 1px solid #d1d5db;
-  color: #64748b;
-  padding: 6px 14px;
-  border-radius: 4px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.period-btn:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
-}
-
-.period-btn.active {
-  background: #10b981;
-  color: #ffffff;
-  border-color: #10b981;
-}
-
-.export-btn {
-  background: #3b82f6;
-  color: #ffffff;
-  border: none;
-  padding: 6px 16px;
-  border-radius: 4px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.export-btn:hover {
-  background: #4f46e5;
-}
-
-/* ===== KPI 卡片（带 Sparkline）===== */
-.kpi-cards-grid {
+.metric-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  margin-bottom: 16px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
 }
 
-.kpi-card {
-  background: #ffffff;
-  border-radius: 4px;
-  padding: 12px 16px;
-  box-shadow: none;
-  border: 1px solid #e5e7eb;
-  position: relative;
-  overflow: hidden;
-  transition: all 0.2s;
-}
-
-.kpi-card:hover {
-  border-color: #d1d5db;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-}
-
-.kpi-icon {
-  display: none;
-}
-
-.kpi-content {
-  position: relative;
-  z-index: 2;
-}
-
-.kpi-label {
-  font-size: 11px;
-  color: #6b7280;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  margin-bottom: 4px;
-}
-
-.kpi-value {
-  font-size: 24px;
-  font-weight: 700;
-  color: #111827;
-  letter-spacing: -0.5px;
-  margin-bottom: 4px;
-  font-family: 'Roboto Mono', 'Courier New', monospace;
-}
-
-.kpi-value .currency {
-  font-size: 14px;
-  font-weight: 500;
-  color: #6b7280;
-  margin-right: 2px;
-}
-
-.kpi-value .number {
-  font-family: 'Courier New', monospace;
-}
-
-.roi-value {
-  color: #3b82f6;
-  font-size: 24px;
-  font-family: 'Roboto Mono', 'Courier New', monospace;
-}
-
-.kpi-trend {
-  font-size: 12px;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.kpi-trend.up {
-  color: #10b981;
-}
-
-.kpi-trend.down {
-  color: #f43f5e;
-}
-
-.kpi-trend.flat {
-  color: #64748b;
-}
-
-.sparkline {
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  width: 100%;
-  height: 30px;
-  opacity: 0.4;
-  pointer-events: none;
-}
-
-/* ===== AI 推演沙盘 ===== */
-.simulator-panel {
-  background: #ffffff;
-  border-radius: 4px;
-  padding: 16px;
-  margin-bottom: 16px;
-  box-shadow: none;
-  border: 1px solid #e5e7eb;
-}
-
-.panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #f3f4f6;
-}
-
-.panel-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #111827;
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.panel-title .icon {
-  font-size: 16px;
-}
-
-.panel-hint {
-  font-size: 11px;
-  color: #9ca3af;
-}
-
-.simulator-body {
-  display: flex;
-  gap: 24px;
-}
-
-.factor-console {
-  width: 280px;
-  background: #fafbfc;
-  border-radius: 4px;
-  padding: 14px;
-  border: 1px solid #e5e7eb;
-}
-
-.console-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: #374151;
-  margin-bottom: 12px;
-  text-align: left;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.factor-item {
-  margin-bottom: 16px;
-}
-
-.factor-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 6px;
-}
-
-.factor-name {
-  font-size: 12px;
-  font-weight: 500;
-  color: #4b5563;
-}
-
-.factor-value {
-  font-size: 14px;
-  font-weight: 700;
-  color: #059669;
-  font-family: 'Roboto Mono', 'Courier New', monospace;
-}
-
-.factor-slider {
-  width: 100%;
-  height: 4px;
-  border-radius: 2px;
-  background: #e5e7eb;
-  outline: none;
-  -webkit-appearance: none;
-  appearance: none;
-}
-
-.factor-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: #dc2626;
-  cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-  border: 2px solid #ffffff;
-}
-
-.factor-slider::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: #dc2626;
-  cursor: pointer;
-  border: 2px solid #ffffff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-}
-
-.factor-slider.yield::-webkit-slider-thumb {
-  background: #059669;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-}
-
-.factor-slider.yield::-moz-range-thumb {
-  background: #059669;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-}
-
-.factor-scale {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 4px;
-  font-size: 11px;
-  color: #94a3b8;
-}
-
-.ai-prediction-box {
-  background: #ffffff;
-  border-radius: 4px;
-  padding: 12px;
-  margin-top: 16px;
-  border: 1px solid #dbeafe;
-}
-
-.prediction-label {
-  font-size: 11px;
-  color: #1e40af;
-  font-weight: 500;
-  margin-bottom: 6px;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-}
-
-.prediction-value {
-  font-size: 13px;
-  color: #374151;
-}
-
-.prediction-value strong {
-  font-size: 16px;
-  font-weight: 700;
-  font-family: 'Roboto Mono', 'Courier New', monospace;
-}
-
-.prediction-value strong.positive {
-  color: #10b981;
-}
-
-.prediction-value strong.negative {
-  color: #f43f5e;
-}
-
-.simulator-chart {
-  flex: 1;
-}
-
-.chart-container {
-  width: 100%;
-  height: 320px;
-}
-
-/* ===== 图表行 ===== */
-.charts-row {
-  display: grid;
-  grid-template-columns: 1.5fr 1fr;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.chart-panel {
-  background: #ffffff;
-  border-radius: 4px;
-  padding: 16px;
-  box-shadow: none;
-  border: 1px solid #e5e7eb;
-}
-
-.sankey-panel .chart-container {
-  height: 380px;
-}
-
-/* ===== 智能决策卡片 ===== */
-.insights-panel {
-  background: #ffffff;
-  border-radius: 4px;
-  padding: 16px;
-  box-shadow: none;
-  border: 1px solid #e5e7eb;
-}
-
-.insights-stream {
+.metric-card {
+  padding: 18px 20px;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.insight-card {
-  background: #ffffff;
-  border-radius: 0;
-  padding: 12px 14px;
-  border-left: 3px solid;
-  border: 1px solid #e5e7eb;
-  border-left-width: 3px;
-  transition: all 0.15s;
+.metric-label,
+.metric-meta {
+  color: #64748b;
 }
 
-.insight-card:hover {
-  border-color: #d1d5db;
-  border-left-color: inherit;
+.metric-label {
+  font-size: 13px;
+  font-weight: 600;
 }
 
-.insight-card.warning {
-  border-left-color: #dc2626;
-  background: #ffffff;
+.metric-value {
+  font-size: 32px;
+  line-height: 1;
+  color: #0f172a;
 }
 
-.insight-card.success {
-  border-left-color: #059669;
-  background: #ffffff;
+.metric-value.warning {
+  color: #b91c1c;
 }
 
-.insight-card.info {
-  border-left-color: #2563eb;
-  background: #ffffff;
+.metric-meta {
+  font-size: 12px;
 }
 
-.insight-header {
+.content-grid {
+  display: grid;
+  grid-template-columns: 0.95fr 1.15fr 0.9fr;
+  gap: 16px;
+}
+
+.panel {
+  padding: 20px 22px;
+}
+
+.panel-head {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.alert-list,
+.log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.alert-item {
+  width: 100%;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  border-radius: 18px;
+  padding: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.alert-item.active {
+  border-color: #fdba74;
+  background: linear-gradient(180deg, #fff7ed 0%, #f8fafc 100%);
+}
+
+.alert-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.level-pill,
+.status-chip {
+  display: inline-flex;
   align-items: center;
-  margin-bottom: 8px;
-}
-
-.insight-header .badge {
-  background: #1e293b;
-  color: #ffffff;
-  font-size: 10px;
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 2px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.insight-card.warning .badge {
-  background: #dc2626;
-}
-
-.insight-card.success .badge {
-  background: #059669;
-}
-
-.insight-card.info .badge {
-  background: #2563eb;
-}
-
-.insight-header .time {
-  font-size: 11px;
-  color: #9ca3af;
-}
-
-.insight-text {
-  font-size: 13px;
-  color: #374151;
-  line-height: 1.6;
-  margin: 0 0 10px 0;
-}
-
-.insight-text strong {
-  color: #111827;
-  font-weight: 600;
-}
-
-.highlight-risk {
-  color: #dc2626;
-  font-weight: 600;
-}
-
-.highlight-profit {
-  color: #059669;
-  font-weight: 600;
-}
-
-.highlight-warning {
-  color: #f59e0b;
+  padding: 7px 10px;
+  border-radius: 999px;
+  font-size: 12px;
   font-weight: 700;
 }
 
-.insight-actions {
-  display: flex;
-  gap: 8px;
+.level-pill.high,
+.status-chip.high {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.level-pill.medium,
+.status-chip.medium {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.level-pill.low,
+.status-chip.low {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-chip.steady {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.time-text {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.alert-item strong,
+.log-item strong,
+.detail-card strong {
+  display: block;
+  color: #0f172a;
+}
+
+.alert-item p,
+.log-item p,
+.message-card p {
+  margin: 8px 0 0;
+  color: #475569;
+  line-height: 1.6;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.detail-card,
+.message-card,
+.log-item {
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.detail-card span {
+  display: block;
+  margin-bottom: 10px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.message-card {
+  margin-bottom: 16px;
+}
+
+.message-card h3 {
+  margin: 0 0 10px;
+  color: #14213d;
+}
+
+.suggestion-list {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  color: #0f172a;
+}
+
+.suggestion-list li + li {
+  margin-top: 8px;
+}
+
+.action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
 .action-btn {
-  padding: 6px 14px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 500;
+  border: 0;
+  border-radius: 16px;
+  padding: 16px;
+  color: #fff;
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.15s;
-  border: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.action-btn.primary {
-  background: #059669;
-  color: #ffffff;
+.action-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
 }
 
-.action-btn.primary:hover {
-  background: #047857;
+.action-btn.fan {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
 }
 
-.action-btn.secondary {
-  background: #f9fafb;
-  color: #4b5563;
-  border: 1px solid #d1d5db;
+.action-btn.led {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
 }
 
-.action-btn.secondary:hover {
-  background: #f3f4f6;
+.action-btn.pump {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+}
+
+.action-btn.neutral {
+  background: linear-gradient(135deg, #475569 0%, #334155 100%);
+}
+
+.footer-actions {
+  display: flex;
+  gap: 10px;
 }
 
 @media screen and (max-width: 1280px) {
-  .fintech-page {
-    min-height: calc(100vh - 60px);
-    padding: 14px;
-  }
-
-  .page-header {
-    flex-wrap: wrap;
-    align-items: flex-start;
-    gap: 12px;
-  }
-
-  .header-right {
-    flex-wrap: wrap;
-    justify-content: flex-start;
-  }
-
-  .kpi-cards-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .simulator-body {
-    flex-direction: column;
-    gap: 16px;
-  }
-
-  .factor-console {
-    width: 100%;
-  }
-
-  .charts-row {
+  .content-grid {
     grid-template-columns: 1fr;
   }
 }
 
 @media screen and (max-width: 768px) {
-  .fintech-page {
-    padding: 12px;
-  }
-
-  .header-left,
-  .header-right,
-  .panel-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .header-right {
-    width: 100%;
-    gap: 10px;
-  }
-
-  .period-btn,
-  .export-btn {
-    width: 100%;
-    text-align: center;
-  }
-
-  .kpi-cards-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .kpi-card,
-  .simulator-panel,
-  .chart-panel,
-  .insights-panel {
+  .analysis-center {
     padding: 14px;
   }
 
-  .chart-container,
-  .sankey-panel .chart-container {
-    height: 280px;
-  }
-
-  .insight-header,
-  .insight-actions {
+  .hero-panel,
+  .hero-actions,
+  .panel-head,
+  .detail-grid,
+  .action-grid,
+  .footer-actions {
     flex-direction: column;
-    align-items: flex-start;
+    grid-template-columns: 1fr;
+    align-items: stretch;
   }
 
-  .insight-actions {
-    width: 100%;
-  }
-
-  .action-btn {
-    width: 100%;
-  }
-}
-
-@media screen and (max-width: 480px) {
-  .page-title {
-    font-size: 18px;
-  }
-
-  .kpi-value,
-  .roi-value {
-    font-size: 20px;
-  }
-
-  .prediction-value strong {
-    font-size: 15px;
+  .metric-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

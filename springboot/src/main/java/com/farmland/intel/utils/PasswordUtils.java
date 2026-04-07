@@ -14,6 +14,7 @@ public final class PasswordUtils {
         if (StrUtil.isBlank(rawPassword)) {
             return rawPassword;
         }
+
         return BCrypt.hashpw(rawPassword, BCrypt.gensalt());
     }
 

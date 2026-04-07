@@ -2,6 +2,7 @@ package com.farmland.intel.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.farmland.intel.common.Result;
+import com.farmland.intel.controller.dto.AlertCreateDTO;
 import com.farmland.intel.entity.FarmlandAlert;
 import com.farmland.intel.mapper.FarmlandAlertMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,6 +42,49 @@ public class FarmlandAlertController {
                 .orderByDesc("create_time")
         );
         return Result.success(alerts);
+    }
+
+    /**
+     * 手动创建预警，供视觉巡检或人工复核写入闭环中心
+     */
+    @PostMapping("/manual")
+    public Result createManualAlert(@RequestBody AlertCreateDTO request) {
+        if (request == null || request.getMessage() == null || request.getMessage().trim().isEmpty()) {
+            return Result.error("400", "预警内容不能为空");
+        }
+
+        FarmlandAlert alert = new FarmlandAlert();
+        alert.setFarmlandId(request.getFarmlandId());
+        alert.setFarmlandName(
+                request.getFarmlandName() == null || request.getFarmlandName().trim().isEmpty()
+                        ? "视觉巡检点位"
+                        : request.getFarmlandName().trim()
+        );
+        alert.setAlertType(
+                request.getAlertType() == null || request.getAlertType().trim().isEmpty()
+                        ? "visual"
+                        : request.getAlertType().trim()
+        );
+        alert.setAlertLevel(
+                request.getAlertLevel() == null || request.getAlertLevel().trim().isEmpty()
+                        ? "medium"
+                        : request.getAlertLevel().trim()
+        );
+        alert.setCurrentValue(request.getCurrentValue());
+        alert.setThresholdMin(request.getThresholdMin());
+        alert.setThresholdMax(request.getThresholdMax());
+        alert.setMessage(request.getMessage().trim());
+        alert.setSuggestion(
+                request.getSuggestion() == null || request.getSuggestion().trim().isEmpty()
+                        ? "建议复核现场状态，并根据需要执行设备联动或人工处置"
+                        : request.getSuggestion().trim()
+        );
+        alert.setStatus("pending");
+        alert.setCreateTime(LocalDateTime.now());
+        alert.setProcessor(request.getProcessor());
+
+        alertMapper.insert(alert);
+        return Result.success(alert);
     }
 
     /**
@@ -92,4 +136,3 @@ public class FarmlandAlertController {
         return Result.success(alerts);
     }
 }
-

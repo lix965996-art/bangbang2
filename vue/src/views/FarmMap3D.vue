@@ -213,6 +213,12 @@ export default {
       lightningBolts: [],
       lightningMesh: null,
       activeDrone: null,
+      droneTemplate: null,
+      droneLoadPromise: null,
+      droneFlightFrame: null,
+      droneFogFrame: null,
+      activeDroneFog: null,
+      droneTaskToken: 0,
       activeWaterValve: null,
       clockTimer: null,
       stm32Data: {
@@ -298,6 +304,7 @@ export default {
     this.updateTime();
     this.clockTimer = setInterval(this.updateTime, 1000);
     this.fetchData();
+    this.preloadDroneModel();
 
     this.stm32Timer = setInterval(() => {
       this.fetchSTM32Data();
@@ -324,6 +331,7 @@ export default {
   
   beforeDestroy() {
     cancelAnimationFrame(this.requestId);
+    this.stopDroneOperation(true);
     window.removeEventListener('resize', this.onWindowResize);
     if (this.clockTimer) {
       clearInterval(this.clockTimer);
@@ -345,6 +353,98 @@ export default {
   methods: {
     updateTime() { this.currentTime = new Date().toLocaleString('zh-CN', { hour12: false }); },
     normalize(val, max) { return Math.min((Number(val) / max) * 100, 100); },
+    preloadDroneModel() {
+      this.getDroneTemplate().catch(error => {
+        console.warn('Drone preload failed:', error);
+      });
+    },
+    getDroneTemplate() {
+      if (this.droneTemplate) {
+        return Promise.resolve(this.droneTemplate);
+      }
+      if (this.droneLoadPromise) {
+        return this.droneLoadPromise;
+      }
+
+      this.droneLoadPromise = new Promise((resolve, reject) => {
+        this.gltfLoader.load(
+          '/models/drone.glb',
+          (gltf) => {
+            const drone = gltf.scene;
+            drone.visible = false;
+            drone.traverse((node) => {
+              if (node.isMesh) {
+                node.castShadow = false;
+                node.receiveShadow = false;
+                node.frustumCulled = true;
+                if (node.material) {
+                  if (Array.isArray(node.material)) {
+                    node.material.forEach((material) => {
+                      material.flatShading = true;
+                      material.needsUpdate = true;
+                    });
+                  } else {
+                    node.material.flatShading = true;
+                    node.material.needsUpdate = true;
+                  }
+                }
+              }
+            });
+            this.droneTemplate = drone;
+            resolve(drone);
+          },
+          undefined,
+          (error) => {
+            this.droneLoadPromise = null;
+            reject(error);
+          }
+        );
+      });
+
+      return this.droneLoadPromise;
+    },
+    cleanupPoints(points) {
+      if (!points) return;
+      if (points.parent) {
+        points.parent.remove(points);
+      }
+      if (points.geometry) {
+        points.geometry.dispose();
+      }
+      if (points.material) {
+        if (Array.isArray(points.material)) {
+          points.material.forEach(material => material.dispose && material.dispose());
+        } else if (points.material.dispose) {
+          points.material.dispose();
+        }
+      }
+    },
+    stopDroneOperation(silent = false) {
+      this.droneTaskToken += 1;
+
+      if (this.droneFlightFrame) {
+        cancelAnimationFrame(this.droneFlightFrame);
+        this.droneFlightFrame = null;
+      }
+      if (this.droneFogFrame) {
+        cancelAnimationFrame(this.droneFogFrame);
+        this.droneFogFrame = null;
+      }
+
+      if (this.activeDrone && this.activeDrone.parent) {
+        this.activeDrone.parent.remove(this.activeDrone);
+      }
+      if (this.activeDroneFog) {
+        this.cleanupPoints(this.activeDroneFog);
+      }
+
+      this.activeDrone = null;
+      this.activeDroneFog = null;
+
+      if (!silent) {
+        this.switchState.pest = false;
+      }
+    },
     resolveCropType(crop) {
         const raw = String(crop || '').trim();
         const lower = raw.toLowerCase();
@@ -706,11 +806,7 @@ export default {
             }
           }
           if (type === 'pest') {
-            // 移除无人机模型
-            if (this.activeDrone) {
-              this.scene.remove(this.activeDrone);
-              this.activeDrone = null;
-            }
+            this.stopDroneOperation(true);
           }
           this.$message.info(`[${this.selectedFarm.farm}] ${actionNames[type]}已关闭`);
         }
@@ -751,6 +847,9 @@ export default {
 
         setTimeout(() => {
             this.loadingState[type] = false;
+            if (type === 'pest' && this.switchState.pest) {
+              this.stopDroneOperation();
+            }
             this.$message.success('农事作业完成');
         }, 4000);
     },
@@ -885,129 +984,130 @@ export default {
         animate();
     },
 
-    // ☁️ 杀虫特效 (增强版 - 加入无人机模型)
-    spawnDroneFog(x, z) {
-        
-        // 加载无人机模型
-        this.gltfLoader.load(
-            '/models/drone.glb',
-            (gltf) => {
-                const drone = gltf.scene;
-                const size = 17.5; // 地块半径（baseSize=35，半径=17.5）
-                const startX = x - size;
-                const startZ = z - size;
-                
-                drone.position.set(startX, 25, startZ); // 提高飞行高度
-                drone.scale.set(20, 20, 20); // 适中大小
-                this.activeDrone = drone; // 跟踪当前无人机
-                
-                // 性能优化：禁用阴影 + 简化材质
-                drone.traverse((node) => {
-                    if (node.isMesh) {
-                        node.castShadow = false;
-                        node.receiveShadow = false;
-                        node.frustumCulled = true; // 启用视锥剔除
-                        if (node.material) {
-                            node.material.flatShading = true; // 简化着色
-                        }
-                    }
-                });
-                this.scene.add(drone);
-                // 移除灯光以提升性能
-                
-                // 飞行路径（绕地块飞行）
-                const path = [
-                    { x: startX, z: startZ },
-                    { x: x + size, z: startZ },
-                    { x: x + size, z: z + size },
-                    { x: startX, z: z + size },
-                    { x: startX, z: startZ }
-                ];
-                
-                let pathIndex = 0;
-                let progress = 0;
-                const flySpeed = 0.005; // 稍快一点的飞行速度
-                let lastUpdate = Date.now();
-                
-                const flyDrone = () => {
-                    // 性能优化：限制帧率为20fps
-                    const now = Date.now();
-                    if (now - lastUpdate < 50) {
-                        requestAnimationFrame(flyDrone);
-                        return;
-                    }
-                    lastUpdate = now;
-                    
-                    if (!drone.parent || pathIndex >= path.length - 1) {
-                        if (drone.parent) {
-                            this.scene.remove(drone);
-                        }
-                        return;
-                    }
-                    
-                    progress += flySpeed;
-                    const current = path[pathIndex];
-                    const next = path[pathIndex + 1];
-                    
-                    // 插值飞行
-                    drone.position.x = current.x + (next.x - current.x) * progress;
-                    drone.position.z = current.z + (next.z - current.z) * progress;
-                    
-                    // 朝向飞行方向
-                    const angle = Math.atan2(next.z - current.z, next.x - current.x);
-                    drone.rotation.y = angle - Math.PI / 2;
-                    
-                    // 螺旋桨旋转效果
-                    drone.rotation.z += 0.2;
-                    
-                    if (progress >= 1.0) {
-                        progress = 0;
-                        pathIndex++;
-                    }
-                    
-                    requestAnimationFrame(flyDrone);
-                };
-                flyDrone();
-            },
-            (progress) => {
-            },
-            (error) => {
-                console.error("无人机模型加载失败:", error);
-            }
-        );
-        // 喷雾粒子效果
-        const particleCount = 80; // 性能优化：减少粒子数量
+    // ☁️ 杀虫特效（性能修复版）
+    async spawnDroneFog(x, z) {
+        if (!this.scene) return;
+
+        this.stopDroneOperation(true);
+        const taskToken = ++this.droneTaskToken;
+
+        const particleCount = 48;
         const geo = new THREE.BufferGeometry();
         const positions = [];
         for (let i = 0; i < particleCount; i++) {
-            positions.push(x + (Math.random()-0.5)*30, 15 + Math.random()*8, z + (Math.random()-0.5)*30);
+            positions.push(x + (Math.random() - 0.5) * 24, 14 + Math.random() * 5, z + (Math.random() - 0.5) * 24);
         }
         geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
 
         const mat = new THREE.PointsMaterial({
-            color: 0xffffff, size: 15, map: this.textureMap.smoke, 
-            transparent: true, opacity: 0.0, depthWrite: false, 
-            sizeAttenuation: true, blending: THREE.AdditiveBlending
+            color: 0xffffff,
+            size: 10,
+            map: this.textureMap.smoke,
+            transparent: true,
+            opacity: 0,
+            depthWrite: false,
+            sizeAttenuation: true,
+            blending: THREE.AdditiveBlending
         });
 
         const particles = new THREE.Points(geo, mat);
+        this.activeDroneFog = particles;
         this.scene.add(particles);
 
         let life = 0;
-        const animate = () => {
-            if (!particles.parent) return;
-            life += 0.008;
-            if (life < 0.2) mat.opacity = life * 4.0;
-            else if (life > 0.7) mat.opacity = (1 - life) * 3.0;
-            
+        const animateFog = () => {
+            if (taskToken !== this.droneTaskToken || !particles.parent) return;
+
+            life += 0.02;
+            if (life < 0.25) mat.opacity = life * 2.8;
+            else if (life > 0.7) mat.opacity = Math.max(0, (1 - life) * 2.2);
+            else mat.opacity = 0.6;
+
             const pos = particles.geometry.attributes.position.array;
-            for(let i=0; i<particleCount; i++) pos[i*3+1] -= 0.015;
+            for (let i = 0; i < particleCount; i++) {
+                pos[i * 3 + 1] -= 0.02;
+            }
             particles.geometry.attributes.position.needsUpdate = true;
 
-            if (life < 1.0) requestAnimationFrame(animate);
-            else { this.scene.remove(particles); geo.dispose(); mat.dispose(); }
+            if (life < 1) {
+                this.droneFogFrame = requestAnimationFrame(animateFog);
+            } else {
+                this.cleanupPoints(particles);
+                if (this.activeDroneFog === particles) {
+                  this.activeDroneFog = null;
+                }
+                this.droneFogFrame = null;
+            }
         };
-        animate();
+        this.droneFogFrame = requestAnimationFrame(animateFog);
+
+        try {
+            const template = await this.getDroneTemplate();
+            if (taskToken !== this.droneTaskToken || !this.scene) return;
+
+            const drone = template.clone(true);
+            const size = 17.5;
+            const startX = x - size;
+            const startZ = z - size;
+            drone.visible = true;
+            drone.position.set(startX, 25, startZ);
+            drone.scale.set(12, 12, 12);
+            this.activeDrone = drone;
+            this.scene.add(drone);
+
+            const path = [
+                { x: startX, z: startZ },
+                { x: x + size, z: startZ },
+                { x: x + size, z: z + size },
+                { x: startX, z: z + size },
+                { x: startX, z: startZ }
+            ];
+
+            let pathIndex = 0;
+            let progress = 0;
+            const flySpeed = 0.02;
+            let lastUpdate = performance.now();
+
+            const flyDrone = (now) => {
+                if (taskToken !== this.droneTaskToken || !drone.parent) {
+                    return;
+                }
+
+                if (now - lastUpdate < 33) {
+                    this.droneFlightFrame = requestAnimationFrame(flyDrone);
+                    return;
+                }
+                lastUpdate = now;
+
+                if (pathIndex >= path.length - 1) {
+                    this.stopDroneOperation(true);
+                    return;
+                }
+
+                progress += flySpeed;
+                const current = path[pathIndex];
+                const next = path[pathIndex + 1];
+
+                drone.position.x = current.x + (next.x - current.x) * progress;
+                drone.position.z = current.z + (next.z - current.z) * progress;
+
+                const angle = Math.atan2(next.z - current.z, next.x - current.x);
+                drone.rotation.y = angle - Math.PI / 2;
+
+                if (progress >= 1) {
+                    progress = 0;
+                    pathIndex += 1;
+                }
+
+                this.droneFlightFrame = requestAnimationFrame(flyDrone);
+            };
+
+            this.droneFlightFrame = requestAnimationFrame(flyDrone);
+        } catch (error) {
+            console.error("无人机模型加载失败:", error);
+            this.stopDroneOperation(true);
+            this.switchState.pest = false;
+        }
     },
 
     // ✨ 施肥特效 (增强版)
@@ -1797,34 +1897,4 @@ export default {
 ::-webkit-scrollbar-track { background: transparent; }
 </style>
 
-<style>
-/* 隐藏父容器滚动条 */
-.el-main { overflow: hidden !important; }
-.el-main::-webkit-scrollbar { display: none !important; }
-html, body { overflow: hidden !important; }
-
-/* 修复按钮图标点击错位 */
-.action-btn.el-button {
-  transition: none !important;
-}
-.action-btn.el-button:hover,
-.action-btn.el-button:focus,
-.action-btn.el-button:active {
-  transform: none !important;
-  transition: none !important;
-}
-.action-btn.el-button span {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  width: 100% !important;
-  height: 100% !important;
-}
-.action-btn .action-img {
-  position: static !important;
-  margin: 0 !important;
-  transform: none !important;
-  transition: none !important;
-}
-</style>
 

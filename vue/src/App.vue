@@ -2,7 +2,7 @@
   <div id="app">
     <router-view />
 
-    <!-- AI聊天机器人浮动球 -->
+    <!-- 全局研判助手入口 -->
     <div 
       v-if="showFloatingChat"
       class="ai-chat-container" 
@@ -13,10 +13,10 @@
         class="fab-btn" 
         @mousedown="startDrag"
         @click="handleFabClick"
-        title="点击咨询 AI 农艺师，拖动可移动位置"
+        :title="`${assistantName}，拖动可移动位置`"
         style="display: flex !important; width: 60px; height: 60px; background: linear-gradient(135deg, #42d392, #3bb2b8); border-radius: 50%; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 15px rgba(66, 211, 146, 0.4); transition: all 0.3s ease;"
       >
-        <img src="@/assets/ai2.png" alt="AI" style="width: 32px; height: 32px; object-fit: contain;" />
+        <img src="@/assets/ai2.png" :alt="assistantName" style="width: 32px; height: 32px; object-fit: contain;" />
       </div>
 
       <transition name="fade">
@@ -24,7 +24,7 @@
           <div class="chat-header">
             <div class="title">
               <span class="status-dot"></span>
-              智能体农情大脑
+              {{ assistantName }}
             </div>
             <span class="close-btn" @click="showChat = false">×</span>
           </div>
@@ -32,7 +32,7 @@
           <div class="chat-body" ref="chatBody">
             <div v-for="(msg, index) in messages" :key="index" :class="['message-row', msg.role]">
               <div class="avatar">
-                <img v-if="msg.role === 'ai'" src="@/assets/ai2.png" alt="AI" class="avatar-img" />
+                <img v-if="msg.role === 'ai'" src="@/assets/ai2.png" :alt="assistantName" class="avatar-img" />
                 <img v-else src="@/assets/nongming.png" alt="农民" class="avatar-img" />
               </div>
               <div class="bubble">
@@ -49,7 +49,7 @@
             </div>
             
             <div v-if="isLoading" class="message-row ai">
-              <div class="avatar"><img src="@/assets/ai2.png" alt="AI" class="avatar-img" /></div>
+              <div class="avatar"><img src="@/assets/ai2.png" :alt="assistantName" class="avatar-img" /></div>
               <div class="bubble loading">
                 <span>.</span><span>.</span><span>.</span>
               </div>
@@ -71,7 +71,7 @@
               v-model="inputMsg" 
               @keyup.enter="sendMessage"
               type="text" 
-              :placeholder="isRecording ? '正在聆听...' : '例如：现在的温度适合草莓生长吗？'" 
+              :placeholder="isRecording ? '正在聆听...' : '例如：帮我判断当前优先处理哪条预警'" 
             />
             <button @click="sendMessage" :disabled="isLoading || isRecording">发送</button>
           </div>
@@ -85,6 +85,23 @@
 import request from '@/utils/request';
 import { eventBus, EVENTS } from '@/utils/eventBus';
 
+const ASSISTANT_NAME = '禾序';
+const MAIN_STAGE_ROUTES = new Set([
+  '/home',
+  '/aether-monitor',
+  '/fruit-detect',
+  '/farm-map-gaode',
+  '/farmmap3d',
+  '/business-analysis'
+]);
+const MAIN_STAGE_ACTION_TYPES = new Set([
+  'irrigation_on',
+  'irrigation_off',
+  'led_on',
+  'led_off',
+  'drone_spray'
+]);
+
 export default {
   name: 'App',
   data() {
@@ -95,7 +112,7 @@ export default {
       messages: [
         {
           role: 'ai',
-          content: 'Hello, I am your AI agriculture assistant.'
+          content: '你好，我是禾序。我可以帮你梳理当前页面重点、建议优先处理项，并跳转到主线页面。'
         }
       ],
       // 拖动相关
@@ -108,13 +125,13 @@ export default {
       // 语音识别相关
       isRecording: false,
       recognition: null,
-      voiceSupported: false
+      voiceSupported: false,
+      assistantName: ASSISTANT_NAME
     };
   },
   computed: {
     showFloatingChat() {
-      const hiddenRoutes = ['/login', '/register'];
-      return !hiddenRoutes.includes(this.$route.path);
+      return MAIN_STAGE_ROUTES.has(this.$route.path);
     },
     containerStyle() {
       const baseStyle = {
@@ -140,6 +157,13 @@ export default {
         right: '30px',
         bottom: '30px'
       };
+    }
+  },
+  watch: {
+    '$route.path'(path) {
+      if (!MAIN_STAGE_ROUTES.has(path)) {
+        this.showChat = false;
+      }
     }
   },
   mounted() {
@@ -271,18 +295,26 @@ export default {
         // request 拦截器已经处理了响应，直接使用 planRes
         if (planRes && (planRes.code === '200' || planRes.code === 200) && planRes.data) {
           const plan = planRes.data;
+          const filteredActions = this.filterCompetitionActions(plan.actions || []);
           
-          // 显示AI的建议
+          // 显示建议摘要
           this.messages.push({ 
             role: 'ai', 
             content: plan.advice || '已生成执行计划。'
           });
           this.scrollToBottom();
 
-          if (plan.actions && plan.actions.length > 0) {
+          if ((plan.actions || []).length > 0 && filteredActions.length === 0) {
+            this.messages.push({
+              role: 'ai',
+              content: '当前建议已整理为文字摘要；这里仅保留主线页面跳转和主线相关动作。'
+            });
+          }
+
+          if (filteredActions.length > 0) {
             // 分离导航动作和需要确认的设备控制动作
-            const navigateActions = plan.actions.filter(a => a.type === 'navigate');
-            const deviceActions = plan.actions.filter(a => a.type !== 'navigate');
+            const navigateActions = filteredActions.filter(a => a.type === 'navigate');
+            const deviceActions = filteredActions.filter(a => a.type !== 'navigate');
             
             // 导航动作直接执行，无需确认（低风险操作）
             if (navigateActions.length > 0) {
@@ -319,7 +351,7 @@ export default {
       } catch (error) {
         console.error('调用Agent API失败:', error);
         // 显示更友好的错误信息
-        let errorMsg = 'AI服务暂时不可用，请稍后再试。';
+        let errorMsg = `${this.assistantName}暂时不可用，请稍后再试。`;
         if (error.response) {
           errorMsg = `服务器错误：${error.response.status}`;
         } else if (error.message) {
@@ -331,10 +363,28 @@ export default {
         this.scrollToBottom();
       }
     },
+    filterCompetitionActions(actions) {
+      return actions.filter(action => this.isAllowedCompetitionAction(action));
+    },
+    isAllowedCompetitionAction(action) {
+      if (!action || !action.type) {
+        return false;
+      }
+      if (action.type === 'navigate') {
+        return MAIN_STAGE_ROUTES.has(action.route);
+      }
+      return MAIN_STAGE_ACTION_TYPES.has(action.type);
+    },
     
     // 跳转到指定路由
     navigateTo(route) {
-      if (!route) return;
+      if (!route || !MAIN_STAGE_ROUTES.has(route)) {
+        this.messages.push({
+          role: 'ai',
+          content: '当前入口仅保留主线页面跳转，请从左侧导航进入其他功能。'
+        });
+        return;
+      }
       if (this.$route.path === route) {
         this.messages.push({ role: 'ai', content: '您已经在该页面了。' });
         return;
@@ -509,6 +559,14 @@ export default {
     
     async executeDeviceAction(action) {
       if (!action) return;
+      if (!this.isAllowedCompetitionAction(action)) {
+        this.messages.push({
+          role: 'ai',
+          content: '当前入口仅保留主线相关动作，其余操作请在对应页面处理。'
+        });
+        this.scrollToBottom();
+        return;
+      }
       
       this.messages.push({
         role: 'ai',
