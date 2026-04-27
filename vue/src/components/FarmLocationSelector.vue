@@ -1,50 +1,51 @@
 <template>
   <el-dialog
-    title="Farm Location"
-    v-model="dialogVisible"
+    title="地块位置标记"
+    :visible="visible"
+    @opened="initMap"
+    @close="$emit('update:visible', false)"
     width="70%"
     top="5vh"
     :close-on-click-modal="false"
     append-to-body
-    @opened="initMap"
   >
     <div class="location-selector">
       <div class="toolbar">
         <el-input
           v-model="searchKeyword"
-          placeholder="Search address or place"
+          placeholder="搜索地址或地点"
           clearable
           @keyup.enter="handleSearch"
         />
-        <el-button type="primary" icon="el-icon-search" @click="handleSearch">Search</el-button>
+        <el-button type="primary" icon="el-icon-search" @click="handleSearch">搜索</el-button>
         <el-button type="success" icon="el-icon-edit-outline" :disabled="isDrawing" @click="startDraw">
-          {{ isDrawing ? 'Drawing...' : 'Draw Area' }}
+          {{ isDrawing ? '绘制中...' : '绘制区域' }}
         </el-button>
-        <el-button type="warning" icon="el-icon-delete" @click="clearDraw">Clear</el-button>
+        <el-button type="warning" icon="el-icon-delete" @click="clearDraw">清除</el-button>
       </div>
 
       <div id="selector-container" class="map-container"></div>
 
       <div class="status-panel">
         <div class="status-line">
-          <span class="label">Address</span>
-          <span class="value">{{ selectedLocation.address || 'Click the map or search to choose a location' }}</span>
+          <span class="label">地址</span>
+          <span class="value">{{ selectedLocation.address || '点击地图选择位置，或搜索地址' }}</span>
         </div>
         <div class="status-line">
-          <span class="label">District</span>
+          <span class="label">所属区县</span>
           <span class="value">{{ calculatedDistrict || '-' }}</span>
         </div>
         <div class="status-line">
-          <span class="label">Area</span>
-          <span class="value">{{ calculatedArea ? `${calculatedArea} mu` : '-' }}</span>
+          <span class="label">面积</span>
+          <span class="value">{{ calculatedArea ? `${calculatedArea} 亩` : '-' }}</span>
         </div>
       </div>
     </div>
 
     <template #footer>
       <div class="dialog-footer">
-        <el-button @click="dialogVisible = false">Cancel</el-button>
-        <el-button type="primary" @click="confirmSelection">Confirm</el-button>
+        <el-button @click="$emit('update:visible', false)">取消</el-button>
+        <el-button type="primary" @click="confirmSelection">确认</el-button>
       </div>
     </template>
   </el-dialog>
@@ -81,14 +82,10 @@ export default {
       }
     }
   },
-  computed: {
-    dialogVisible: {
-      get() {
-        return this.visible
-      },
-      set(val) {
-        this.$emit('update:visible', val)
-      }
+  computed: {},
+  watch: {
+    visible(val) {
+      console.log('[FarmLocationSelector] visible 变化为:', val)
     }
   },
   beforeDestroy() {
@@ -96,25 +93,30 @@ export default {
   },
   methods: {
     async initMap() {
+      console.log('[FarmLocationSelector] initMap 被调用, window.AMap:', !!window.AMap)
       try {
         await this.ensureMapSdk()
+        console.log('[FarmLocationSelector] SDK 加载完成，开始创建地图')
         this.createMap()
       } catch (error) {
-        console.error('Failed to initialize map selector:', error)
+        console.error('[FarmLocationSelector] 地图初始化失败:', error)
       }
     },
     async ensureMapSdk() {
       if (this.isLoadingMap) {
+        console.log('[FarmLocationSelector] SDK 正在加载中，跳过重复请求')
         return
       }
 
       this.isLoadingMap = true
+      console.log('[FarmLocationSelector] 开始加载 AMap SDK...')
       try {
         await loadAmapSdk({
           plugins: ['AMap.ToolBar', 'AMap.PlaceSearch', 'AMap.Geocoder', 'AMap.MouseTool', 'AMap.GeometryUtil']
         })
+        console.log('[FarmLocationSelector] AMap SDK 加载成功')
       } catch (error) {
-        console.error('Failed to load AMap SDK:', error)
+        console.error('[FarmLocationSelector] AMap SDK 加载失败:', error)
         this.$message.error('高德地图加载失败，请检查网络或 Key 配置')
         throw error
       } finally {
@@ -122,9 +124,12 @@ export default {
       }
     },
     createMap() {
+      console.log('[FarmLocationSelector] createMap 被调用')
       this.$nextTick(() => {
         const container = document.getElementById('selector-container')
+        console.log('[FarmLocationSelector] 容器元素:', !!container, 'AMap:', !!window.AMap)
         if (!container || !window.AMap) {
+          console.warn('[FarmLocationSelector] 无法创建地图 - 容器或AMap不存在')
           return
         }
 
@@ -138,12 +143,24 @@ export default {
         })
 
         this.map.addControl(new window.AMap.ToolBar())
-        this.geocoder = new window.AMap.Geocoder({ radius: 1000, extensions: 'all' })
-        this.placeSearch = new window.AMap.PlaceSearch({
-          map: this.map,
-          autoFitView: true,
-          city: '430800'
-        })
+
+        console.log('[FarmLocationSelector] 插件可用性 - Geocoder:', !!window.AMap.Geocoder, 'PlaceSearch:', !!window.AMap.PlaceSearch, 'MouseTool:', !!window.AMap.MouseTool)
+
+        if (window.AMap.Geocoder) {
+          this.geocoder = new window.AMap.Geocoder({ radius: 1000, extensions: 'all' })
+        } else {
+          console.warn('[FarmLocationSelector] Geocoder 插件不可用')
+        }
+
+        if (window.AMap.PlaceSearch) {
+          this.placeSearch = new window.AMap.PlaceSearch({
+            map: this.map,
+            autoFitView: true,
+            city: '430800'
+          })
+        } else {
+          console.warn('[FarmLocationSelector] PlaceSearch 插件不可用')
+        }
 
         if (window.AMap.MouseTool) {
           this.mouseTool = new window.AMap.MouseTool(this.map)
@@ -217,22 +234,27 @@ export default {
       }
     },
     handleSearch() {
+      console.log('[FarmLocationSelector] handleSearch 被调用, keyword:', this.searchKeyword)
+      console.log('[FarmLocationSelector] placeSearch 对象:', !!this.placeSearch)
       if (!this.searchKeyword || !this.placeSearch) {
+        console.warn('[FarmLocationSelector] 搜索条件不满足 - keyword:', !!this.searchKeyword, 'placeSearch:', !!this.placeSearch)
         return
       }
 
       this.placeSearch.search(this.searchKeyword, (status, result) => {
+        console.log('[FarmLocationSelector] 搜索结果 - status:', status, 'result:', result)
         if (status !== 'complete' || !result.poiList || !result.poiList.pois.length) {
-          this.$message.warning('No matching address was found')
+          this.$message.warning('未找到匹配的地址')
           return
         }
 
         const poi = result.poiList.pois[0]
         if (!poi.location) {
-          this.$message.warning('Selected address has no coordinate data')
+          this.$message.warning('所选地址没有坐标数据')
           return
         }
 
+        console.log('[FarmLocationSelector] 搜索到POI:', poi.name, poi.location)
         this.updateLocation(poi.location.lng, poi.location.lat, poi.name)
         this.map.setZoom(16)
       })
@@ -274,7 +296,7 @@ export default {
     },
     startDraw() {
       if (!this.mouseTool) {
-        this.$message.warning('Drawing tool is not available')
+        this.$message.warning('绘图工具不可用')
         return
       }
 
@@ -306,7 +328,7 @@ export default {
     },
     confirmSelection() {
       if (!this.selectedLocation.lng || !this.selectedLocation.lat) {
-        this.$message.warning('Please choose a location first')
+        this.$message.warning('请先选择位置')
         return
       }
 
@@ -318,7 +340,7 @@ export default {
         area: this.calculatedArea || this.initialData.area || 0,
         coordinates: this.currentPath.length ? JSON.stringify(this.currentPath) : this.initialData.coordinates || ''
       })
-      this.dialogVisible = false
+      this.$emit('update:visible', false)
     },
     destroyMap() {
       if (this.map) {

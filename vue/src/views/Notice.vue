@@ -4,7 +4,7 @@
     <div class="ai-dashboard">
       <div class="dashboard-left">
         <div class="big-title">农情预警指挥中心</div>
-        <div class="sub-text">DeepSeek 语义分析引擎 · 实时监控中</div>
+        <div class="sub-text">通义千问 (Qwen) 语义分析引擎 · 实时监控中</div>
         <div class="pulse-line"></div>
       </div>
       <div class="dashboard-right">
@@ -40,7 +40,7 @@
                 :key="item.id"
                 :timestamp="item.time"
                 placement="top"
-                :color="index === 0 ? '#F56C6C' : '#409EFF'" 
+                :color="index === 0 ? '#ef4444' : '#38bdf8'" 
                 :size="index === 0 ? 'large' : 'normal'"
                 :icon="index === 0 ? 'el-icon-message-solid' : 'el-icon-collection-tag'">
                 
@@ -52,7 +52,7 @@
                       <span class="item-title">{{ item.name }}</span>
                       <div class="tags-row">
                         <el-tag size="mini" effect="dark" :type="index % 2 === 0 ? 'danger' : 'primary'">{{ index % 2 === 0 ? '紧急' : '常规' }}</el-tag>
-                        <el-tag size="mini" type="info" effect="plain" style="margin-left: 5px">DeepSeek 已归档</el-tag>
+                        <el-tag size="mini" type="info" effect="plain" style="margin-left: 5px; border-color: #38bdf8; color: #38bdf8; background: #f0f9ff">Qwen 已归档</el-tag>
                       </div>
                     </div>
 
@@ -64,9 +64,13 @@
                       <div class="img-wrapper" v-if="item.img">
                         <el-image 
                           class="log-image"
+                          style="width: 100px; height: 75px; border-radius: 6px;"
                           :src="item.img" 
-                          :preview-src-list="[item.img]"
+                          :preview-src-list="item.img ? [item.img] : []"
                           fit="cover">
+                          <div slot="error" class="image-slot" style="display: flex; justify-content: center; align-items: center; width: 100%; height: 100%; background: #f1f5f9; color: #94a3b8;">
+                            <i class="el-icon-picture-outline" style="font-size: 24px;"></i>
+                          </div>
                         </el-image>
                       </div>
                     </div>
@@ -74,10 +78,10 @@
                     <div class="item-footer">
                       <span class="author-info"><i class="el-icon-user"></i> {{ item.user || 'AI 助手' }}</span>
                       <div class="actions">
-                        <el-button type="text" size="mini" icon="el-icon-magic-stick" @click="mockAnalyze">AI 深度分析</el-button>
-                        <el-button type="text" size="mini" icon="el-icon-edit" @click="handleEdit(item)">编辑</el-button>
+                        <el-button type="text" size="mini" icon="el-icon-magic-stick" style="color: #6366f1" @click="mockAnalyze">Qwen 深度分析</el-button>
+                        <el-button type="text" size="mini" icon="el-icon-edit" style="color: #64748b" @click="handleEdit(item)">编辑</el-button>
                         <el-popconfirm title="删除这条记录？" @confirm="del(item.id)">
-                          <el-button slot="reference" type="text" size="mini" icon="el-icon-delete" style="color: #F56C6C; margin-left: 10px"></el-button>
+                          <el-button slot="reference" type="text" size="mini" icon="el-icon-delete" style="color: #ef4444; margin-left: 10px"></el-button>
                         </el-popconfirm>
                       </div>
                     </div>
@@ -86,45 +90,58 @@
 
               </el-timeline-item>
             </el-timeline>
+            
+            <!-- 分页控件 -->
+            <div style="padding: 20px 0; text-align: center;">
+              <el-pagination
+                @size-change="handleSizeChange"
+                @current-change="handleCurrentChange"
+                :current-page="pageNum"
+                :page-sizes="[5, 10, 20]"
+                :page-size="pageSize"
+                layout="total, sizes, prev, pager, next, jumper"
+                :total="total">
+              </el-pagination>
+            </div>
           </div>
         </el-card>
       </el-col>
 
       <el-col :span="8">
-        <el-card class="glass-card mb-20">
-          <div slot="header" class="panel-header">🔍 智库检索</div>
-          <el-input placeholder="输入关键词..." v-model="name" class="search-input" clearable @clear="load">
-            <el-button slot="append" icon="el-icon-search" @click="load"></el-button>
+        <div class="custom-card mb-20" style="background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); margin-bottom: 20px">
+          <div class="panel-header" style="color: #334155; font-weight: 600; margin-bottom: 15px;">🔍 智库检索</div>
+          <el-input placeholder="输入关键词..." v-model="name" class="search-input custom-input" clearable @clear="load">
+            <el-button slot="append" icon="el-icon-search" style="background-color: #f1f5f9; color: #475569" @click="load"></el-button>
           </el-input>
-        </el-card>
+        </div>
 
-        <el-card class="glass-card ai-suggest-card">
-          <div slot="header" class="panel-header" style="color: white">🤖 DeepSeek 今日建议</div>
+        <div class="custom-card ai-suggest-card mb-20" style="background: linear-gradient(145deg, #1e293b 0%, #334155 100%); border-radius: 12px; padding: 20px; box-shadow: 0 8px 20px rgba(0,0,0,0.15); margin-bottom: 20px">
+          <div class="panel-header" style="color: white; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; margin-bottom: 15px; font-weight: 600;">🤖 Qwen 今日建议</div>
           <div class="ai-content">
-            <p>“根据近 3 天的日志分析，A5 地块湿度持续偏低。建议启用智能灌溉系统，并将阈值调整为 65%。”</p>
-            <el-button size="small" round style="background: rgba(255,255,255,0.2); color: white; border: none; margin-top: 10px">一键执行建议</el-button>
+            <p style="color: #cbd5e1; line-height: 1.6; font-size: 14px; margin: 0;">“根据近 3 天的日志分析，A5 地块湿度持续偏低。建议启用智能灌溉系统，并将阈值调整为 65%。”</p>
+            <el-button size="small" round style="background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56,189,248, 0.4); margin-top: 15px">一键执行建议</el-button>
           </div>
-        </el-card>
+        </div>
 
-        <el-card class="glass-card mt-20" :body-style="{padding: '0px'}">
-          <div class="quick-action" @click="handleAdd">
-            <i class="el-icon-camera-solid" style="font-size: 32px; color: #409EFF; margin-bottom: 10px;"></i>
-            <div>拍照识别上传</div>
-            <div style="font-size: 12px; color: #999; margin-top: 5px">自动识别病虫害</div>
+        <div class="custom-card mt-20" style="background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.03); margin-top: 20px">
+          <div class="quick-action" @click="handleAdd" style="padding: 30px; text-align: center; cursor: pointer; transition: all 0.3s" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'">
+            <i class="el-icon-camera-solid" style="font-size: 32px; color: #38bdf8; margin-bottom: 10px;"></i>
+            <div style="font-size: 16px; color: #334155; font-weight: 500">拍照识别上传</div>
+            <div style="font-size: 12px; color: #64748b; margin-top: 5px">自动识别病虫害特征</div>
           </div>
-        </el-card>
+        </div>
       </el-col>
 
     </el-row>
 
-    <el-dialog :title="form.id ? '编辑日志' : '📝 发布新农情'" :visible.sync="dialogFormVisible" width="50%" center custom-class="custom-dialog">
-      <el-form label-width="80px" size="small" :model="form">
+    <el-dialog :title="form.id ? '编辑日志' : '📝 发布新农情'" :visible.sync="dialogFormVisible" width="50%" center custom-class="custom-dialog ios-dialog">
+      <el-form label-width="80px" size="small" :model="form" class="ios-form">
         <el-form-item label="标题">
           <el-input v-model="form.name" placeholder="请输入标题"></el-input>
         </el-form-item>
         <el-form-item label="内容">
           <el-input type="textarea" :rows="5" v-model="form.content" placeholder="输入内容后，可点击下方按钮进行 AI 润色"></el-input>
-          <el-button type="text" icon="el-icon-cpu" @click="mockAIPolish" style="color: #67C23A">DeepSeek 智能润色</el-button>
+          <el-button type="text" icon="el-icon-cpu" @click="mockAIPolish" style="color: #38bdf8; margin-top: 10px;">Qwen 智能润色</el-button>
         </el-form-item>
         <el-row>
           <el-col :span="12">
@@ -139,15 +156,15 @@
           </el-col>
         </el-row>
         <el-form-item label="图片">
-          <el-upload :action="apiConfig.fileUpload" :on-success="handleImgUploadSuccess" :show-file-list="false">
-            <el-button size="small" type="primary" plain>上传现场图</el-button>
-            <span v-if="form.img" style="margin-left: 10px; color: #67C23A"><i class="el-icon-check"></i> 已上传</span>
+          <el-upload :action="apiEndpoints.fileUpload" :headers="uploadHeaders" :on-success="handleImgUploadSuccess" :show-file-list="false">
+            <el-button size="small" type="primary" plain class="ios-btn-secondary">上传现场图</el-button>
+            <span v-if="form.img" style="margin-left: 10px; color: #4ade80"><i class="el-icon-check"></i> 已上传</span>
           </el-upload>
         </el-form-item>
       </el-form>
       <span slot="footer" class="dialog-footer">
-        <el-button @click="dialogFormVisible = false">取 消</el-button>
-        <el-button type="primary" @click="save">立即发布</el-button>
+        <el-button class="ios-btn-secondary" @click="dialogFormVisible = false">取消</el-button>
+        <el-button class="ios-btn-primary" @click="save">立即发布</el-button>
       </span>
     </el-dialog>
 
@@ -155,13 +172,16 @@
 </template>
 
 <script>
-import apiConfig from '@/config/api.config';
+import { API_ENDPOINTS } from '@/config/api.config';
 
 export default {
   name: "Notice",
   data() {
     return {
-      apiConfig, // 引入API配置
+      apiEndpoints: API_ENDPOINTS, // 修复：正确引入 API 终点
+      uploadHeaders: {
+        token: (localStorage.getItem("user") ? JSON.parse(localStorage.getItem("user")).token : '')
+      },
       tableData: [],
       total: 0,
       pageNum: 1,
@@ -184,14 +204,30 @@ export default {
           name: this.name,
         }
       }).then(res => {
-        this.tableData = res.data.records
-        this.total = res.data.total
+        if (res && res.data) {
+          this.tableData = res.data.records || []
+          this.total = res.data.total || 0
+        } else {
+          this.tableData = []
+          this.total = 0
+        }
+      }).catch(() => {
+        this.tableData = []
+        this.total = 0
       })
+    },
+    handleSizeChange(val) {
+      this.pageSize = val;
+      this.load();
+    },
+    handleCurrentChange(val) {
+      this.pageNum = val;
+      this.load();
     },
     // 模拟 AI 润色
     mockAIPolish() {
       if (!this.form.content) return this.$message.warning("请先填写一点内容");
-      const loading = this.$loading({ text: 'DeepSeek 正在重组语言逻辑...', background: 'rgba(0,0,0,0.7)' });
+      const loading = this.$loading({ text: 'Qwen 大模型正在重组语言逻辑...', background: 'rgba(0,0,0,0.7)' });
       setTimeout(() => {
         loading.close();
         this.form.content = "【AI 优化】" + this.form.content + "。 (系统分析：该描述符合真菌感染特征，建议重点关注。)";
@@ -201,7 +237,7 @@ export default {
     // 模拟 AI 分析
     mockAnalyze() {
       this.$notify({
-        title: 'DeepSeek 分析报告',
+        title: '通义千问 分析报告',
         message: '该日志关键词提取：[病害] [湿度]。已自动关联历史相似案例 3 起。',
         type: 'success',
         duration: 4000
@@ -210,20 +246,21 @@ export default {
     save() {
       this.request.post("/notice", this.form).then(res => {
         if (res.code === '200') {
-          this.$message.success("操作成功");
+          this.$message.success(this.form.id ? "日志更新成功" : "日志发布成功");
           this.dialogFormVisible = false;
           this.load();
         } else {
-          this.$message.error("失败");
+          this.$message.error(res.msg || "保存失败");
         }
       })
     },
     handleAdd() {
-      this.dialogFormVisible = true;
+      this.form = {}; // 关键修复：需要先重置表单避免旧数据污染
       this.form = { time: new Date().toISOString().replace('T', ' ').substring(0, 19), user: this.user.username };
+      this.dialogFormVisible = true;
     },
     handleEdit(row) {
-      this.form = JSON.parse(JSON.stringify(row));
+      this.form = Object.assign({}, JSON.parse(JSON.stringify(row))); // 关键防弹：确保响应式不会丢
       this.dialogFormVisible = true;
     },
     del(id) {
@@ -287,7 +324,7 @@ export default {
 .pulse-line {
   width: 50px;
   height: 3px;
-  background: #00e676;
+  background: #38bdf8; /* 由原先的荧光绿 #00e676 改为科技蓝 */
   margin-top: 15px;
   border-radius: 2px;
   animation: pulse-width 2s infinite;
@@ -315,7 +352,7 @@ export default {
   font-family: 'Courier New', Courier, monospace;
   font-size: 28px;
   font-weight: bold;
-  color: #00e676;
+  color: #38bdf8; /* 由原先的荧光绿 #00e676 改为科技蓝 */
 }
 .tags-cloud {
   display: flex;
@@ -404,6 +441,17 @@ export default {
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
+/* 打字机渐显效果 */
+.typing-effect {
+  display: inline-block;
+  opacity: 0;
+  animation: fadeInText 1.5s ease-in-out forwards;
+}
+@keyframes fadeInText {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .item-footer {
   display: flex;
   justify-content: space-between;
@@ -415,7 +463,6 @@ export default {
 
 /* --- 4. 右侧功能区 --- */
 .ai-suggest-card {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border: none;
   color: white;
 }
@@ -433,10 +480,27 @@ export default {
   transition: all 0.3s;
 }
 .quick-action:hover {
-  background: #f0f9eb;
+  background: #f8fafc;
 }
 
 /* 间距工具类 */
 .mb-20 { margin-bottom: 20px; }
 .mt-20 { margin-top: 20px; }
+
+/* 强制重置 Manage.vue 中不合理的全局 el-card 样式污染 */
+.notice-container ::v-deep .el-card {
+  border: none !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.03) !important;
+}
+.notice-container ::v-deep .el-card__header {
+  background: transparent !important;
+  border-bottom: 1px solid #f0f0f0 !important;
+}
+.notice-container ::v-deep .el-card:hover {
+  transform: translateY(-2px) !important;
+}
+.notice-container ::v-deep .latest-card {
+  border-left: 4px solid #F56C6C !important;
+  background: #fffcfc !important;
+}
 </style>

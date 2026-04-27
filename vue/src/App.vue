@@ -37,14 +37,6 @@
               </div>
               <div class="bubble">
                 <div class="message-text">{{ msg.content }}</div>
-                <!-- 动作确认按钮 -->
-                <button 
-                  v-if="msg.isDeviceAction && msg.action" 
-                  @click="executeDeviceAction(msg.action)" 
-                  :class="getActionButtonClass(msg.action)">
-                  <i :class="getActionButtonIcon(msg.action)"></i> 
-                  {{ getActionButtonText(msg.action) }}
-                </button>
               </div>
             </div>
             
@@ -92,6 +84,7 @@ const MAIN_STAGE_ROUTES = new Set([
   '/fruit-detect',
   '/farm-map-gaode',
   '/farmmap3d',
+  '/alert-center',
   '/business-analysis'
 ]);
 const MAIN_STAGE_ACTION_TYPES = new Set([
@@ -330,15 +323,10 @@ export default {
               }, 500);
             }
             
-            // 设备控制动作需要用户确认（不可逆操作）
+            // 设备控制动作直接自动执行（删除二次确认）
             if (deviceActions.length > 0) {
               deviceActions.forEach(action => {
-                this.messages.push({
-                  role: 'ai',
-                  content: `${action.title || action.type}：${action.description || ''}`,
-                  isDeviceAction: true,
-                  action: action
-                });
+                this.executeDeviceAction(action);
               });
             }
           }
@@ -1018,4 +1006,5 @@ html, body, #app {
   40% { transform: scale(1); }
 }
 </style>
+
 

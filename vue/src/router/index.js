@@ -1,4 +1,4 @@
-import Vue from 'vue'
+﻿import Vue from 'vue'
 import VueRouter from 'vue-router'
 import store from '@/store'
 
@@ -19,11 +19,6 @@ const baseRoutes = [
     path: '/404',
     name: '404',
     component: () => import('../views/404.vue')
-  },
-  {
-    path: '/big-screen-3d',
-    name: '态势展示大屏',
-    component: () => import('../views/BigScreen.vue')
   }
 ]
 
@@ -35,8 +30,8 @@ const staticManageChildren = [
   { path: 'fruit-detect', name: '视觉巡检与异常识别', component: () => import('../views/FruitDetect.vue') },
   { path: 'farm-map-gaode', name: 'GIS 地块指挥', component: () => import('../views/FarmMapGaode.vue') },
   { path: 'farmmap3d', name: '3D 数字孪生', component: () => import('../views/FarmMap3D.vue') },
-  { path: 'business-analysis', name: '预警与研判中心', component: () => import('../views/BusinessAnalysis.vue') },
-  { path: 'bigscreen', name: '态势展示大屏', component: () => import('../views/BigScreen.vue') },
+  { path: 'alert-center', name: '预警与研判中心', component: () => import('../views/BusinessAnalysis.vue') },
+  { path: 'business-analysis', redirect: '/alert-center' },
   { path: 'dashbordnew', name: '监测分析看板', component: () => import('../views/DashbordNew.vue') },
   { path: 'statistic', name: '地块数据总览', component: () => import('../views/Statistic.vue') },
   { path: 'farmland', name: '地块资产图谱', component: () => import('../views/Farmland.vue') },
@@ -78,12 +73,18 @@ export const resetRouter = () => {
 }
 
 export const setRoutes = () => {
+  // 确保 Manage 路由始终存在
+  const manageRoute = buildManageRoute()
+
+  const currentRouteNames = router.getRoutes().map(item => item.name)
+  if (!currentRouteNames.includes('Manage')) {
+    router.addRoute(manageRoute)
+  }
+
   const storeMenus = localStorage.getItem('menus')
   if (!storeMenus) {
     return
   }
-
-  const manageRoute = buildManageRoute()
 
   let menus = []
   try {
@@ -93,17 +94,23 @@ export const setRoutes = () => {
     return
   }
 
+  // 添加动态菜单项
   const existingPaths = manageRoute.children.map(item => item.path)
   const existingNames = manageRoute.children.map(item => item.name)
 
   menus.forEach(item => {
     if (item.path) {
       const routePath = item.path.replace('/', '')
+      const pagePath = String(item.pagePath || '')
+      const isDeprecatedBigScreen = routePath === 'bigscreen' || /BigScreen/i.test(pagePath)
+      if (isDeprecatedBigScreen) {
+        return
+      }
       if (!existingPaths.includes(routePath) && !existingNames.includes(item.name)) {
         manageRoute.children.push({
           path: routePath,
           name: item.name,
-          component: () => import('../views/' + item.pagePath + '.vue')
+          component: () => import('../views/' + pagePath + '.vue')
         })
         existingPaths.push(routePath)
         existingNames.push(item.name)
@@ -114,11 +121,16 @@ export const setRoutes = () => {
           return
         }
         const routePath = subItem.path.replace('/', '')
+        const pagePath = String(subItem.pagePath || '')
+        const isDeprecatedBigScreen = routePath === 'bigscreen' || /BigScreen/i.test(pagePath)
+        if (isDeprecatedBigScreen) {
+          return
+        }
         if (!existingPaths.includes(routePath) && !existingNames.includes(subItem.name)) {
           manageRoute.children.push({
             path: routePath,
             name: subItem.name,
-            component: () => import('../views/' + subItem.pagePath + '.vue')
+            component: () => import('../views/' + pagePath + '.vue')
           })
           existingPaths.push(routePath)
           existingNames.push(subItem.name)
@@ -126,11 +138,6 @@ export const setRoutes = () => {
       })
     }
   })
-
-  const currentRouteNames = router.getRoutes().map(item => item.name)
-  if (!currentRouteNames.includes('Manage')) {
-    router.addRoute(manageRoute)
-  }
 }
 
 setRoutes()

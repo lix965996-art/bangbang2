@@ -89,7 +89,7 @@ export default {
       }
     },
     handleViewportChange() {
-      const nextIsMobile = window.innerWidth <= 768
+      const nextIsMobile = window.innerWidth <= 600
       this.isMobile = nextIsMobile
 
       if (nextIsMobile) {
@@ -347,8 +347,8 @@ export default {
   }
 }
 
-/* 移动设备 (< 768px) */
-@media screen and (max-width: 768px) {
+/* 移动设备 (< 600px) */
+@media screen and (max-width: 600px) {
   /* 侧边栏默认隐藏，点击按钮显示 */
   .green-sidebar {
     transform: translateX(-100%);

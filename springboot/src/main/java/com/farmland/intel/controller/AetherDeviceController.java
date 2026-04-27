@@ -1,5 +1,6 @@
 package com.farmland.intel.controller;
 
+import com.farmland.intel.config.interceptor.AuthAccess;
 import com.farmland.intel.common.Result;
 import com.farmland.intel.entity.SensorReading;
 import com.farmland.intel.mapper.SensorReadingMapper;
@@ -37,6 +38,23 @@ public class AetherDeviceController {
     private static boolean currentPump = false;
     private static boolean deviceOnline = true;
     
+    /**
+     * 测试OneNET连通性（免登录）
+     */
+    @GetMapping("/device/test")
+    @AuthAccess
+    public Result testOneNet() {
+        if (oneNetService == null) {
+            return Result.error("500", "OneNET服务未启用");
+        }
+        try {
+            Map<String, Object> data = oneNetService.getDeviceData();
+            return Result.success(data);
+        } catch (Exception e) {
+            return Result.error("500", "OneNET连接失败: " + e.getMessage());
+        }
+    }
+
     /**
      * 获取设备状态（优先从OneNET获取真实数据，降级到数据库或模拟数据）
      */

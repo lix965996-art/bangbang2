@@ -98,7 +98,7 @@
               <span class="metric-icon">🌡️</span>
               <div class="metric-content">
                 <span class="metric-label">温度</span>
-                <span class="metric-value">{{ field.temperature }}°C</span>
+                <span class="metric-value">{{ formatTemperature(field.temperature) }}°C</span>
                 <span class="metric-trend" :class="getTrendClass(field.tempTrend)">{{ field.tempTrend > 0 ? '↑' : field.tempTrend < 0 ? '↓' : '→' }}</span>
               </div>
             </div>
@@ -106,9 +106,9 @@
               <span class="metric-icon">💧</span>
               <div class="metric-content">
                 <span class="metric-label">土壤湿度</span>
-                <span class="metric-value">{{ field.soilhumidity }}%</span>
+                <span class="metric-value">{{ formatHumidity(field.soilhumidity) }}%</span>
                 <div class="metric-bar">
-                  <div class="bar-fill" :style="{ width: field.soilhumidity + '%' }"></div>
+                  <div class="bar-fill" :style="{ width: normalizeHumidity(field.soilhumidity) + '%' }"></div>
                 </div>
               </div>
             </div>
@@ -400,6 +400,24 @@ export default {
       if (trend > 0) return 'trend-up'
       if (trend < 0) return 'trend-down'
       return 'trend-stable'
+    },
+    
+    toFiniteNumber(value, fallback = 0) {
+      const n = Number(value)
+      return Number.isFinite(n) ? n : fallback
+    },
+    
+    formatTemperature(value) {
+      return this.toFiniteNumber(value, 0).toFixed(1)
+    },
+    
+    formatHumidity(value) {
+      return Math.round(this.toFiniteNumber(value, 0))
+    },
+    
+    normalizeHumidity(value) {
+      const humidity = this.formatHumidity(value)
+      return Math.max(0, Math.min(100, humidity))
     },
     
     getCropImage(crop) {

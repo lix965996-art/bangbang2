@@ -1,254 +1,251 @@
 <template>
-  <div class="business-page market-center-page" v-loading="salesLoading || onlineLoading">
-    <section class="market-hero">
-      <div class="market-hero__intro">
-        <span class="market-hero__eyebrow">业务协同</span>
-        <h1>产销协同中心</h1>
-        <p>
-          产销协同中心统一展示订单去向、在架状态和待转化库存，支撑销售履约、
-          联销管理与库存转化，形成完整的产销协作视图。
-        </p>
+  <div class="ios-container" v-loading="salesLoading || onlineLoading">
+    <div class="ios-header-bar">
+      <div class="header-left">
+        <div class="title-box">
+          <i class="el-icon-shopping-cart-full icon-blue"></i>
+          <h1>产销协同中心</h1>
+        </div>
+        <p class="subtitle">统一管理销售履约、联销上架与市场业绩转化</p>
       </div>
-      <div class="market-hero__metrics">
-        <article class="metric-card">
-          <span>销售总额</span>
-          <strong>{{ formatCurrency(totalSalesAmount) }}</strong>
-          <small>{{ salesList.length }} 笔订单</small>
-        </article>
-        <article class="metric-card">
-          <span>客户覆盖</span>
-          <strong>{{ buyerCount }}</strong>
-          <small>主销作物 {{ hotCropName || '待形成样本' }}</small>
-        </article>
-        <article class="metric-card">
-          <span>在架品项</span>
-          <strong>{{ onShelfCount }}</strong>
-          <small>预计货值 {{ formatCurrency(onShelfValue) }}</small>
-        </article>
-        <article class="metric-card">
-          <span>待转上架</span>
-          <strong>{{ pendingListings.length }}</strong>
-          <small>联销覆盖率 {{ listingCoverageRate }}%</small>
-        </article>
+      <div class="header-right">
+        <el-button class="ios-btn-primary" size="small" icon="el-icon-plus" @click="openSalesDialog()">录入订单</el-button>
+        <el-button class="ios-btn-secondary" size="small" icon="el-icon-position" @click="openOnlineDialog()">新建上架</el-button>
+        <el-button class="ios-btn-secondary" size="small" icon="el-icon-download" @click="exportSales">导出报表</el-button>
       </div>
-    </section>
+    </div>
 
-    <section class="market-grid">
-      <article class="market-panel market-panel--channel">
-        <div class="market-panel__header">
-          <div>
-            <h2>客户去向分布</h2>
-            <p>展示客户覆盖、订单分布和当前主要销售去向。</p>
+    <el-row :gutter="16" class="metrics-row">
+      <el-col :span="6">
+        <div class="ios-card metric-card">
+          <div class="metric-icon-box bg-blue-light">
+            <i class="el-icon-money text-blue"></i>
+          </div>
+          <div class="metric-info">
+            <div class="metric-label">累计销售总额</div>
+            <div class="metric-value"><span class="unit">¥ </span>{{ formatCurrency(totalSalesAmount).replace('¥','') }}</div>
+            <div class="metric-sub">{{ salesList.length }} 笔订单已履约</div>
           </div>
         </div>
+      </el-col>
+      <el-col :span="6">
+        <div class="ios-card metric-card">
+          <div class="metric-icon-box bg-orange-light">
+            <i class="el-icon-user text-orange"></i>
+          </div>
+          <div class="metric-info">
+            <div class="metric-label">合作客户覆盖</div>
+            <div class="metric-value">{{ buyerCount }}<span class="unit"> 家</span></div>
+            <div class="metric-sub">主销作物: {{ hotCropName || '暂无数据' }}</div>
+          </div>
+        </div>
+      </el-col>
+      <el-col :span="6">
+        <div class="ios-card metric-card">
+          <div class="metric-icon-box bg-cyan-light">
+            <i class="el-icon-sell text-cyan"></i>
+          </div>
+          <div class="metric-info">
+            <div class="metric-label">在架联销品项</div>
+            <div class="metric-value">{{ onShelfCount }}<span class="unit"> 项</span></div>
+            <div class="metric-sub">预计总货值 {{ formatCurrency(onShelfValue) }}</div>
+          </div>
+        </div>
+      </el-col>
+      <el-col :span="6">
+        <div class="ios-card metric-card">
+          <div class="metric-icon-box bg-purple-light">
+            <i class="el-icon-shopping-bag-1 text-purple"></i>
+          </div>
+          <div class="metric-info">
+            <div class="metric-label">待转上架库存</div>
+            <div class="metric-value">{{ pendingListings.length }}<span class="unit"> 批</span></div>
+            <div class="metric-sub">联销覆盖率 {{ listingCoverageRate }}%</div>
+          </div>
+        </div>
+      </el-col>
+    </el-row>
 
-        <div v-if="buyerRanking.length" class="channel-list">
-          <div v-for="item in buyerRanking" :key="item.name" class="channel-item">
-            <div class="channel-item__top">
-              <div>
-                <div class="channel-item__name">{{ item.name }}</div>
-                <div class="channel-item__meta">{{ item.count }} 笔订单</div>
+    <el-row :gutter="20" class="main-layout" type="flex">
+      
+      <el-col :span="16" class="flex-col">
+        <div class="ios-card flex-1 flex-col">
+          <div class="card-header">
+            <div class="ios-segmented-control">
+              <button 
+                :class="['segment-btn', { active: activeLedger === 'sales' }]" 
+                @click="activeLedger = 'sales'">销售订单台账</button>
+              <button 
+                :class="['segment-btn', { active: activeLedger === 'online' }]" 
+                @click="activeLedger = 'online'">联销上架管理</button>
+            </div>
+            
+            <div class="toolbar-search">
+              <el-input 
+                :placeholder="activeLedger === 'sales' ? '搜索销售作物 / 客户' : '搜索上架作物'" 
+                prefix-icon="el-icon-search" 
+                v-model="activeLedger === 'sales' ? salesKeyword : onlineKeyword"
+                @clear="activeLedger === 'sales' ? loadSales() : loadOnline()"
+                @keyup.enter.native="activeLedger === 'sales' ? loadSales() : loadOnline()"
+                class="ios-input search-input"
+                size="small"
+                clearable>
+              </el-input>
+            </div>
+          </div>
+
+          <div class="card-body table-container">
+            <el-table 
+              v-if="activeLedger === 'sales'"
+              :data="salesList" 
+              style="width: 100%" 
+              height="100%"
+              class="ios-table"
+              :header-cell-style="tableHeaderStyle">
+              <el-table-column prop="product" label="作物名称" min-width="140">
+                <template slot-scope="scope">
+                  <span class="strong-text">{{ scope.row.product }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="buyer" label="客户名称" min-width="160"></el-table-column>
+              <el-table-column prop="number" label="数量" min-width="120" align="center">
+                <template slot-scope="{ row }">
+                  <span class="num-text">{{ row.number }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="单价" min-width="120" align="right">
+                <template slot-scope="{ row }">
+                  <span class="num-text">{{ formatCurrency(row.price) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="订单总额" min-width="140" align="right">
+                <template slot-scope="{ row }">
+                  <span class="strong-text text-blue">{{ formatCurrency(getSalesTotal(row)) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="shipper" label="出货人" min-width="120" align="center"></el-table-column>
+              <el-table-column label="操作" width="140" fixed="right" align="center">
+                <template slot-scope="{ row }">
+                  <el-button type="text" class="ios-btn-link" @click="openSalesDialog(row)">编辑</el-button>
+                  <el-button type="text" class="ios-btn-link action-danger" @click="removeSales(row)">删除</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+
+            <el-table 
+              v-if="activeLedger === 'online'"
+              :data="onlineList" 
+              style="width: 100%" 
+              height="100%"
+              class="ios-table"
+              :header-cell-style="tableHeaderStyle">
+              <el-table-column prop="produce" label="上架作物" min-width="150">
+                <template slot-scope="scope">
+                  <span class="strong-text">{{ scope.row.produce }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="warehouse" label="供货仓区" min-width="140"></el-table-column>
+              <el-table-column prop="quantity" label="挂牌数量" min-width="120" align="center">
+                <template slot-scope="{ row }">
+                  <span class="num-text">{{ row.quantity }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="预计总货值" min-width="140" align="right">
+                <template slot-scope="{ row }">
+                  <span class="strong-text text-blue">{{ formatCurrency(row.totalPrice || row.price) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="状态" width="120" align="center">
+                <template slot-scope="{ row }">
+                  <span :class="['status-pill', getStatusClass(row.status)]">
+                    {{ row.status || '待处理' }}
+                  </span>
+                </template>
+              </el-table-column>
+              <el-table-column label="操作" width="200" align="center" fixed="right">
+                <template slot-scope="{ row }">
+                  <el-button type="text" class="ios-btn-link" @click="toggleStatus(row)">
+                    {{ row.status === '上架中' ? '下架' : '重新上架' }}
+                  </el-button>
+                  <el-button type="text" class="ios-btn-link" @click="openOnlineDialog(row)">编辑</el-button>
+                  <el-button type="text" class="ios-btn-link action-danger" @click="removeOnline(row)">删除</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+        </div>
+      </el-col>
+
+      <el-col :span="8" class="flex-col">
+        <div class="ios-card flex-1 flex-col" style="margin-bottom: 16px;">
+          <div class="card-header border-bottom">
+            <div class="header-title">
+              <i class="el-icon-medal" style="color: #FF9500;"></i> 优质大客户榜单
+            </div>
+          </div>
+          <div class="card-body scroll-body">
+            <div v-if="buyerRanking.length === 0" class="ios-empty-state">
+               <div class="empty-icon-circle"><i class="el-icon-user"></i></div>
+               <p>暂无客户交易数据</p>
+            </div>
+            <div v-else class="ranking-list">
+              <div class="ranking-item" v-for="(item, index) in buyerRanking" :key="item.name">
+                <div class="rank-num" :class="'rank-' + (index + 1)">{{ index + 1 }}</div>
+                <div class="rank-content">
+                  <div class="rank-name">{{ item.name }}</div>
+                  <div class="rank-meta">{{ item.count }} 笔交易完成</div>
+                </div>
+                <div class="rank-amount">{{ formatCurrency(item.total) }}</div>
               </div>
-              <strong>{{ formatCurrency(item.total) }}</strong>
-            </div>
-            <div class="channel-item__bar">
-              <div class="channel-item__fill" :style="{ width: getBuyerShare(item) + '%' }"></div>
             </div>
           </div>
         </div>
-        <div v-else class="empty-state">当前没有销售样本，暂时无法形成渠道分布。</div>
-      </article>
 
-      <article class="market-panel market-panel--listing">
-        <div class="market-panel__header">
-          <div>
-            <h2>上架状态板</h2>
-            <p>集中呈现在架、下架与售罄状态，便于跟踪联销进度。</p>
-          </div>
-        </div>
-
-        <div class="listing-columns">
-          <div v-for="column in lifecycleColumns" :key="column.key" class="listing-column">
-            <div class="listing-column__header">
-              <span>{{ column.title }}</span>
-              <strong>{{ column.items.length }}</strong>
+        <div class="ios-card flex-1 flex-col">
+          <div class="card-header border-bottom">
+            <div class="header-title">
+              <i class="el-icon-data-line" style="color: #FF2D55;"></i> 热销作物表现
             </div>
-            <div v-if="column.items.length" class="listing-column__body">
-              <div v-for="item in column.items" :key="item.id" class="listing-card">
-                <div class="listing-card__name">{{ item.produce }}</div>
-                <div class="listing-card__meta">{{ item.warehouse || '默认仓区' }} · {{ item.quantity }} 件</div>
-                <div class="listing-card__price">{{ formatCurrency(item.totalPrice || item.price) }}</div>
+          </div>
+          <div class="card-body scroll-body">
+            <div v-if="cropRanking.length === 0" class="ios-empty-state">
+               <div class="empty-icon-circle"><i class="el-icon-box"></i></div>
+               <p>暂无产品销售数据</p>
+            </div>
+            <div v-else class="ranking-list">
+              <div class="ranking-item" v-for="(item, index) in cropRanking" :key="item.name">
+                <div class="rank-content" style="margin-left: 0;">
+                  <div class="rank-name">{{ item.name }}</div>
+                  <div class="rank-meta">共计售出: <span class="num-text">{{ item.number }}</span></div>
+                </div>
+                <div class="rank-amount text-blue">{{ formatCurrency(item.total) }}</div>
               </div>
             </div>
-            <div v-else class="listing-column__empty">暂无记录</div>
           </div>
         </div>
-      </article>
-    </section>
+      </el-col>
 
-    <section class="market-grid market-grid--secondary">
-      <article class="market-panel">
-        <div class="market-panel__header">
-          <div>
-            <h2>待转上架清单</h2>
-            <p>把库存中尚未进入联销链路的作物挑出来，便于做后续展示。</p>
-          </div>
-          <span class="market-panel__pill">{{ pendingListings.length }} 项</span>
-        </div>
-
-        <div v-if="pendingListings.length" class="pending-list">
-          <div v-for="item in pendingListings" :key="item.id" class="pending-item">
-            <div>
-              <div class="pending-item__name">{{ item.produce }}</div>
-              <div class="pending-item__meta">{{ item.warehouse || '默认仓区' }} · 库存 {{ item.number || 0 }}</div>
-            </div>
-            <div class="pending-item__flag">待转上架</div>
-          </div>
-        </div>
-        <div v-else class="empty-state">当前库存已基本覆盖到联销环节。</div>
-      </article>
-
-      <article class="market-panel">
-        <div class="market-panel__header">
-          <div>
-            <h2>作物成交热度</h2>
-            <p>和客户去向分开讲，避免销售页只剩一个重复表格。</p>
-          </div>
-        </div>
-
-        <div v-if="cropRanking.length" class="crop-grid">
-          <div v-for="item in cropRanking" :key="item.name" class="crop-card">
-            <div class="crop-card__name">{{ item.name }}</div>
-            <div class="crop-card__amount">{{ formatCurrency(item.total) }}</div>
-            <div class="crop-card__meta">销量 {{ item.number }} · 订单 {{ item.count }}</div>
-          </div>
-        </div>
-        <div v-else class="empty-state">当前没有形成稳定的销售热度样本。</div>
-      </article>
-    </section>
-
-    <section class="ledger-panel">
-      <div class="ledger-panel__header">
-        <div>
-          <h2>产销台账</h2>
-          <p>统一查看销售订单与上架记录，支撑录入、维护和状态跟踪。</p>
-        </div>
-      </div>
-
-      <el-tabs v-model="activeLedger" class="market-tabs">
-        <el-tab-pane label="销售台账" name="sales">
-          <div class="ledger-toolbar">
-            <el-input
-              v-model="salesKeyword"
-              clearable
-              placeholder="搜索销售作物"
-              prefix-icon="el-icon-search"
-              @clear="loadSales"
-              @keyup.enter.native="loadSales"
-            />
-            <div class="ledger-toolbar__actions">
-              <el-button type="primary" icon="el-icon-plus" @click="openSalesDialog()">录入订单</el-button>
-              <el-button plain icon="el-icon-refresh" @click="loadSales">刷新</el-button>
-              <el-button plain icon="el-icon-download" @click="exportSales">导出</el-button>
-            </div>
-          </div>
-
-          <el-table :data="salesList" stripe>
-            <el-table-column prop="product" label="作物名称" min-width="180" />
-            <el-table-column prop="buyer" label="客户名称" min-width="160" />
-            <el-table-column prop="number" label="数量" width="90" align="center" />
-            <el-table-column label="单价" width="120" align="center">
-              <template slot-scope="{ row }">
-                {{ formatCurrency(row.price) }}
-              </template>
-            </el-table-column>
-            <el-table-column label="订单金额" width="120" align="center">
-              <template slot-scope="{ row }">
-                {{ formatCurrency(getSalesTotal(row)) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="shipper" label="出货人" width="110" align="center" />
-            <el-table-column label="操作" width="140" align="center" fixed="right">
-              <template slot-scope="{ row }">
-                <el-button type="text" @click="openSalesDialog(row)">编辑</el-button>
-                <el-button type="text" class="action-danger" @click="removeSales(row)">删除</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-tab-pane>
-
-        <el-tab-pane label="上架管理" name="online">
-          <div class="ledger-toolbar">
-            <el-input
-              v-model="onlineKeyword"
-              clearable
-              placeholder="搜索上架作物"
-              prefix-icon="el-icon-search"
-              @clear="loadOnline"
-              @keyup.enter.native="loadOnline"
-            />
-            <div class="ledger-toolbar__actions">
-              <el-button type="primary" icon="el-icon-plus" @click="openOnlineDialog()">新建上架</el-button>
-              <el-button plain icon="el-icon-refresh" @click="loadOnline">刷新</el-button>
-              <el-button plain icon="el-icon-download" @click="exportOnline">导出</el-button>
-            </div>
-          </div>
-
-          <el-table :data="onlineList" stripe>
-            <el-table-column prop="produce" label="上架作物" min-width="180" />
-            <el-table-column prop="warehouse" label="仓区" width="120" />
-            <el-table-column prop="quantity" label="数量" width="90" align="center" />
-            <el-table-column label="总价" width="120" align="center">
-              <template slot-scope="{ row }">
-                {{ formatCurrency(row.totalPrice || row.price) }}
-              </template>
-            </el-table-column>
-            <el-table-column label="状态" width="120" align="center">
-              <template slot-scope="{ row }">
-                <span :class="['table-status', getStatusClass(row.status)]">
-                  {{ row.status || '待处理' }}
-                </span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="seller" label="登记人" width="110" align="center" />
-            <el-table-column label="操作" width="200" align="center" fixed="right">
-              <template slot-scope="{ row }">
-                <el-button type="text" @click="openOnlineDialog(row)">编辑</el-button>
-                <el-button type="text" @click="toggleStatus(row)">
-                  {{ row.status === '上架中' ? '下架' : '上架' }}
-                </el-button>
-                <el-button type="text" class="action-danger" @click="removeOnline(row)">删除</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-tab-pane>
-      </el-tabs>
-    </section>
+    </el-row>
 
     <el-dialog
       :title="salesForm.id ? '编辑销售订单' : '录入销售订单'"
       :visible.sync="salesDialogVisible"
       width="540px"
       :close-on-click-modal="false"
+      custom-class="ios-dialog"
     >
-      <el-form :model="salesForm" label-width="100px" size="small">
+      <el-form :model="salesForm" label-width="100px" size="small" class="ios-form">
         <el-form-item label="作物名称">
-          <el-input v-model="salesForm.product" />
+          <el-input v-model="salesForm.product" placeholder="如：优选番茄" />
         </el-form-item>
         <el-form-item label="销售数量">
           <el-input-number v-model="salesForm.number" :min="1" style="width: 100%" />
         </el-form-item>
         <el-form-item label="销售单价">
-          <el-input-number
-            v-model="salesForm.price"
-            :min="0"
-            :precision="2"
-            :step="0.1"
-            style="width: 100%"
-          />
+          <el-input-number v-model="salesForm.price" :min="0" :precision="2" :step="0.1" style="width: 100%" />
         </el-form-item>
         <el-form-item label="客户名称">
-          <el-input v-model="salesForm.buyer" />
+          <el-input v-model="salesForm.buyer" placeholder="如：华联超市" />
         </el-form-item>
         <el-form-item label="联系电话">
           <el-input v-model="salesForm.phone" />
@@ -260,12 +257,12 @@
           <el-input v-model="salesForm.shipper" />
         </el-form-item>
         <el-form-item label="备注">
-          <el-input v-model="salesForm.remark" type="textarea" />
+          <el-input v-model="salesForm.remark" type="textarea" :rows="2" />
         </el-form-item>
       </el-form>
-      <div slot="footer">
-        <el-button @click="salesDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="saveSales">保存</el-button>
+      <div slot="footer" class="dialog-footer">
+        <el-button class="ios-btn-secondary" @click="salesDialogVisible = false">取消</el-button>
+        <el-button class="ios-btn-primary" @click="saveSales">确定保存</el-button>
       </div>
     </el-dialog>
 
@@ -274,12 +271,13 @@
       :visible.sync="onlineDialogVisible"
       width="560px"
       :close-on-click-modal="false"
+      custom-class="ios-dialog"
     >
-      <el-form ref="onlineFormRef" :model="onlineForm" label-width="100px" size="small">
+      <el-form ref="onlineFormRef" :model="onlineForm" label-width="100px" size="small" class="ios-form">
         <el-form-item label="库存物资">
           <el-select
             v-model="onlineForm.inventoryId"
-            placeholder="请选择库存物资"
+            placeholder="请选择仓库中已有的待售作物"
             style="width: 100%"
             :disabled="!!onlineForm.id"
             @change="onInventoryChange"
@@ -287,7 +285,7 @@
             <el-option
               v-for="item in inventoryList"
               :key="item.id"
-              :label="item.produce + '（库存：' + (item.number || 0) + '）'"
+              :label="item.produce + '（当前库存：' + (item.number || item.stock || 0) + '）'"
               :value="item.id"
             />
           </el-select>
@@ -299,65 +297,35 @@
           <el-input v-model="onlineForm.warehouse" disabled />
         </el-form-item>
         <el-form-item label="上架数量">
-          <el-input-number
-            v-model="onlineForm.quantity"
-            :min="1"
-            :max="maxOnlineQuantity || 9999"
-            style="width: 100%"
-          />
-          <div v-if="maxOnlineQuantity" class="field-tip">当前最多可上架 {{ maxOnlineQuantity }} 件</div>
+          <el-input-number v-model="onlineForm.quantity" :min="1" :max="maxOnlineQuantity || 99999" style="width: 100%" />
+          <div v-if="maxOnlineQuantity" style="font-size: 12px; color: #8E8E93; margin-top: 4px;">该批次最多可上架 {{ maxOnlineQuantity }} 件</div>
         </el-form-item>
-        <el-form-item label="单价">
-          <el-input-number
-            v-model="onlineForm.price"
-            :min="0.01"
-            :precision="2"
-            style="width: 100%"
-          />
+        <el-form-item label="上架单价">
+          <el-input-number v-model="onlineForm.price" :min="0.01" :precision="2" style="width: 100%" />
         </el-form-item>
         <el-form-item label="登记人">
           <el-input v-model="onlineForm.seller" />
         </el-form-item>
         <el-form-item label="备注">
-          <el-input v-model="onlineForm.remark" type="textarea" />
+          <el-input v-model="onlineForm.remark" type="textarea" :rows="2" />
         </el-form-item>
       </el-form>
-      <div slot="footer">
-        <el-button @click="onlineDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="saveOnline">保存</el-button>
+      <div slot="footer" class="dialog-footer">
+        <el-button class="ios-btn-secondary" @click="onlineDialogVisible = false">取消</el-button>
+        <el-button class="ios-btn-primary" @click="saveOnline">发布上架</el-button>
       </div>
     </el-dialog>
   </div>
 </template>
 
 <script>
-import apiConfig from '@/config/api.config'
-
+// 初始化表单工厂函数
 function createSalesForm(user) {
-  return {
-    product: '',
-    price: 0,
-    number: 1,
-    buyer: '',
-    address: '',
-    phone: '',
-    shipper: user.nickname || user.username || '',
-    remark: ''
-  }
+  return { product: '', price: 0, number: 1, buyer: '', address: '', phone: '', shipper: user.nickname || user.username || '', remark: '' }
 }
 
 function createOnlineForm(user) {
-  return {
-    inventoryId: '',
-    produce: '',
-    warehouse: '',
-    quantity: 1,
-    price: 0,
-    totalPrice: 0,
-    status: '上架中',
-    seller: user.nickname || user.username || '',
-    remark: ''
-  }
+  return { inventoryId: '', produce: '', warehouse: '', quantity: 1, price: 0, totalPrice: 0, status: '上架中', seller: user.nickname || user.username || '', remark: '' }
 }
 
 export default {
@@ -365,185 +333,101 @@ export default {
   data() {
     const user = localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')) : {}
     return {
-      apiConfig,
-      user,
-      activeLedger: 'sales',
-      salesKeyword: '',
-      onlineKeyword: '',
-      salesList: [],
-      onlineList: [],
-      inventoryList: [],
-      salesLoading: false,
-      onlineLoading: false,
-      salesDialogVisible: false,
-      onlineDialogVisible: false,
-      salesForm: createSalesForm(user),
-      onlineForm: createOnlineForm(user),
+      user, activeLedger: 'sales', salesKeyword: '', onlineKeyword: '',
+      salesList: [], onlineList: [], inventoryList: [],
+      salesLoading: false, onlineLoading: false,
+      salesDialogVisible: false, onlineDialogVisible: false,
+      salesForm: createSalesForm(user), onlineForm: createOnlineForm(user),
       maxOnlineQuantity: 0
     }
   },
   computed: {
-    totalSalesAmount() {
-      return this.salesList.reduce((sum, item) => sum + this.getSalesTotal(item), 0)
-    },
-    buyerCount() {
-      return new Set(
-        this.salesList
-          .map(item => (item.buyer || '').trim())
-          .filter(Boolean)
-      ).size
-    },
+    // ===== 动态计算核心商业指标 =====
+    totalSalesAmount() { return this.salesList.reduce((sum, item) => sum + this.getSalesTotal(item), 0) },
+    buyerCount() { return new Set(this.salesList.map(item => (item.buyer || '').trim()).filter(Boolean)).size },
+    
+    // 优质客户排行榜
     buyerRanking() {
       const bucket = {}
       this.salesList.forEach(item => {
-        const name = item.buyer && item.buyer.trim() ? item.buyer.trim() : '待补充客户'
-        if (!bucket[name]) {
-          bucket[name] = { name, count: 0, total: 0 }
-        }
+        const name = item.buyer && item.buyer.trim() ? item.buyer.trim() : '零散客户'
+        if (!bucket[name]) bucket[name] = { name, count: 0, total: 0 }
         bucket[name].count += 1
         bucket[name].total += this.getSalesTotal(item)
       })
-      return Object.values(bucket)
-        .sort((a, b) => b.total - a.total)
-        .slice(0, 5)
+      return Object.values(bucket).sort((a, b) => b.total - a.total).slice(0, 5) // 取前5名
     },
+    
+    // 热销作物排行榜
     cropRanking() {
       const bucket = {}
       this.salesList.forEach(item => {
-        const name = item.product && item.product.trim() ? item.product.trim() : '未命名作物'
-        if (!bucket[name]) {
-          bucket[name] = { name, count: 0, number: 0, total: 0 }
-        }
+        const name = item.product && item.product.trim() ? item.product.trim() : '未分类作物'
+        if (!bucket[name]) bucket[name] = { name, count: 0, number: 0, total: 0 }
         bucket[name].count += 1
         bucket[name].number += Number(item.number) || 0
         bucket[name].total += this.getSalesTotal(item)
       })
-      return Object.values(bucket)
-        .sort((a, b) => b.total - a.total)
-        .slice(0, 6)
+      return Object.values(bucket).sort((a, b) => b.total - a.total).slice(0, 4) // 取前4名
     },
-    hotCropName() {
-      return this.cropRanking.length ? this.cropRanking[0].name : ''
-    },
-    onShelfCount() {
-      return this.onlineList.filter(item => item.status === '上架中').length
-    },
-    offShelfCount() {
-      return this.onlineList.filter(item => item.status === '已下架').length
-    },
-    soldOutCount() {
-      return this.onlineList.filter(item => item.status === '已售罄').length
-    },
-    onShelfValue() {
-      return this.onlineList
-        .filter(item => item.status === '上架中')
-        .reduce((sum, item) => sum + (Number(item.totalPrice) || this.getOnlineTotal(item)), 0)
-    },
+    hotCropName() { return this.cropRanking.length ? this.cropRanking[0].name : '' },
+    
+    onShelfCount() { return this.onlineList.filter(item => item.status === '上架中').length },
+    onShelfValue() { return this.onlineList.filter(item => item.status === '上架中').reduce((sum, item) => sum + (Number(item.totalPrice) || this.getOnlineTotal(item)), 0) },
     listingCoverageRate() {
-      if (!this.inventoryList.length) {
-        return 0
-      }
+      if (!this.inventoryList.length) return 0;
       return Math.round((this.onShelfCount / this.inventoryList.length) * 100)
     },
     pendingListings() {
-      const activeIds = new Set(
-        this.onlineList
-          .filter(item => item.status === '上架中')
-          .map(item => item.inventoryId)
-      )
-      return this.inventoryList
-        .filter(item => !activeIds.has(item.id))
-        .sort((a, b) => (Number(b.number) || 0) - (Number(a.number) || 0))
-        .slice(0, 6)
-    },
-    lifecycleColumns() {
-      return [
-        { key: '上架中', title: '在架', items: this.onlineList.filter(item => item.status === '上架中') },
-        { key: '已下架', title: '已下架', items: this.onlineList.filter(item => item.status === '已下架') },
-        { key: '已售罄', title: '已售罄', items: this.onlineList.filter(item => item.status === '已售罄') }
-      ]
+      const activeIds = new Set(this.onlineList.filter(item => item.status === '上架中').map(item => item.inventoryId))
+      return this.inventoryList.filter(item => !activeIds.has(item.id)).sort((a, b) => (Number(b.number) || 0) - (Number(a.number) || 0)).slice(0, 6)
     }
   },
   created() {
     this.refreshAll()
   },
   methods: {
+    // ================= 接口请求与数据拉取 =================
     refreshAll() {
       this.loadSales()
       this.loadOnline()
       this.loadInventory()
     },
-    loadSales() {
+    async loadSales() {
       this.salesLoading = true
-      this.request.get('/sales/page', {
-        params: {
-          pageNum: 1,
-          pageSize: 200,
-          product: this.salesKeyword
-        }
-      }).then(res => {
-        this.salesList = res.code === '200' ? (res.data.records || []) : []
-      }).finally(() => {
-        this.salesLoading = false
-      })
+      try {
+        const res = await this.request.get('/sales/page', { params: { pageNum: 1, pageSize: 500, product: this.salesKeyword } })
+        this.salesList = res.code === '200' ? (res.data.records || res.data || []) : []
+      } catch (e) {
+        console.error(e)
+      } finally { this.salesLoading = false }
     },
-    loadOnline() {
+    async loadOnline() {
       this.onlineLoading = true
-      this.request.get('/onlineSale/page', {
-        params: {
-          pageNum: 1,
-          pageSize: 200,
-          produce: this.onlineKeyword
-        }
-      }).then(res => {
-        this.onlineList = res.code === '200' ? (res.data.records || []) : []
-      }).finally(() => {
-        this.onlineLoading = false
-      })
+      try {
+        const res = await this.request.get('/onlineSale/page', { params: { pageNum: 1, pageSize: 500, produce: this.onlineKeyword } })
+        this.onlineList = res.code === '200' ? (res.data.records || res.data || []) : []
+      } catch (e) {
+        console.error(e)
+      } finally { this.onlineLoading = false }
     },
-    loadInventory() {
-      this.request.get('/inventory/page', {
-        params: {
-          pageNum: 1,
-          pageSize: 1000,
-          produce: ''
-        }
-      }).then(res => {
-        this.inventoryList = res.code === '200' ? (res.data.records || []) : []
-      })
+    async loadInventory() {
+      try {
+        const res = await this.request.get('/inventory/page', { params: { pageNum: 1, pageSize: 1000, produce: '' } })
+        this.inventoryList = res.code === '200' ? (res.data.records || res.data || []) : []
+      } catch (e) {}
     },
+
+    // ================= 弹窗交互控制 =================
     openSalesDialog(row) {
-      this.salesForm = row ? JSON.parse(JSON.stringify(row)) : createSalesForm(this.user)
+      this.salesForm = row ? Object.assign(createSalesForm(this.user), JSON.parse(JSON.stringify(row))) : createSalesForm(this.user)
+      if (row && !this.salesForm.product) this.salesForm.product = row.itemName || row.name || '';
+      if (row && !this.salesForm.buyer) this.salesForm.buyer = row.customer || '';
       this.salesDialogVisible = true
-    },
-    saveSales() {
-      this.request.post('/sales', this.salesForm).then(res => {
-        if (res.code === '200') {
-          this.$message.success('销售订单已更新')
-          this.salesDialogVisible = false
-          this.loadSales()
-        } else {
-          this.$message.error(res.msg || '保存失败')
-        }
-      })
-    },
-    removeSales(row) {
-      this.$confirm(`确定删除订单“${row.product}”吗？`, '删除确认', {
-        type: 'warning'
-      }).then(() => {
-        this.request.delete('/sales/' + row.id).then(res => {
-          if (res.code === '200') {
-            this.$message.success('删除成功')
-            this.loadSales()
-          } else {
-            this.$message.error(res.msg || '删除失败')
-          }
-        })
-      }).catch(() => {})
     },
     openOnlineDialog(row) {
       if (row) {
-        this.onlineForm = JSON.parse(JSON.stringify(row))
+        this.onlineForm = Object.assign(createOnlineForm(this.user), JSON.parse(JSON.stringify(row)))
         this.maxOnlineQuantity = 0
       } else {
         this.onlineForm = createOnlineForm(this.user)
@@ -553,454 +437,319 @@ export default {
     },
     onInventoryChange(inventoryId) {
       const current = this.inventoryList.find(item => item.id === inventoryId)
-      if (!current) {
-        return
-      }
-      this.onlineForm.produce = current.produce
+      if (!current) return
+      this.onlineForm.produce = current.produce || current.name
       this.onlineForm.warehouse = current.warehouse
       this.onlineForm.quantity = 1
-      this.maxOnlineQuantity = Number(current.number) || 0
+      this.maxOnlineQuantity = Number(current.number || current.stock || current.quantity) || 0
     },
-    saveOnline() {
-      const payload = Object.assign({}, this.onlineForm)
-      if (!payload.inventoryId) {
-        this.$message.warning('请先选择库存物资')
-        return
-      }
-      payload.totalPrice = this.getOnlineTotal(payload)
-      if (!payload.status) {
-        payload.status = '上架中'
-      }
-      this.request.post('/onlineSale', payload).then(res => {
+
+    // ================= 🔥 防弹级：严格区分 POST 与 PUT =================
+    saveSales() {
+      const isEdit = !!this.salesForm.id;
+      
+      this.request.post('/sales', this.salesForm).then(res => {
         if (res.code === '200') {
-          this.$message.success('上架档案已更新')
-          this.onlineDialogVisible = false
-          this.loadOnline()
-          this.loadInventory()
+          this.$message.success(isEdit ? '销售订单已更新' : '销售订单已成功录入')
+          this.salesDialogVisible = false
+          this.loadSales()
         } else {
           this.$message.error(res.msg || '保存失败')
         }
       })
     },
+
+    saveOnline() {
+      const payload = Object.assign({}, this.onlineForm)
+      if (!payload.inventoryId && !payload.id) { this.$message.warning('请先选择需要上架的库存物资'); return }
+      payload.totalPrice = this.getOnlineTotal(payload)
+      if (!payload.status) payload.status = '上架中'
+      
+      const isEdit = !!payload.id;
+
+      this.request.post('/onlineSale', payload).then(res => {
+        if (res.code === '200') {
+          this.$message.success(isEdit ? '上架档案已更新' : '已成功发布上架')
+          this.onlineDialogVisible = false
+          this.loadOnline()
+        } else {
+          this.$message.error(res.msg || '保存失败')
+        }
+      })
+    },
+
+    // ================= 状态与删除 =================
     toggleStatus(row) {
       const newStatus = row.status === '上架中' ? '已下架' : '上架中'
       this.request.put('/onlineSale/status/' + row.id + '?status=' + newStatus).then(res => {
         if (res.code === '200') {
-          this.$message.success(newStatus === '上架中' ? '已上架' : '已下架')
+          this.$message.success(newStatus === '上架中' ? '已重新上架' : '已强制下架')
           this.loadOnline()
         } else {
           this.$message.error(res.msg || '状态更新失败')
         }
       })
     },
-    removeOnline(row) {
-      this.$confirm(`确定删除上架档案“${row.produce}”吗？`, '删除确认', {
-        type: 'warning'
-      }).then(() => {
-        this.request.delete('/onlineSale/' + row.id).then(res => {
-          if (res.code === '200') {
-            this.$message.success('删除成功')
-            this.loadOnline()
-            this.loadInventory()
-          } else {
-            this.$message.error(res.msg || '删除失败')
-          }
+    removeSales(row) {
+      this.$confirm(`确定删除该笔销售订单吗？`, '删除确认', { type: 'warning' }).then(() => {
+        this.request.delete('/sales/' + row.id).then(res => {
+          if (res.code === '200') { this.$message.success('删除成功'); this.loadSales() } 
+          else { this.$message.error(res.msg || '删除失败') }
         })
       }).catch(() => {})
     },
-    exportSales() {
-      window.open(this.apiConfig.salesExport)
+    removeOnline(row) {
+      this.$confirm(`确定删除上架档案吗？`, '删除确认', { type: 'warning' }).then(() => {
+        this.request.delete('/onlineSale/' + row.id).then(res => {
+          if (res.code === '200') { this.$message.success('删除成功'); this.loadOnline() } 
+          else { this.$message.error(res.msg || '删除失败') }
+        })
+      }).catch(() => {})
     },
-    exportOnline() {
-      window.open(this.apiConfig.onlineSaleExport)
-    },
-    getSalesTotal(row) {
-      return (Number(row.price) || 0) * (Number(row.number) || 0)
-    },
-    getOnlineTotal(row) {
-      return (Number(row.price) || 0) * (Number(row.quantity) || 0)
-    },
-    getBuyerShare(item) {
-      if (!this.totalSalesAmount) {
-        return 0
-      }
-      return Math.min(100, Math.round((item.total / this.totalSalesAmount) * 100))
-    },
+
+    // ================= 辅助工具方法 =================
+    exportSales() { window.open(this.apiConfig ? this.apiConfig.salesExport : '') },
+    getSalesTotal(row) { return (Number(row.price) || 0) * (Number(row.number) || 0) },
+    getOnlineTotal(row) { return (Number(row.price) || 0) * (Number(row.quantity) || 0) },
     getStatusClass(status) {
-      if (status === '上架中') {
-        return 'table-status--safe'
-      }
-      if (status === '已售罄') {
-        return 'table-status--risk'
-      }
-      return 'table-status--neutral'
+      if (status === '上架中') return 'pill-blue'
+      if (status === '已售罄' || status === '已下架') return 'pill-red'
+      return 'pill-neutral'
     },
-    formatCurrency(value) {
-      return '¥' + (Number(value) || 0).toFixed(2)
+    formatCurrency(value) { return '¥' + (Number(value) || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) },
+    tableHeaderStyle() {
+      return { backgroundColor: '#F8F9FA', color: '#64748B', fontWeight: '600', fontSize: '13px', borderBottom: '1px solid #E5E5EA' };
     }
   }
 }
 </script>
 
 <style scoped>
-.business-page {
-  min-height: 100%;
+/* ========================================================== */
+/* B2B 经典企业级后台风格 - 产销协同中心 (Market Center) */
+/* ========================================================== */
+.ios-container {
   padding: 24px;
-  background:
-    radial-gradient(circle at top left, rgba(59, 130, 246, 0.12), transparent 28%),
-    linear-gradient(180deg, #f8fbff 0%, #eef4fb 100%);
+  background-color: #f4f7fb;
+  min-height: calc(100vh - 60px);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: #303133;
 }
 
-.market-hero,
-.market-grid,
-.ledger-panel {
-  max-width: 1480px;
-  margin: 0 auto 22px;
-}
-
-.market-hero {
-  display: grid;
-  grid-template-columns: 1.2fr 1fr;
-  gap: 18px;
-  padding: 28px;
-  border-radius: 28px;
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(59, 130, 246, 0.1);
-  box-shadow: 0 20px 45px rgba(148, 163, 184, 0.12);
-}
-
-.market-hero__eyebrow {
-  display: inline-flex;
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: rgba(59, 130, 246, 0.12);
-  color: #2563eb;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-}
-
-.market-hero h1 {
-  margin: 16px 0 12px;
-  font-size: 34px;
-  color: #0f172a;
-}
-
-.market-hero p {
-  margin: 0;
-  line-height: 1.8;
-  color: #475569;
-}
-
-.market-hero__metrics {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.metric-card {
-  padding: 18px;
-  border-radius: 22px;
-  background: linear-gradient(180deg, #fff 0%, #f7faff 100%);
-  border: 1px solid rgba(148, 163, 184, 0.16);
-}
-
-.metric-card span,
-.metric-card small {
-  display: block;
-}
-
-.metric-card span {
-  color: #64748b;
-  font-size: 13px;
-}
-
-.metric-card strong {
-  display: block;
-  margin: 10px 0 6px;
-  font-size: 28px;
-  color: #0f172a;
-}
-
-.metric-card small {
-  color: #2563eb;
-}
-
-.market-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
-}
-
-.market-grid--secondary {
-  grid-template-columns: 0.95fr 1.05fr;
-}
-
-.market-panel,
-.ledger-panel {
-  padding: 24px;
-  border-radius: 28px;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  box-shadow: 0 18px 42px rgba(148, 163, 184, 0.1);
-}
-
-.market-panel__header,
-.ledger-panel__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 18px;
-}
-
-.market-panel__header h2,
-.ledger-panel__header h2 {
-  margin: 0 0 6px;
-  font-size: 22px;
-  color: #0f172a;
-}
-
-.market-panel__header p,
-.ledger-panel__header p {
-  margin: 0;
-  color: #64748b;
-  line-height: 1.7;
-}
-
-.market-panel__pill {
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: rgba(59, 130, 246, 0.1);
-  color: #2563eb;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.channel-list,
-.pending-list,
-.crop-grid {
-  display: grid;
-  gap: 12px;
-}
-
-.channel-item,
-.pending-item,
-.crop-card,
-.listing-card {
-  padding: 16px 18px;
-  border-radius: 20px;
-  background: #f8fafc;
-  border: 1px solid rgba(148, 163, 184, 0.12);
-}
-
-.channel-item__top {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 10px;
-}
-
-.channel-item__name,
-.pending-item__name,
-.crop-card__name,
-.listing-card__name {
-  font-size: 16px;
-  font-weight: 700;
-  color: #0f172a;
-}
-
-.channel-item__meta,
-.pending-item__meta,
-.crop-card__meta,
-.listing-card__meta {
-  margin-top: 6px;
-  color: #64748b;
-  font-size: 13px;
-}
-
-.channel-item__bar {
-  height: 8px;
-  border-radius: 999px;
-  background: #e2e8f0;
+/* --- 公共工具类 --- */
+.flex-col { display: flex; flex-direction: column; }
+.flex-1 { flex: 1; min-height: 0; }
+.ios-card {
+  background: #ffffff; 
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+  border: 1px solid #ebeef5;
+  margin-bottom: 24px;
   overflow: hidden;
 }
 
-.channel-item__fill {
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #2563eb, #38bdf8);
-}
-
-.listing-columns {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.listing-column {
-  padding: 16px;
-  border-radius: 22px;
-  background: linear-gradient(180deg, #f8fbff 0%, #f1f5f9 100%);
-  border: 1px solid rgba(148, 163, 184, 0.14);
-}
-
-.listing-column__header {
+.card-header {
+  padding: 0 24px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
-  font-weight: 700;
-  color: #0f172a;
+  border-bottom: 1px solid #ebeef5;
+  height: 56px;
 }
-
-.listing-column__body {
-  display: grid;
-  gap: 10px;
+.card-header.border-bottom {
+  border-bottom: 1px solid #ebeef5;
 }
-
-.listing-card__price,
-.crop-card__amount {
-  margin-top: 10px;
-  font-weight: 700;
-  color: #2563eb;
-}
-
-.listing-column__empty,
-.empty-state {
-  padding: 32px 16px;
-  text-align: center;
-  color: #94a3b8;
-  border-radius: 18px;
-  background: #f8fafc;
-}
-
-.pending-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.pending-item__flag {
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: rgba(245, 158, 11, 0.12);
-  color: #b45309;
-  font-size: 12px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.crop-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.ledger-toolbar {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.ledger-toolbar .el-input {
-  max-width: 320px;
-}
-
-.ledger-toolbar__actions {
-  display: flex;
-  gap: 10px;
-}
-
-.table-status {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 78px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.table-status--safe {
-  color: #047857;
-  background: rgba(16, 185, 129, 0.12);
-}
-
-.table-status--risk {
-  color: #dc2626;
-  background: rgba(248, 113, 113, 0.14);
-}
-
-.table-status--neutral {
-  color: #334155;
-  background: rgba(148, 163, 184, 0.14);
-}
-
-.action-danger {
-  color: #dc2626;
-}
-
-.field-tip {
-  margin-top: 6px;
-  color: #64748b;
-  font-size: 12px;
-}
-
-::v-deep .market-tabs .el-tabs__header {
-  margin-bottom: 20px;
-}
-
-::v-deep .market-tabs .el-tabs__nav-wrap::after {
-  background-color: #e2e8f0;
-}
-
-::v-deep .market-tabs .el-tabs__item {
-  height: 42px;
-  line-height: 42px;
+.header-title {
+  font-size: 16px;
   font-weight: 600;
+  color: #303133;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+}
+.header-title i { font-size: 18px; }
+
+/* 1. 顶部操作栏 */
+.ios-header-bar {
+  display: flex; justify-content: space-between; align-items: center; 
+  background: #ffffff; padding: 24px 32px; margin-bottom: 24px;
+  border-radius: 8px; box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05); border: 1px solid #ebeef5;
+}
+.header-left { display: flex; align-items: center; gap: 16px; }
+.title-box { display: flex; align-items: center; gap: 10px; }
+.title-box h1 { font-size: 20px; font-weight: 600; color: #303133; margin: 0; }
+.icon-blue { font-size: 24px; color: #409eff; }
+.subtitle { display: none; } /* 顶栏化简 */
+
+.header-right { display: flex; align-items: center; gap: 12px; }
+.ios-btn-primary {
+  background: #409eff !important; border: transparent !important; color: white !important;
+  border-radius: 4px !important; font-weight: 500 !important; padding: 10px 20px !important;
+  transition: opacity 0.2s;
+}
+.ios-btn-primary:active, .ios-btn-primary:hover { opacity: 0.85; transform: none; }
+.ios-btn-secondary {
+  background: #ffffff !important; border: 1px solid #dcdfe6 !important; color: #606266 !important;
+  border-radius: 4px !important; font-weight: 500 !important; padding: 10px 20px !important;
+  transition: background 0.2s;
+}
+.ios-btn-secondary:hover { background: #f5f7fa !important; color: #409eff !important; border-color: #c6e2ff !important; }
+
+/* 2. KPI 卡片 */
+.metrics-row { margin-bottom: 0px; }
+.metric-card { padding: 20px 24px; display: flex; align-items: center; gap: 16px; border: 1px solid #ebeef5; border-radius: 8px; transition: none; cursor: default;}
+.metric-card:hover { transform: none; box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05); border-color: #c6e2ff; }
+.metric-icon-box {
+  width: 48px; height: 48px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0;
+}
+.bg-blue-light { background: #ecf5ff; } .text-blue { color: #409eff; }
+.bg-cyan-light { background: #e0f7fa; } .text-cyan { color: #00bcd4; }
+.bg-orange-light { background: #fdf6ec; } .text-orange { color: #e6a23c; }
+.bg-purple-light { background: #f4f4f5; } .text-purple { color: #909399; }
+
+.metric-info { display: flex; flex-direction: column; overflow: hidden; justify-content: center; }
+.metric-label { font-size: 14px; color: #909399; margin-bottom: 8px;}
+.metric-value { font-size: 28px; font-weight: 600; color: #303133; line-height: 1; margin-bottom: 4px; white-space: nowrap;}
+.unit { font-size: 14px; font-weight: normal; color: #909399; margin: 0 2px;}
+.metric-sub { font-size: 13px; color: #c0c4cc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 4px; }
+
+/* 3. 主体布局 */
+.main-layout { height: calc(100vh - 270px); min-height: 550px; }
+.card-body { flex: 1; min-height: 0; overflow: hidden;}
+.scroll-body { overflow-y: auto; padding: 16px;}
+
+/* 分段控制器 (经典后台标签页风格) */
+.ios-segmented-control {
+  display: flex; height: 100%;
+}
+.segment-btn {
+  padding: 0 8px; margin-right: 32px; border: none; background: transparent; 
+  font-size: 15px; font-weight: 500; color: #606266; cursor: pointer; transition: all 0.2s ease;
+  display: flex; align-items: center; height: 100%; border-bottom: 2px solid transparent;
+  position: relative; top: 1px;
+}
+.segment-btn:last-child { margin-right: 0; }
+.segment-btn:hover { color: #409eff; }
+.segment-btn.active {
+  color: #409eff; font-weight: 600; border-bottom: 2px solid #409eff;
 }
 
-@media (max-width: 1280px) {
-  .market-hero,
-  .market-grid,
-  .market-grid--secondary {
-    grid-template-columns: 1fr;
-  }
+/* 搜索框 */
+.toolbar-search { width: 260px; }
+::v-deep .search-input .el-input__inner {
+  border: 1px solid #dcdfe6; border-radius: 4px; height: 32px; line-height: 32px; font-size: 13px; background: #fff; transition: none;
+}
+::v-deep .search-input .el-input__inner:focus { border-color: #409eff; box-shadow: none; }
 
-  .listing-columns {
-    grid-template-columns: 1fr;
-  }
+/* 表格样式重写（强力去绿覆盖 global.css） */
+.table-container { padding: 0; }
+::v-deep .ios-table.el-table {
+  background: #ffffff !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  border: none !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+::v-deep .ios-table .el-table__body-wrapper::-webkit-scrollbar {
+  width: 6px; height: 6px;
+}
+::v-deep .ios-table .el-table__body-wrapper::-webkit-scrollbar-thumb {
+  background: #cbd5e1 !important; border-radius: 3px;
+}
+::v-deep .ios-table .el-table__body-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8 !important;
 }
 
-@media (max-width: 768px) {
-  .business-page {
-    padding: 16px;
-  }
+::v-deep .ios-table th.el-table__cell {
+  background: #f8f9fa !important;
+  color: #606266 !important;
+  font-weight: 600 !important;
+  border-bottom: 1px solid #ebeef5 !important;
+  padding: 12px 16px !important;
+}
+::v-deep .ios-table td.el-table__cell {
+  padding: 12px 16px !important;
+  border-bottom: 1px solid #ebeef5 !important;
+  background: #ffffff !important;
+}
+::v-deep .ios-table tbody tr:hover > td {
+  background-color: #f5f7fa !important;
+}
+::v-deep .ios-table--striped .el-table__body tr.el-table__row--striped td {
+  background: #fafafa !important;
+}
+::v-deep .ios-table::before, ::v-deep .ios-table::after { display: none !important; }
+.strong-text { font-weight: 500; color: #303133; }
+.num-text { font-family: monospace; color: #606266; font-size: 14px;}
+.ios-btn-link { color: #409eff; font-weight: 500; padding: 0 8px; }
+.action-danger { color: #f56c6c !important; }
 
-  .market-hero,
-  .market-panel,
-  .ledger-panel {
-    padding: 18px;
-    border-radius: 22px;
-  }
+/* 状态标签 */
+.status-pill {
+  display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; border: 1px solid transparent;
+}
+.pill-blue { background: #ecf5ff; color: #409eff; border-color: #d9ecff; }
+.pill-red { background: #fef0f0; color: #f56c6c; border-color: #fde2e2; }
+.pill-neutral { background: #f4f4f5; color: #909399; border-color: #e9e9eb; }
 
-  .market-hero__metrics,
-  .crop-grid {
-    grid-template-columns: 1fr;
-  }
+/* --- 商业排行榜单 --- */
+.ranking-list { display: flex; flex-direction: column; gap: 12px; }
+.ranking-item {
+  display: flex; align-items: center; padding: 12px 16px; background: #ffffff;
+  border: 1px solid #ebeef5; border-radius: 4px;
+}
+.ranking-item:hover { background: #f5f7fa; }
 
-  .ledger-toolbar {
-    flex-direction: column;
-  }
+.rank-num {
+  width: 28px; height: 28px; border-radius: 4px; background: #f4f4f5; color: #909399;
+  display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 14px; margin-right: 14px; flex-shrink: 0;
+}
+/* 前三名专属样式 */
+.rank-1 { background: #fdf6ec; color: #e6a23c; }
+.rank-2 { background: #f4f4f5; color: #909399; }
+.rank-3 { background: #ecf5ff; color: #409eff; }
 
-  .ledger-toolbar .el-input {
-    max-width: none;
-  }
+.rank-content { flex: 1; min-width: 0; }
+.rank-name { font-size: 14px; font-weight: 500; color: #303133; margin-bottom: 4px; }
+.rank-meta { font-size: 13px; color: #909399; }
 
-  .ledger-toolbar__actions {
-    flex-wrap: wrap;
-  }
+.rank-amount { font-size: 14px; font-weight: 600; color: #303133; font-family: monospace; flex-shrink: 0; text-align: right;}
+.text-blue { color: #409eff !important; }
+
+/* 空状态 */
+.ios-empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #909399; font-size: 14px; margin-top: 40px;}
+.empty-icon-circle { width: 60px; height: 60px; border-radius: 50%; background: #f4f4f5; display: flex; align-items: center; justify-content: center; font-size: 28px; margin-bottom: 12px; color: #c0c4cc;}
+
+/* ================= 弹窗表单精修 (强力驱逐全局绿) ================= */
+::v-deep .ios-dialog { 
+  border-radius: 8px !important; overflow: hidden !important; 
+  border: none !important; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1) !important;
+}
+::v-deep .ios-dialog .el-dialog__header { 
+  background: #ffffff !important; padding: 20px 24px !important; border-bottom: 1px solid #ebeef5 !important; 
+}
+::v-deep .ios-dialog .el-dialog__title { 
+  font-weight: 600 !important; font-size: 16px !important; color: #303133 !important; 
+}
+::v-deep .ios-dialog .el-dialog__body { padding: 24px !important; }
+::v-deep .ios-dialog .el-dialog__footer { 
+  padding: 16px 24px !important; border-top: 1px solid #ebeef5 !important; background: #ffffff !important; 
+}
+
+::v-deep .ios-form .el-form-item__label { font-weight: 500 !important; color: #606266 !important; }
+::v-deep .ios-form .el-input__inner,
+::v-deep .ios-form .el-textarea__inner {
+  border-radius: 4px !important; border: 1px solid #dcdfe6 !important; transition: none !important;
+  box-shadow: none !important;
+}
+::v-deep .ios-form .el-input__inner:focus,
+::v-deep .ios-form .el-textarea__inner:focus { 
+  border-color: #409eff !important; box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.1) !important; 
+}
+::v-deep .ios-form .el-input-number__increase,
+::v-deep .ios-form .el-input-number__decrease { 
+  background: #f5f7fa !important; border-color: #dcdfe6 !important; 
 }
 </style>

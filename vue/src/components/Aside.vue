@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="aside-container">
     <div class="logo-box">
       <img src="../assets/logo2.png" alt="帮帮农" class="logo-img" />
@@ -64,7 +64,7 @@ const mainMenus = [
   { path: '/fruit-detect', icon: 'el-icon-picture-outline-round', title: '视觉巡检与异常识别' },
   { path: '/farm-map-gaode', icon: 'el-icon-map-location', title: 'GIS 地块指挥' },
   { path: '/farmmap3d', icon: 'el-icon-office-building', title: '3D 数字孪生' },
-  { path: '/business-analysis', icon: 'el-icon-data-analysis', title: '预警与研判中心' }
+  { path: '/alert-center', icon: 'el-icon-data-analysis', title: '预警与研判中心' }
 ]
 
 const supportGroups = [
@@ -72,8 +72,7 @@ const supportGroups = [
     index: 'display',
     title: '展示分析',
     children: [
-      { path: '/bigscreen', icon: 'el-icon-monitor', title: '态势展示大屏' },
-      { path: '/dashbordnew', icon: 'el-icon-data-line', title: '监测分析看板' },
+      { path: '/dashbordnew', icon: 'el-icon-data-line', title: '环境监测大屏' },
       { path: '/statistic', icon: 'el-icon-pie-chart', title: '地块数据总览' },
       { path: '/farmland', icon: 'el-icon-location-outline', title: '地块资产图谱' }
     ]
@@ -100,7 +99,8 @@ const supportGroups = [
 export default {
   name: 'Aside',
   props: {
-    isCollapse: Boolean
+    isCollapse: Boolean,
+    logoTextShow: Boolean
   },
   data() {
     return {
@@ -121,6 +121,7 @@ export default {
 </script>
 
 <style scoped>
+/* 鍘熸湁鐨勬牱寮忓畬鍏ㄤ繚鐣欙紝淇濇寔浣犵殑 UI 缇庤鎬?*/
 .aside-container {
   height: 100%;
   background: #f8faf9;
@@ -242,13 +243,14 @@ export default {
 
 ::v-deep .more-submenu > .el-submenu__title {
   margin-top: 0;
-  color: #64748b !important;
-  font-size: 14px;
+  color: #475569 !important;
+  font-size: 15px;
   font-weight: 500;
 }
 
 ::v-deep .secondary-item {
-  color: #64748b !important;
-  font-size: 14px;
+  color: #475569 !important;
+  font-size: 15px;
+  font-weight: 500;
 }
 </style>

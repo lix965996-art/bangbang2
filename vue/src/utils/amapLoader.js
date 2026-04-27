@@ -16,8 +16,13 @@ const removeKnownScripts = () => {
   })
 }
 
-const buildScriptUrl = (key, version) =>
-  `https://webapi.amap.com/maps?v=${encodeURIComponent(version)}&key=${encodeURIComponent(key)}`
+const buildScriptUrl = (key, version, plugins) => {
+  let url = `https://webapi.amap.com/maps?v=${encodeURIComponent(version)}&key=${encodeURIComponent(key)}`
+  if (plugins && plugins.length > 0) {
+    url += `&plugin=${encodeURIComponent(plugins.join(','))}`
+  }
+  return url
+}
 
 const ensureSecurityConfig = (securityCode) => {
   if (!securityCode) {
@@ -51,12 +56,22 @@ export const resetAmapLoader = () => {
 
 export const loadAmapSdk = async (options = {}) => {
   const key = options.key || mapConfig.amap.jsKey || process.env.VUE_APP_AMAP_JS_KEY || ''
-  const securityCode = options.securityCode || process.env.VUE_APP_AMAP_SECURITY_CODE || ''
+  const securityCode = options.securityCode || process.env.VUE_APP_AMAP_SECURITY_CODE || mapConfig.amap.securityCode || ''
   const version = options.version || mapConfig.amap.version || '2.0'
   const plugins = Array.from(new Set([...(options.plugins || [])].filter(Boolean)))
 
   if (!key) {
     throw new Error('AMAP_KEY_MISSING')
+  }
+
+  // 如果之前加载的 SDK 是不同 Key 的版本，强制清除重新加载
+  if (window.AMap && window.AMap.Map && window.__AMAP_LOADED_KEY__ !== key) {
+    console.log('[amapLoader] 检测到 Key 变更，清除旧 SDK 重新加载')
+    delete window.AMap
+    delete window._AMapSecurityConfig
+    window.__AMAP_LOADED_KEY__ = undefined
+    removeKnownScripts()
+    loaderPromise = null
   }
 
   ensureSecurityConfig(securityCode)
@@ -73,6 +88,7 @@ export const loadAmapSdk = async (options = {}) => {
 
       const handleLoad = () => {
         if (window.AMap && window.AMap.Map) {
+          window.__AMAP_LOADED_KEY__ = key
           resolve(window.AMap)
           return
         }
@@ -96,7 +112,7 @@ export const loadAmapSdk = async (options = {}) => {
       const script = document.createElement('script')
       script.id = PRIMARY_SCRIPT_ID
       script.async = true
-      script.src = buildScriptUrl(key, version)
+      script.src = buildScriptUrl(key, version, plugins)
       script.addEventListener('load', handleLoad, { once: true })
       script.addEventListener('error', handleError, { once: true })
       document.head.appendChild(script)

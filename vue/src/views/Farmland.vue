@@ -73,7 +73,7 @@
         <el-table-column label=" 生长质量评分" width="180">
           <template #default="scope">
              <el-rate
-              :value="getFakeScore(scope.row.id)"
+              :value="getQualityScore(scope.row)"
               disabled
               show-score
               text-color="#ff9900"
@@ -113,7 +113,7 @@
     <!-- 适量的底部空间 -->
     <div style="height: 50px; opacity: 0; pointer-events: none;"></div>
 
-    <el-dialog title="地块信息录入" v-model="dialogFormVisible" width="500px" :close-on-click-modal="false" append-to-body :lock-scroll="false">
+    <el-dialog title="地块信息录入" :visible.sync="dialogFormVisible" width="500px" :close-on-click-modal="false" append-to-body :lock-scroll="false">
       <el-form label-width="100px" size="medium" :model="form" :rules="rules" ref="farmForm" class="custom-form">
         <el-form-item label="农田名称" prop="farm">
           <el-input v-model="form.farm" placeholder="例如：A1号有机示范田"></el-input>
@@ -143,7 +143,7 @@
           </div>
         </el-form-item>
         <el-form-item label="面积 (亩)" prop="area">
-          <el-input-number v-model="form.area" :min="0.1" :max="10000" :precision="1" placeholder="通过绘制区域自动计算" readonly></el-input-number>
+          <el-input-number v-model="form.area" :min="0.1" :max="10000" :precision="1" placeholder="手动输入或通过地图绘制自动计算"></el-input-number>
         </el-form-item>
         <el-form-item label="具体地址">
           <el-input v-model="form.address" type="textarea" :rows="2" placeholder="地址可通过地图自动获取" readonly></el-input>
@@ -196,14 +196,14 @@
     </el-dialog>
 
     <farm-location-selector
-      v-model:visible="locationSelectorVisible"
+      :visible.sync="locationSelectorVisible"
       :initial-data="form"
       @confirm="handleLocationConfirm"
     />
 
-    <el-dialog 
-      v-model="traceVisible" 
-      width="420px" 
+    <el-dialog
+      :visible.sync="traceVisible"
+      width="420px"
       custom-class="mobile-preview-dialog"
       :show-close="false"
       top="2vh"
@@ -259,18 +259,18 @@
             <div class="env-grid">
               <div class="env-item">
                 <div class="icon sun"><i class="el-icon-sunny"></i></div>
-                <div class="val">{{ traceData.sunlight || 1200 }}h</div>
-                <div class="lbl">累计光照</div>
+                <div class="val">{{ currentTraceRow && currentTraceRow.light ? currentTraceRow.light : '--' }}</div>
+                <div class="lbl">光照强度(lux)</div>
               </div>
               <div class="env-item">
                 <div class="icon water"><i class="el-icon-heavy-rain"></i></div>
-                <div class="val">{{ traceData.waterCount || 45 }}次</div>
-                <div class="lbl">智能灌溉次数</div>
+                <div class="val">{{ currentTraceRow && currentTraceRow.soilhumidity ? currentTraceRow.soilhumidity : '--' }}%</div>
+                <div class="lbl">土壤湿度</div>
               </div>
               <div class="env-item">
                 <div class="icon temp"><i class="el-icon-stopwatch"></i></div>
-                <div class="val">24.5°C</div>
-                <div class="lbl">平均积温</div>
+                <div class="val">{{ currentTraceRow && currentTraceRow.temperature ? currentTraceRow.temperature : '--' }}°C</div>
+                <div class="lbl">当前温度</div>
               </div>
             </div>
           </div>
@@ -342,7 +342,17 @@ export default {
         ],
         area: [
           { required: true, message: '请完善地块面积', trigger: 'change' },
-          { type: 'number', min: 0.1, max: 10000, message: 'Area must be between 0.1 and 10000 mu', trigger: 'change' }
+          {
+            validator: (_rule, value, callback) => {
+              const num = Number(value)
+              if (isNaN(num) || num < 0.1 || num > 10000) {
+                callback(new Error('面积需在 0.1 ~ 10000 亩之间'))
+              } else {
+                callback()
+              }
+            },
+            trigger: 'change'
+          }
         ],
         keeper: [
           { required: true, message: '请输入负责人姓名', trigger: 'blur' }
@@ -352,10 +362,8 @@ export default {
       traceVisible: false, 
       currentTraceRow: null,
       traceData: {
-        score: 98,
-        level: 'S',
-        sunlight: 1200,
-        waterCount: 45,
+        score: 0,
+        level: '--',
         desc: '',
         timeline: []
       },
@@ -454,52 +462,48 @@ export default {
       })
     },
 
-    // --- 核心逻辑：动态生成溯源数据 ---
-    openTrace(row) {
+    // --- 核心逻辑：基于真实数据生成溯源卡片 ---
+    async openTrace(row) {
       this.currentTraceRow = row;
-      
-      // 1. 动态计算评分 (模拟)
-      const baseScore = 95;
-      const fluctuating = (row.id % 5); 
-      this.traceData.score = baseScore - fluctuating;
-      this.traceData.level = this.traceData.score > 90 ? 'S级特优' : 'A级优选';
-      
-      // 2. 模拟IoT累计数据
-      this.traceData.sunlight = 1000 + (row.id * 50); 
-      this.traceData.waterCount = 20 + (row.id % 10); 
+      const quality = this.getQualityScore(row);
+      const score = Math.round((quality / 5) * 100);
+      this.traceData.score = score;
+      this.traceData.level = score >= 90 ? 'S级特优' : score >= 75 ? 'A级优选' : 'B级观察';
+      this.traceData.desc = `地块 ${row.farm || '--'}（${row.crop || '--'}）的环境与预警数据已按当前档案生成。`;
 
-      // 3. 动态生成建档摘要
-      this.traceData.desc = `该批次 ${row.crop} 种植于 ${row.address || '标准示范区'}。全周期生长环境数据完整，水肥和巡检记录已完成归档校验。`;
+      try {
+        const res = await this.request.get('/alert/farmland/' + row.id);
+        const alerts = Array.isArray(res.data) ? res.data : [];
+        this.traceData.timeline = this.generateTimeline(alerts);
+      } catch (e) {
+        this.traceData.timeline = this.generateTimeline([]);
+      }
 
-      // 4. 生成时间轴
-      this.traceData.timeline = this.generateTimeline(row.crop);
-      
       this.traceVisible = true;
-      this.$message.success('区块链溯源数据校验通过');
+      this.$message.success('已加载真实溯源数据');
     },
 
-    generateTimeline(crop) {
-      const today = new Date();
-      const dateStr = (offset) => {
-        const d = new Date();
-        d.setDate(today.getDate() - offset);
-        return `${d.getMonth()+1}-${d.getDate()}`;
-      };
-
-      if (crop && (crop.includes('果') || crop.includes('莓'))) {
-        return [
-          { color: '#67C23A', date: dateStr(90), title: '智能移栽', desc: '完成定植，成活率 99%' },
-          { color: '#409EFF', date: dateStr(60), title: '花期管控', desc: '温控 25°C，完成授粉保障' },
-          { color: '#E6A23C', date: dateStr(15), title: '糖度检测', desc: '抽样检测糖度达 12%' },
-          { color: '#67C23A', date: '刚刚', title: '数字建档', desc: '生成溯源码，准备上市' }
-        ];
-      } else {
-        return [
-          { color: '#67C23A', date: dateStr(45), title: '种苗播种', desc: '基质检测合格' },
-          { color: '#409EFF', date: dateStr(20), title: '水肥一体化', desc: '智能灌溉系统介入' },
-          { color: '#67C23A', date: '刚刚', title: '采摘上市', desc: '完成农残快速检测' }
-        ];
+    generateTimeline(alerts) {
+      if (Array.isArray(alerts) && alerts.length > 0) {
+        return alerts.slice(0, 6).map(alert => ({
+          color: alert.status === 'processed' ? '#67C23A' : '#E6A23C',
+          date: this.formatAlertDate(alert.createTime || alert.processTime),
+          title: alert.farmlandName || '地块预警',
+          desc: alert.message || '暂无描述'
+        }));
       }
+      return [{
+        color: '#67C23A',
+        date: this.formatAlertDate(new Date()),
+        title: '数据建档',
+        desc: '当前地块暂无历史预警记录'
+      }];
+    },
+
+    formatAlertDate(value) {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '--';
+      return `${date.getMonth() + 1}-${date.getDate()}`;
     },
 
     // 防抖搜索
@@ -512,8 +516,20 @@ export default {
       }, 500)
     },
     
-    getFakeScore(id) {
-      return 3 + (id % 20) / 10;
+    getQualityScore(row) {
+      const temp = Number(row.temperature);
+      const humi = Number(row.soilhumidity);
+      let score = 3.5;
+      if (Number.isFinite(temp)) {
+        if (temp >= 20 && temp <= 30) score += 0.8;
+        else if (temp >= 15 && temp <= 35) score += 0.4;
+      }
+      if (Number.isFinite(humi)) {
+        if (humi >= 45 && humi <= 75) score += 0.7;
+        else if (humi >= 30 && humi <= 85) score += 0.3;
+      }
+      if (row.state && String(row.state).includes('风险')) score -= 0.8;
+      return Math.max(1, Math.min(5, Number(score.toFixed(1))));
     },
     
     getCropIcon(crop) {
@@ -546,16 +562,29 @@ export default {
     },
 
     save() {
+      console.log('[Farmland] save 被调用，当前 form:', JSON.stringify(this.form))
       // 将 Tags 转换为逗号分隔字符串
       this.form.crop = this.dynamicTags.join(',');
 
-      // 表单验证
-      this.$refs.farmForm.validate((valid) => {
+      const formRef = this.$refs.farmForm
+      if (!formRef) {
+        console.error('[Farmland] $refs.farmForm 不存在')
+        this.$message.error('表单未就绪，请关闭对话框后重试')
+        return
+      }
+
+      formRef.validate((valid) => {
+        console.log('[Farmland] 验证结果:', valid)
         if (!valid) {
           this.$message.warning('请完善必填信息')
           return false
         }
-        
+
+        // 确保 area 转为字符串，匹配后端 String 类型
+        if (this.form.area != null) {
+          this.form.area = String(this.form.area)
+        }
+
         // 验证通过，提交数据
         this.request.post("/statistic", this.form).then(res => {
           if (res.code === '200') {
@@ -571,10 +600,22 @@ export default {
       })
     },
     handleAdd() {
+      console.log('[Farmland] handleAdd 被调用')
+      this.form = {
+        farm: '',
+        crop: '',
+        area: undefined,
+        address: '',
+        district: '',
+        keeper: '',
+        centerLng: null,
+        centerLat: null,
+        coordinates: ''
+      }
+      this.dynamicTags = []
+      this.showPreviewMap = false
       this.dialogFormVisible = true
-      this.form = {}
-      this.dynamicTags = [] // 重置 Tags
-      this.showPreviewMap = false // 隐藏预览地图
+      console.log('[Farmland] dialogFormVisible 已设置为', this.dialogFormVisible)
       
       // 清理预览地图
       if (this.previewMap) {
@@ -639,9 +680,21 @@ export default {
     },
     exp() {
       this.$message.info('正在生成Excel报表，请稍候...')
-      setTimeout(() => {
-        this.request.download('/statistic/export', 'farmland.xlsx')
-      }, 300)
+      this.request.get('/statistic/export', {
+        responseType: 'blob'
+      }).then(res => {
+        const url = window.URL.createObjectURL(new Blob([res]))
+        const link = document.createElement('a')
+        link.href = url
+        link.setAttribute('download', 'farmland.xlsx')
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(url)
+        this.$message.success('导出成功')
+      }).catch(err => {
+        this.$message.error('导出失败：' + (err.message || '网络异常'))
+      })
     },
     handleSizeChange(pageSize) {
       this.pageSize = pageSize
@@ -652,25 +705,25 @@ export default {
       this.load()
     },
     openLocationSelector() {
+      console.log('[Farmland] openLocationSelector 被调用')
       this.locationSelectorVisible = true
+      console.log('[Farmland] locationSelectorVisible 已设置为', this.locationSelectorVisible)
     },
     handleLocationConfirm(locationData) {
-      
-      // 更新坐标和面积
-      this.form.centerLng = locationData.centerLng
-      this.form.centerLat = locationData.centerLat
-      this.form.coordinates = locationData.coordinates
-      
-      // 自动填充面积
+      // 使用 $set 确保响应式更新（Vue 2）
+      this.$set(this.form, 'centerLng', locationData.centerLng)
+      this.$set(this.form, 'centerLat', locationData.centerLat)
+      this.$set(this.form, 'coordinates', locationData.coordinates)
+
+      // 自动填充面积（转为数字用于表单显示，保存时会转为字符串）
       if (locationData.area && locationData.area > 0) {
-        this.form.area = parseFloat(locationData.area)
+        this.$set(this.form, 'area', parseFloat(locationData.area))
       }
-      
-      // 关键：使用 $set 确保响应式更新地址和区县
+
       if (locationData.address) {
         this.$set(this.form, 'address', locationData.address)
       }
-      
+
       // 自动填充区县信息（优先使用地图组件计算的结果）
       if (locationData.district) {
         this.$set(this.form, 'district', locationData.district)

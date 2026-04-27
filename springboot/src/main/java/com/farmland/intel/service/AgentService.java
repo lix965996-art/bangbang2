@@ -252,8 +252,8 @@ public class AgentService {
         payload.put("input", input);
         
         JSONObject parameters = new JSONObject();
-        parameters.put("temperature", 0.7);  // 提高创造性和分析能力
-        parameters.put("top_p", 0.9);        // 增加多样性
+        parameters.put("temperature", 0.85);  // 提高创造性和分析能力（从 0.7 提升到 0.85）
+        parameters.put("top_p", 0.92);        // 增加多样性（从 0.9 提升到 0.92）
         parameters.put("result_format", "message");
         payload.put("parameters", parameters);
         
@@ -686,7 +686,7 @@ public class AgentService {
     }
     
     /**
-     * 构建系统提示词
+     * 构建系统提示词 - 增强经营分析框架 v2.0
      */
     private String buildSystemPrompt() {
         return "你是一个智能农业 AI Agent，具有数据分析和自主执行能力。\n\n" +
@@ -734,12 +734,6 @@ public class AgentService {
                "   - 光照 < 1000lux → control_led(action='on')\n" +
                "2. 库存不足 → 自动创建采购订单\n" +
                "3. 用户明确要求操作 → 立即执行\n\n" +
-               "【自动执行规则】\n" +
-               "1. 环境异常 → 自动控制设备\n" +
-               "   - 土壤湿度 < 30% → control_irrigation(action='on')\n" +
-               "   - 光照 < 1000lux → control_led(action='on')\n" +
-               "2. 库存不足 → 自动创建采购订单\n" +
-               "3. 用户明确要求操作 → 立即执行\n\n" +
                "【输出格式】JSON：\n" +
                "{\n" +
                "  \"advice\": \"详细说明：①调用了什么工具 ②获取的数据 ③分析结果 ④执行的操作（如果有）⑤建议\",\n" +
@@ -749,11 +743,19 @@ public class AgentService {
                "- 用户问数据问题 → 调用工具查询，在 advice 中详细回答，不要用 navigate\n" +
                "- 用户要求操作 → 调用执行工具，在 advice 中说明结果\n" +
                "- 只有用户明确说\"打开XX页面\" → 才用 navigate\n" +
-               "- advice 必须包含具体数据和分析，不要只说\"正在跳转\"";
+               "- advice 必须包含具体数据和分析，不要只说\"正在跳转\"\n\n" +
+
+               "【主动分析触发规则】\n" +
+               "- 用户问候 (你好) → 调用 get_system_overview 汇报当前状态\n" +
+               "- 农场怎么样/最近情况/帮我看看 → 调用 get_comprehensive_report\n" +
+               "- 赚钱吗/经营怎么样 → 调用 get_business_health_score\n" +
+               "- 有什么问题/需要注意什么 → 调用 get_comprehensive_report 列出问题清单\n\n" +
+
+               "【分析框架】环境健康→资金健康→库存健康→运营健康→风险预警";
     }
-    
+
     /**
-     * 构建工具定义
+     * 构建工具定义 - 增强经营分析工具描述
      */
     private static JSONArray buildTools() {
         JSONArray tools = new JSONArray();

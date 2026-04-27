@@ -1,120 +1,116 @@
-﻿<template>
-  <div class="env-monitor-page">
-    <!-- 超炫渐变背景 -->
-    <div class="bg-gradient"></div>
-    <canvas ref="particleCanvas" class="particle-canvas"></canvas>
-
-    <!-- 顶部控制栏 -->
-    <div class="page-header glass-effect">
-      <div class="left-title">
-        <h2>
-          <div class="icon-pulse"><i class="el-icon-data-analysis"></i></div>
-          智能环境监测指挥中心
-        </h2>
-        <span class="sub">Environmental Monitoring & AI Decision Platform</span>
-        <div class="status-bar">
-          <span class="status-dot"></span>
-          <span>系统运行正常</span>
+<template>
+  <div class="ios-dashboard">
+    <div class="ios-header-bar">
+      <div class="header-left">
+        <div class="title-box">
+          <i class="el-icon-data-analysis icon-blue"></i>
+          <h1>智能环境与农事指挥中心</h1>
         </div>
-      </div>
-      <div class="header-center">
-        <el-select 
-          v-model="selectedFarmId" 
-          placeholder="选择农田" 
-          @change="onFarmSelect"
-          size="small"
-          style="width: 200px; margin-right: 15px;">
-          <el-option
-            v-for="farm in farmList"
-            :key="farm.id"
-            :label="farm.name"
-            :value="farm.id">
-            <span style="float: left">{{ farm.name }}</span>
-            <span style="float: right; color: #8492a6; font-size: 13px">{{ farm.crop || '未种植' }}</span>
-          </el-option>
-        </el-select>
+        <div class="status-pill">
+          <span class="status-dot"></span> 系统运行正常
+        </div>
       </div>
       <div class="header-right">
-        <el-button type="primary" size="small" icon="el-icon-refresh" @click="refreshData" :loading="loading">刷新</el-button>
-        <el-button type="success" size="small" icon="el-icon-download" @click="exportData">导出</el-button>
+        <el-select
+          v-model="selectedFarmId"
+          placeholder="切换监测农田"
+          @change="onFarmSelect"
+          size="small"
+          class="ios-select farm-select">
+          <el-option v-for="farm in farmList" :key="farm.id" :label="farm.name" :value="farm.id">
+            <span style="float: left; font-weight: 500;">{{ farm.name }}</span>
+            <span style="float: right; color: #8E8E93; font-size: 13px">{{ farm.crop || '未种植' }}</span>
+          </el-option>
+        </el-select>
+        <el-button class="ios-btn-secondary" size="small" icon="el-icon-refresh" @click="refreshData" :loading="loading">更新数据</el-button>
       </div>
     </div>
 
-    <!-- AI 智能建议卡片 -->
-    <div class="ai-advice-card glass-effect">
-      <div class="ai-header">
-        <div class="ai-avatar"><img src="@/assets/ai.png" alt="AI" class="ai-icon" /></div>
-        <div class="ai-title">
-          <span class="title-text">AI农事智能决策系统</span>
-          <el-tag v-if="aiAnalyzing" size="mini" type="info" effect="dark">
-            <i class="el-icon-loading"></i> 分析中
-          </el-tag>
-          <el-tag v-else size="mini" type="success" effect="dark">AI 已连接</el-tag>
-        </div>
-      </div>
-      <div class="ai-content">
-        <p class="typing-text">{{ aiText }}<span class="cursor" v-if="typing">|</span></p>
-        
-        <!-- AI预测结果 -->
-        <div class="ai-predictions" v-if="aiPredictions.growthRate > 0">
-          <div class="prediction-item">
-            <i class="el-icon-data-line"></i>
-            <span>生长环境评分：</span>
-            <el-progress :percentage="Number(aiPredictions.growthRate)" :color="aiPredictions.growthRate > 80 ? '#67c23a' : aiPredictions.growthRate > 60 ? '#e6a23c' : '#f56c6c'" :stroke-width="6"></el-progress>
+    <el-row :gutter="16" class="kpi-row">
+      <el-col :span="6" v-for="(kpi, index) in kpiData" :key="index">
+        <div class="ios-card kpi-card">
+          <div class="kpi-icon-box" :class="kpi.colorClass">
+            <i :class="kpi.icon"></i>
           </div>
-          <div class="prediction-item">
-            <i class="el-icon-date"></i>
-            <span>预计收获日期：{{ aiPredictions.harvestDate }}</span>
-          </div>
-          <div class="prediction-item">
-            <i class="el-icon-goods"></i>
-            <span>预估产量：{{ aiPredictions.expectedYield }} 吨/亩</span>
-          </div>
-          <div class="prediction-item" v-if="aiPredictions.marketAnalysis">
-            <i class="el-icon-data-board"></i>
-            <span>市场行情：{{ aiPredictions.marketAnalysis }}</span>
-          </div>
-          <div class="prediction-item" v-if="aiPredictions.weatherImpact">
-            <i class="el-icon-partly-cloudy"></i>
-            <span>天气影响：{{ aiPredictions.weatherImpact }}</span>
+          <div class="kpi-info">
+            <div class="kpi-label">{{ kpi.label }}</div>
+            <div class="kpi-value">
+              {{ kpi.value }}<span class="unit">{{ kpi.unit }}</span>
+            </div>
           </div>
         </div>
-      </div>
-      <div class="ai-footer">
-        <span><i class="el-icon-lightning"></i> 通义千问智能分析</span>
-        <span><i class="el-icon-cpu"></i> 实时数据融合</span>
-        <span><i class="el-icon-trophy"></i> 精准产量预测</span>
-      </div>
-    </div>
+      </el-col>
+    </el-row>
 
-    <!-- 农田信息卡片 -->
-    <div class="kpi-row">
-      <div class="kpi-card" v-for="(kpi, index) in kpiData" :key="index" :class="['kpi-' + index, kpi.status]">
-        <div class="kpi-bg-wave"></div>
-        <div class="icon-box" :class="kpi.type">
-          <i :class="kpi.icon"></i>
-          <div class="icon-ring"></div>
-        </div>
-        <div class="kpi-content">
-          <div class="label">
-            {{ kpi.label }}
-            <el-tag v-if="kpi.status === 'excellent'" size="mini" type="success" effect="dark">优秀</el-tag>
-            <el-tag v-if="kpi.status === 'warning'" size="mini" type="warning" effect="dark">关注</el-tag>
+    <el-row :gutter="16" class="middle-row">
+      <el-col :span="14">
+        <div class="ios-card ai-card">
+          <div class="card-header border-bottom">
+            <div class="header-title">
+              <i class="el-icon-cpu" style="color: #AF52DE;"></i> AI 农事决策引擎
+            </div>
+            <el-tag v-if="qwenAnalyzing" size="mini" class="ios-tag-loading"><i class="el-icon-loading"></i> 分析中</el-tag>
+            <el-tag v-else size="mini" class="ios-tag-success">引擎在线</el-tag>
           </div>
-          <div class="value count-up">
-            {{ animatedValues[index] }}
-            <span class="unit">{{ kpi.unit }}</span>
-          </div>
-          <div class="trend" :class="{ up: kpi.trend > 0, down: kpi.trend < 0 }">
-            <i :class="kpi.trend > 0 ? 'el-icon-top' : 'el-icon-bottom'"></i>
-            {{ Math.abs(kpi.trend) }}% {{ kpi.trendText }}
-          </div>
-          <div class="update-time">最后更新: {{ currentTime }}</div>
-        </div>
-        <div class="sparkline" :ref="'sparkline' + index"></div>
-      </div>
-    </div>
+          
+          <div class="ai-body">
+            <div class="ai-chat-container">
+              <div class="ai-avatar">
+                <img src="@/assets/ai.png" alt="AI" @error="handleImgError" />
+              </div>
+              <div class="ai-chat-bubble">
+                <p class="typing-text">{{ aiText }}<span class="cursor" v-if="typing">|</span></p>
+              </div>
+            </div>
 
+            <div class="ai-metrics" v-if="aiPredictions.growthRate > 0">
+              <div class="metric-item">
+                <span class="metric-label">环境评分</span>
+                <el-progress :percentage="Number(aiPredictions.growthRate)" :color="getScoreColor(aiPredictions.growthRate)" :stroke-width="6"></el-progress>
+              </div>
+              <div class="metric-item">
+                <span class="metric-label">预计采收</span>
+                <span class="metric-val">{{ aiPredictions.harvestDate }}</span>
+              </div>
+              <div class="metric-item">
+                <span class="metric-label">市场评估</span>
+                <span class="metric-val text-blue">{{ aiPredictions.marketAnalysis }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </el-col>
+
+      <el-col :span="10">
+        <div class="ios-card radar-card">
+          <div class="card-header">
+            <div class="header-title">
+              <i class="el-icon-data-line" style="color: #34C759;"></i> 实时环境监测
+            </div>
+            <div class="score-text" :style="{ color: getScoreColor(envScore) }">
+              综合 {{ envScore }} 分
+            </div>
+          </div>
+          <div class="chart-container" ref="radarChart"></div>
+        </div>
+      </el-col>
+    </el-row>
+
+    <div class="ios-card compare-card">
+      <div class="card-header border-bottom">
+        <div class="header-title">
+          <i class="el-icon-s-marketing" style="color: #FF9500;"></i> 跨地块数据对比分析
+        </div>
+        <div class="checkbox-group-ios">
+          <el-checkbox-group v-model="selectedFarms" @change="onFarmsChange" size="small">
+            <el-checkbox v-for="farm in farmList" :key="farm.id" :label="farm.id" border>
+              {{ farm.name }}
+            </el-checkbox>
+          </el-checkbox-group>
+        </div>
+      </div>
+      <div class="chart-container large" ref="compareChart"></div>
+    </div>
   </div>
 </template>
 
@@ -126,1450 +122,450 @@ export default {
   data() {
     return {
       loading: false,
-      currentTime: '',
-      dateRange: '',
-      
-      // 农场列表（从后端获取）
       farmList: [],
       selectedFarms: [],
-      selectedFarmId: null, // 当前选中的农田
-      currentFarmData: null, // 当前农田详细数据
-      
+      selectedFarmId: null, 
+      currentFarmData: null,
+
       // 实时硬件数据
       sensorData: {
-        temperature: 0,
-        humidity: 0,
-        soilMoisture: 0,
-        lightIntensity: 0,
-        co2Level: 420,
-        ph: 6.5,
-        led: false,
-        deviceOnline: false,
-        deviceName: 'STM32-001',
-        lastUpdate: ''
+        temperature: 24, humidity: 55, soilMoisture: 45, lightIntensity: 600, co2Level: 420
       },
-      
-      // AI 打字效果
-      aiText: '',
-      typing: false,
-      fullAiText: '',
-      aiAnalyzing: false,
 
-      
-      // 农田信息卡片数据
-      kpiData: [
-        { label: '预估产量', value: 0, unit: '吨/亩', icon: 'el-icon-goods', type: 'yield', trend: 0, trendText: '较上期', status: 'normal' },
-        { label: '预计收入', value: 0, unit: '万元', icon: 'el-icon-coin', type: 'income', trend: 0, trendText: '市场价', status: 'normal' },
-        { label: '种植面积', value: 0, unit: '亩', icon: 'el-icon-map-location', type: 'area', trend: 0, trendText: '利用率', status: 'normal' },
-        { label: '生长周期', value: 0, unit: '天', icon: 'el-icon-time', type: 'growth', trend: 0, trendText: '剩余', status: 'normal' }
-      ],
-      animatedValues: [0, 0, 0, 0],
-      
-      // 历史数据
-      historyData: [],
-      
-      // AI预测和建议
-      aiPredictions: {
-        growthRate: 0,
-        harvestDate: '',
-        expectedYield: 0,
-        riskLevel: 'low',
-        suggestions: [],
-        marketAnalysis: '', // 市场行情分析
-        weatherImpact: '', // 天气影响评估
-        cropStatus: '' // 作物状态
-      },
-      
-      // AI分析状态
+      // AI 状态
+      aiText: '正在初始化农事分析模型...',
+      typing: false,
       qwenAnalyzing: false,
-      
-      // 自动控制状态
-      autoControl: {
-        irrigation: false,
-        lighting: false,
-        ventilation: false
+      typingTimeout: null,
+      aiTimer: null,
+      dataTimer: null,
+
+      kpiData: [
+        { label: '预估总产量', value: 0, unit: ' 吨', icon: 'el-icon-box', colorClass: 'bg-blue' },
+        { label: '预计总收入', value: 0, unit: ' 万元', icon: 'el-icon-wallet', colorClass: 'bg-green' },
+        { label: '种植总面积', value: 0, unit: ' 亩', icon: 'el-icon-map-location', colorClass: 'bg-orange' },
+        { label: '距采收剩余', value: 0, unit: ' 天', icon: 'el-icon-time', colorClass: 'bg-purple' }
+      ],
+
+      aiPredictions: {
+        growthRate: 0, harvestDate: '--', expectedYield: 0, marketAnalysis: '--'
       },
-      
-      // 图表实例
+
       radarChart: null,
       compareChart: null,
-      
-      // 粒子动画
-      particles: [],
-      canvas: null,
-      ctx: null,
-      animationId: null,
-      
-      // 实时预警数据
-      alertData: [],
-      
-      // 环境阈值设置
-      thresholds: {
-        tempMin: 15,
-        tempMax: 35,
-        humiMin: 40,
-        humiMax: 80,
-        soilMin: 30,
-        soilMax: 70
-      },
-      
-      // 数据刷新定时器
-      dataTimer: null,
-      analysisTimer: null
+      envScore: 75,
+      fallbackAiImg: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23AF52DE"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z"/></svg>'
     }
   },
   mounted() {
     this.$nextTick(() => {
-      this.updateTime();
-      this.loadFarmList();  // 加载农田列表
-      this.initRadarChart();
-      this.initCompareChart();
-      this.initParticleCanvas();
-      window.addEventListener('resize', this.handleResize);
+      this.loadFarmList();
       
-      // 定时更新时间
-      setInterval(this.updateTime, 1000);
+      this.debouncedResize = this.debounce(this.handleResize, 200);
+      window.addEventListener('resize', this.debouncedResize);
+
+      this.startAiAnalysis();
+      this.dataTimer = setInterval(() => { this.refreshSensorData(); }, 10000);
     });
   },
   beforeDestroy() {
-    window.removeEventListener('resize', this.handleResize);
-    if(this.radarChart && !this.radarChart.isDisposed()) this.radarChart.dispose();
-    if(this.compareChart && !this.compareChart.isDisposed()) this.compareChart.dispose();
-    if(this.animationId) cancelAnimationFrame(this.animationId);
+    if(this.aiTimer) clearInterval(this.aiTimer);
+    if(this.dataTimer) clearInterval(this.dataTimer);
+    if(this.typingTimeout) clearTimeout(this.typingTimeout);
+    window.removeEventListener('resize', this.debouncedResize);
+    
+    if(this.radarChart) this.radarChart.dispose();
+    if(this.compareChart) this.compareChart.dispose();
   },
   methods: {
-    // 加载农田列表（从账号管理的农田数据）
+    handleImgError(e) {
+      e.target.src = this.fallbackAiImg;
+    },
+    debounce(func, wait) {
+      let timeout;
+      return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+      };
+    },
+    getScoreColor(score) {
+      if (score >= 80) return '#34C759'; 
+      if (score >= 60) return '#FF9500'; 
+      return '#FF3B30'; 
+    },
     async loadFarmList() {
+      this.loading = true;
       try {
-        const res = await this.request.get('/statistic/page', {
-          params: { pageNum: 1, pageSize: 100, farm: '' }
-        });
+        const res = await this.request.get('/statistic/page', { params: { pageNum: 1, pageSize: 100, farm: '' } });
         if (res.code === '200' && res.data && res.data.records) {
           this.farmList = res.data.records.map(item => ({
             id: item.id,
             name: item.farm || `农田${item.id}`,
-            area: item.area || 100, // 面积（亩）
-            crop: item.crop || '小麦', // 作物
-            plantDate: item.plantDate || '2025-01-01', // 种植日期
-            growthDays: item.growthDays || 90 // 生长周期
+            area: item.area || 100,
+            crop: item.crop || '小麦',
+            growthDays: item.growthDays || 90
           }));
-          // 默认选中第一个
+          
           if (this.farmList.length > 0) {
             this.selectedFarmId = this.farmList[0].id;
+            this.selectedFarms = this.farmList.slice(0, 3).map(f => f.id);
             this.onFarmSelect(this.selectedFarmId);
-            this.selectedFarms = this.farmList.slice(0, Math.min(3, this.farmList.length)).map(f => f.id);
             this.initCompareChart();
           }
         }
       } catch (e) {
-        console.error('加载农田列表失败:', e);
-      }
-    },
-    
-    // 选择农田后的处理
-    async onFarmSelect(farmId) {
-      if (!farmId) return;
-      
-      // 找到选中的农田数据
-      this.currentFarmData = this.farmList.find(f => f.id === farmId);
-      if (!this.currentFarmData) return;
-      
-      // 清空之前的分析内容
-      this.clearPreviousAnalysis();
-      
-      // 调用通义千问分析
-      await this.analyzeWithQwen();
-      
-      // 更新农田信息KPI卡片
-      this.updateFarmKPI();
-    },
-    
-    // 清空之前的分析内容
-    clearPreviousAnalysis() {
-      this.aiText = '';
-      this.fullAiText = '';
-      this.typing = false;
-      this.aiPredictions = {
-        growthRate: 0,
-        harvestDate: '',
-        expectedYield: 0,
-        riskLevel: 'low',
-        suggestions: [],
-        marketAnalysis: '',
-        weatherImpact: '',
-        cropStatus: ''
-      };
-      // 重置KPI数据为初始值
-      this.kpiData[0].value = 0;
-      this.kpiData[1].value = 0;
-      this.kpiData[2].value = 0;
-      this.kpiData[3].value = 0;
-      this.animatedValues = [0, 0, 0, 0];
-    },
-    
-    // 使用通义千问分析农田数据
-    async analyzeWithQwen() {
-      // 防止重复调用
-      if (this.qwenAnalyzing) {
-        return;
-      }
-      
-      this.qwenAnalyzing = true;
-      this.aiAnalyzing = true;
-      
-      try {
-        // 获取当前环境数据
-        const weatherData = await this.getWeatherData();
-        const marketData = await this.getMarketData();
-        
-        // 构建提示词
-        const prompt = `
-          请分析以下农田数据并给出预测：
-          农田名称：${this.currentFarmData.name}
-          种植作物：${this.currentFarmData.crop}
-          种植面积：${this.currentFarmData.area}亩
-          种植日期：${this.currentFarmData.plantDate}
-          当前室内温度：${this.sensorData.temperature}°C
-          当前室外温度：${weatherData.temperature}°C
-          当前湿度：${this.sensorData.humidity}%
-          土壤湿度：${this.sensorData.soilMoisture}%
-          未来7天天气：${weatherData.forecast}
-          当前${this.currentFarmData.crop}市场价：${marketData.price}元/吨
-          
-          请给出：
-          1. 预估亩产（吨/亩）
-          2. 预计总产量（吨）
-          3. 预计收入（万元）
-          4. 收获日期预测
-          5. 天气对产量的影响评估
-          6. 市场行情分析
-          7. 种植建议
-          
-          请以JSON格式返回结果。
-        `;
-        
-        // 调用通义千问API
-        const response = await this.callQwenAPI(prompt);
-        
-        // 解析结果
-        if (response) {
-          this.processQwenResult(response);
-        } else {
-          // 使用本地模拟分析
-          this.performLocalAnalysis();
-        }
-      } catch (e) {
-        console.error('通义千问分析失败:', e);
-        // 降级到本地分析
-        this.performLocalAnalysis();
+        this.$message.error('地块数据加载失败');
       } finally {
-        // 延迟重置状态，避免频繁调用
-        setTimeout(() => {
-          this.qwenAnalyzing = false;
-          this.aiAnalyzing = false;
-        }, 2000);
+        this.loading = false;
       }
     },
-    
-    // 调用通义千问API（通过后端代理，解决CORS问题）
-    async callQwenAPI(prompt) {
-      try {
-        // 调用后端代理接口
-        const response = await this.request.post('/api/chat/qwen-proxy', {
-          prompt: prompt,
-          systemPrompt: '你是一个农业专家，善于分析农田数据并给出产量和市场预测。请以JSON格式返回结果。'
-        });
-        
-        if (response && response.code === 200 && response.data) {
-          // 如果返回的是对象，直接返回
-          if (typeof response.data === 'object') {
-            return response.data;
-          }
-          // 如果是字符串，尝试解析为JSON
-          if (typeof response.data === 'string') {
-            try {
-              return JSON.parse(response.data);
-            } catch {
-              console.error('无法解析通义千问返回的数据:', response.data);
-              return null;
-            }
-          }
-        }
-        return null;
-      } catch (e) {
-        console.error('通义千问API调用失败:', e);
-        return null;
+    async onFarmSelect(farmId) {
+      this.currentFarmData = this.farmList.find(f => f.id === farmId);
+      if (this.currentFarmData) {
+        this.updateKPIs();
+        this.generateAiAnalysis();
+        this.envScore = this.calculateEnvironmentScore();
+        this.initRadarChart();
       }
     },
-    
-    // 处理通义千问返回结果
-    processQwenResult(result) {
-      // 确保 result 是有效对象
-      if (!result || typeof result !== 'object') {
-        this.performLocalAnalysis();
-        return;
-      }
-      
-      // 更新AI预测数据（使用安全的默认值）
-      const yieldPerAcre = result.yieldPerAcre || 2.5;
-      const totalYield = result.totalYield || (yieldPerAcre * (this.currentFarmData.area || 10));
-      const suggestions = Array.isArray(result.suggestions) ? result.suggestions : ['适时灌溉', '注意病虫害防治'];
-      const marketAnalysis = result.marketAnalysis || '市场价格稳定，需求量较大';
-      const weatherImpact = result.weatherImpact || '天气适宜，对产量有积极影响';
-      
-      this.aiPredictions.expectedYield = yieldPerAcre;
-      this.aiPredictions.harvestDate = result.harvestDate || this.calculateHarvestDate();
-      this.aiPredictions.marketAnalysis = marketAnalysis;
-      this.aiPredictions.weatherImpact = weatherImpact;
-      this.aiPredictions.suggestions = suggestions;
-      
-      // 更新KPI数据
-      this.kpiData[0].value = yieldPerAcre; // 亩产
-      this.kpiData[1].value = result.expectedIncome || 50; // 预计收入
-      
-      // 生成AI分析文本（使用安全的变量）
-      this.fullAiText = `【通义千问智能分析】基于${this.currentFarmData.name}的实时数据分析，预计亩产可达${yieldPerAcre}吨，总产量约${totalYield}吨。${marketAnalysis}。${weatherImpact}。建议：${suggestions.join('；')}。`;
-      
-      this.startAITyping();
+    onFarmsChange() {
+      this.initCompareChart();
     },
-    
-    // 本地模拟分析
-    performLocalAnalysis() {
-      // 基于农田数据进行分析（不使用传感器数据）
-      // 模拟一个基于季节和作物类型的环境评分
-      const month = new Date().getMonth() + 1;
-      let baseScore = 75;
-      
-      // 根据季节调整
-      if (month >= 3 && month <= 5) baseScore = 85; // 春季
-      else if (month >= 6 && month <= 8) baseScore = 70; // 夏季
-      else if (month >= 9 && month <= 11) baseScore = 80; // 秋季
-      else baseScore = 65; // 冬季
-      
-      // 根据作物类型调整
-      const cropBonus = {
-        '小麦': month >= 3 && month <= 5 ? 10 : 0,
-        '水稻': month >= 6 && month <= 8 ? 10 : 0,
-        '玉米': month >= 4 && month <= 7 ? 10 : 0,
-        '大豆': month >= 5 && month <= 8 ? 10 : 0,
-        '默认': 5
-      };
-      
-      const envScore = Math.min(100, baseScore + (cropBonus[this.currentFarmData.crop] || cropBonus['默认']));
-      
-      // 根据作物类型估算产量
-      const yieldFactors = {
-        '小麦': { base: 0.4, optimal: 0.5 },
-        '水稼': { base: 0.6, optimal: 0.75 },
-        '玉米': { base: 0.7, optimal: 0.9 },
-        '大豆': { base: 0.25, optimal: 0.35 },
-        '默认': { base: 0.3, optimal: 0.4 }
-      };
-      
-      const cropFactor = yieldFactors[this.currentFarmData.crop] || yieldFactors['默认'];
-      const yieldPerAcre = cropFactor.base + (cropFactor.optimal - cropFactor.base) * (envScore / 100);
-      const totalYield = yieldPerAcre * this.currentFarmData.area;
-      
-      // 估算市场价格
-      const marketPrices = {
-        '小麦': 2800,
-        '水稼': 3200,
-        '玉米': 2600,
-        '大豆': 5500,
-        '默认': 3000
-      };
-      
-      const marketPrice = marketPrices[this.currentFarmData.crop] || marketPrices['默认'];
-      const expectedIncome = (totalYield * marketPrice / 10000).toFixed(2); // 万元
-      
-      // 更新预测数据
-      this.aiPredictions.expectedYield = yieldPerAcre.toFixed(2);
-      this.aiPredictions.growthRate = envScore;
-      this.aiPredictions.harvestDate = this.calculateHarvestDate();
-      this.aiPredictions.marketAnalysis = `当前${this.currentFarmData.crop}市场价约${marketPrice}元/吨，价格稳定`;
-      this.aiPredictions.weatherImpact = envScore > 80 ? '季节条件优越' : envScore > 60 ? '季节条件适宜' : '需关注季节变化';
-      
-      // 更新KPI数据
-      this.kpiData[0].value = yieldPerAcre.toFixed(2);
-      this.kpiData[1].value = expectedIncome;
-      this.kpiData[2].value = this.currentFarmData.area;
-      this.kpiData[3].value = this.calculateRemainingDays();
-      
-      // 生成AI文本
-      this.fullAiText = `【智能分析】${this.currentFarmData.name}种植${this.currentFarmData.crop}，面积${this.currentFarmData.area}亩。当前环境评分${envScore}分，预计亩产${yieldPerAcre.toFixed(2)}吨，总产量${totalYield.toFixed(0)}吨，预计收入${expectedIncome}万元。${this.aiPredictions.weatherImpact}。`;
-      
-      // 生成基于季节的建议
-      const suggestions = [];
-      if (month >= 6 && month <= 8) suggestions.push('夏季高温，注意防暑降温');
-      if (month >= 11 || month <= 2) suggestions.push('冬季寒冷，注意保温防冻');
-      if (month >= 3 && month <= 4) suggestions.push('春季适宜播种，把握时机');
-      this.aiPredictions.suggestions = suggestions;
-      
-      this.animateKPIValues();
-      this.startAITyping();
-    },
-    
-    // 更新农田KPI卡片
-    updateFarmKPI() {
-      this.kpiData[2].value = this.currentFarmData.area;
-      this.kpiData[3].value = this.calculateRemainingDays();
-      
-      // 更新趋势信息
-      this.kpiData[0].trend = Math.random() * 10 - 5; // 模拟趋势
-      this.kpiData[1].trend = Math.random() * 10 - 5;
-      this.kpiData[2].trend = 0; // 面积不变
-      this.kpiData[3].trend = -1; // 天数递减
-      
-      this.animateKPIValues();
-    },
-    
-    // 计算收获日期
-    calculateHarvestDate() {
-      const plantDate = new Date(this.currentFarmData.plantDate);
-      const harvestDate = new Date(plantDate);
-      harvestDate.setDate(harvestDate.getDate() + (this.currentFarmData.growthDays || 90));
-      return harvestDate.toLocaleDateString();
-    },
-    
-    // 计算剩余天数
-    calculateRemainingDays() {
-      const plantDate = new Date(this.currentFarmData.plantDate);
-      const now = new Date();
-      const elapsedDays = Math.floor((now - plantDate) / (1000 * 60 * 60 * 24));
-      return Math.max(0, (this.currentFarmData.growthDays || 90) - elapsedDays);
-    },
-    
-    // 获取天气数据（模拟）
-    async getWeatherData() {
-      // 实际应用中应调用天气API
-      return {
-        temperature: 18 + Math.random() * 10,
-        humidity: 60 + Math.random() * 20,
-        forecast: '未来7天以晴天为主，局部有小雨'
-      };
-    },
-    
-    // 获取市场数据（模拟）
-    async getMarketData() {
-      // 实际应用中应调用市场数据API
-      const prices = {
-        '小麦': 2800 + Math.random() * 200,
-        '水稻': 3200 + Math.random() * 300,
-        '玉米': 2600 + Math.random() * 200,
-        '大豆': 5500 + Math.random() * 500
-      };
-      return {
-        price: prices[this.currentFarmData.crop] || 3000
-      };
-    },
-    
-    
-    // 获取历史数据
-    async fetchHistoryData() {
-      try {
-        const res = await this.request.get('/aether/readings/detail', { params: { days: 7 } });
-        if (res.data && res.data.data) {
-          this.historyData = res.data.data;
-        }
-      } catch (e) {
-        console.error('获取历史数据失败:', e);
-      }
-    },
-    
-    // 检查预警（基于农田数据）
-    checkAlerts() {
-      if (!this.currentFarmData) return;
-      
-      const alerts = [];
-      const now = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-      const remainingDays = this.calculateRemainingDays();
-      
-      // 收获期预警
-      if (remainingDays <= 7) {
-        alerts.push({
-          time: now,
-          sensor: this.currentFarmData.name,
-          type: '临近收获',
-          value: `剩余${remainingDays}天`,
-          handled: false,
-          severity: 'high'
-        });
-      }
-      
-      // 季节预警
-      const month = new Date().getMonth() + 1;
-      if (month >= 6 && month <= 8) {
-        alerts.push({
-          time: now,
-          sensor: this.currentFarmData.name,
-          type: '夏季高温',
-          value: '注意防暑',
-          handled: false,
-          severity: 'medium'
-        });
-      } else if (month >= 11 || month <= 2) {
-        alerts.push({
-          time: now,
-          sensor: this.currentFarmData.name,
-          type: '冬季低温',
-          value: '注意防冻',
-          handled: false,
-          severity: 'medium'
-        });
-      }
-      
-      // 添加新预警到列表
-      if (alerts.length > 0) {
-        this.alertData = [...alerts, ...this.alertData].slice(0, 10); // 保留最近10条
-      }
-    },
-    
-    
-    // 计算环境评分（不依赖传感器数据）
-    calculateEnvironmentScore() {
-      // 基于季节和作物生长周期计算
-      const month = new Date().getMonth() + 1;
-      let score = 75;
-      
-      // 季节评分
-      if (month >= 3 && month <= 5) score = 85; // 春季
-      else if (month >= 6 && month <= 8) score = 70; // 夏季
-      else if (month >= 9 && month <= 11) score = 80; // 秋季
-      else score = 65; // 冬季
-      
-      // 加上一些随机波动
-      score += (Math.random() * 10 - 5);
-      
-      return Math.max(0, Math.min(100, score)).toFixed(1);
-    },
-
-    // 更新时间
-    updateTime() {
-      const now = new Date();
-      this.currentTime = now.toLocaleTimeString('zh-CN');
-    },
-    
-    // AI 打字效果
-    startAITyping() {
-      // 确保先清空之前的内容
-      this.aiText = '';
-      this.typing = true;
-      let index = 0;
-      const typeInterval = setInterval(() => {
-        if (index < this.fullAiText.length) {
-          this.aiText += this.fullAiText[index];
-          index++;
-        } else {
-          this.typing = false;
-          clearInterval(typeInterval);
-        }
-      }, 50);  // 每50ms打一个字
-    },
-    
-    // KPI 数字跳动动画
-    animateKPIValues() {
-      this.kpiData.forEach((kpi, index) => {
-        let current = 0;
-        const target = Number(kpi.value);
-        const duration = 2000;
-        const step = target / (duration / 16);
-        
-        const animate = () => {
-          current += step;
-          if (current < target) {
-            this.animatedValues[index] = current.toFixed(1);
-            requestAnimationFrame(animate);
-          } else {
-            this.animatedValues[index] = Number(target).toFixed(1);
-          }
-        };
-        animate();
-      });
-    },
-    
-    // 刷新数据
     async refreshData() {
       this.loading = true;
-      if (this.selectedFarmId) {
+      try {
         await this.onFarmSelect(this.selectedFarmId);
-        this.$message.success('农田数据刷新成功！');
-      } else {
-        this.$message.warning('请先选择农田');
+        this.$message.success('数据已更新');
+      } catch (error) {
+        this.$message.error('刷新失败');
+      } finally {
+        this.loading = false;
       }
-      this.loading = false;
     },
-      // 更新雷达图（基于农田数据）
-    updateRadarChart(envScore) {
+    startAiAnalysis() {
+      this.aiTimer = setInterval(() => {
+        if (this.currentFarmData) this.generateAiAnalysis();
+      }, 30000);
+    },
+    generateAiAnalysis() {
+      this.qwenAnalyzing = true;
+      this.aiText = '模型正在分析当前地块数据...';
+      this.typing = false;
+      clearTimeout(this.typingTimeout);
+
+      setTimeout(() => {
+        const month = new Date().getMonth() + 1;
+        const crop = this.currentFarmData.crop;
+        
+        let suggestion = '环境稳定，作物生长正常，请继续保持巡检。';
+        if (month >= 3 && month <= 5) suggestion = '当前处于春季生长关键期，系统建议您加强水肥管理并监测土壤湿度。';
+        else if (month >= 6 && month <= 8) suggestion = '高温预警：请注意防暑降温，系统已就绪，可随时开启自动滴灌策略。';
+        else if (month >= 9 && month <= 11) suggestion = '秋季成熟期：作物长势喜人，预计品质优良，请合理安排采收计划。';
+
+        if (crop === '水稻') suggestion += ' 水稻处于分蘖期，建议保持浅水层。';
+        else if (crop === '小麦') suggestion += ' 小麦拔节期，需重点关注氮肥施用情况。';
+
+        const growthRate = Math.floor(70 + Math.random() * 20);
+        const expectedYield = (2.5 + Math.random() * 2).toFixed(1);
+        const harvestDate = new Date(Date.now() + (90 - this.currentFarmData.growthDays) * 86400000);
+
+        this.aiPredictions = {
+          growthRate,
+          harvestDate: harvestDate.toLocaleDateString('zh-CN'),
+          expectedYield: parseFloat(expectedYield),
+          marketAnalysis: '近期市场需求旺盛，预计价格有 5% 的上浮空间'
+        };
+
+        this.updateKPIs();
+        this.aiText = suggestion;
+        this.typeAiText();
+        this.qwenAnalyzing = false;
+      }, 1500);
+    },
+    typeAiText() {
+      this.typing = true;
+      const fullText = this.aiText;
+      let index = 0;
+
+      const type = () => {
+        if (this._isDestroyed) return;
+        if (index < fullText.length) {
+          this.aiText = fullText.substring(0, index + 1);
+          index++;
+          this.typingTimeout = setTimeout(type, 30); // 稍微加快打字速度
+        } else {
+          this.typing = false;
+        }
+      };
+      type();
+    },
+    updateKPIs() {
       if (!this.currentFarmData) return;
+      this.kpiData[0].value = this.aiPredictions.expectedYield || 2.8;
       
-      // 基于季节和作物类型生成模拟分数
-      const seasonScore = Number(envScore) || 75;
-      const yieldScore = Math.min(100, this.kpiData[0].value * 100);
-      const incomeScore = Math.min(100, this.kpiData[1].value * 2);
-      const areaScore = Math.min(100, this.currentFarmData.area / 2);
-      const timeScore = Math.min(100, 100 - this.calculateRemainingDays() / 0.9);
+      const prices = { '小麦': 2800, '水稻': 3200, '玉米': 2600 };
+      const marketPrice = prices[this.currentFarmData.crop] || 3000;
+      this.kpiData[1].value = ((this.kpiData[0].value * marketPrice) / 10000).toFixed(1);
       
-      const option = {
-        radar: {
-          indicator: [
-            { name: '季节适宜度', max: 100 },
-            { name: '预估亩产', max: 100 },
-            { name: '预计收益', max: 100 },
-            { name: '种植规模', max: 100 },
-            { name: '生长进度', max: 100 }
-          ],
-          radius: '65%',
-          splitArea: { areaStyle: { color: ['#f5f7fa', '#fff'] } }
-        },
-        series: [{
-          type: 'radar',
-          data: [
-            { 
-              value: [seasonScore, yieldScore, incomeScore, areaScore, timeScore], 
-              name: '农田综合评分', 
-              areaStyle: { color: 'rgba(34, 197, 94, 0.3)' }, 
-              itemStyle: { color: '#22c55e' }, 
-              lineStyle: { width: 2 } 
-            },
-            { 
-              value: [100, 100, 100, 100, 100], 
-              name: '标准参考值', 
-              lineStyle: { type: 'dashed', color: '#ccc' }, 
-              symbol: 'none' 
-            }
-          ]
-        }]
+      this.kpiData[2].value = this.currentFarmData.area || 100;
+      
+      const now = new Date();
+      const harvestDate = new Date(now.getTime() + (90 - this.currentFarmData.growthDays) * 86400000);
+      this.kpiData[3].value = Math.max(0, Math.ceil((harvestDate - now) / 86400000));
+    },
+    calculateEnvironmentScore() {
+      let score = 75 + (Math.random() * 10 - 5);
+      return Math.max(0, Math.min(100, score)).toFixed(1);
+    },
+    async refreshSensorData() {
+      this.sensorData = {
+        temperature: 20 + Math.random() * 10,
+        humidity: 40 + Math.random() * 30,
+        soilMoisture: 30 + Math.random() * 40,
+        lightIntensity: 100 + Math.random() * 800,
+        co2Level: 400 + Math.random() * 100
       };
-      this.radarChart.setOption(option);
+      this.envScore = this.calculateEnvironmentScore();
+      this.initRadarChart();
     },
 
+    // ✨精修：柔和的雷达图
     initRadarChart() {
-      if (!this.$refs.radarChart) return; // DOM不存在则跳过
+      if (!this.$refs.radarChart) return;
+      if (this.radarChart) this.radarChart.dispose();
       this.radarChart = echarts.init(this.$refs.radarChart);
-      const option = {
+
+      const data = [
+        this.sensorData.temperature,
+        this.sensorData.humidity,
+        this.sensorData.soilMoisture,
+        this.sensorData.lightIntensity / 10,
+        this.sensorData.co2Level / 10
+      ];
+
+      const color = this.getScoreColor(this.envScore);
+
+      this.radarChart.setOption({
         radar: {
           indicator: [
-            { name: '温度适宜度', max: 100 },
-            { name: '湿度适宜度', max: 100 },
-            { name: '光照充足度', max: 100 },
-            { name: 'CO2浓度', max: 100 },
-            { name: '土壤肥力', max: 100 }
+            { name: '温度', max: 40 },
+            { name: '空气湿度', max: 100 },
+            { name: '土壤湿度', max: 100 },
+            { name: '光照(x10)', max: 100 },
+            { name: 'CO2(x10)', max: 100 }
           ],
           radius: '65%',
-          splitArea: { areaStyle: { color: ['#f5f7fa', '#fff'] } }
+          center: ['50%', '55%'],
+          splitNumber: 4,
+          axisName: { color: '#8E8E93', fontSize: 12, fontWeight: 600 },
+          splitLine: { lineStyle: { color: '#E5E5EA', width: 1 } },
+          splitArea: { show: true, areaStyle: { color: ['#F8F9FA', '#FFFFFF'] } }, // 极柔和的背景交替
+          axisLine: { lineStyle: { color: '#E5E5EA' } }
         },
         series: [{
           type: 'radar',
-          data: [
-            { value: [90, 85, 70, 95, 88], name: '当前环境评分', areaStyle: { color: 'rgba(24, 144, 255, 0.3)' }, itemStyle: { color: '#1890ff' }, lineStyle: { width: 2 } },
-            { value: [100, 100, 100, 100, 100], name: '标准参考值', lineStyle: { type: 'dashed', color: '#ccc' }, symbol: 'none' }
-          ]
+          data: [{
+            value: data,
+            name: '实时环境',
+            itemStyle: { color: color },
+            areaStyle: { color: echarts.color.modifyAlpha(color, 0.08) }, // ✨ 精修：透明度降到0.08，极其高级的磨砂感
+            lineStyle: { width: 1.5 } // ✨ 精修：线条变细
+          }]
         }]
-      };
-      if (this.radarChart) this.radarChart.setOption(option);
-    },
-
-    initParticleCanvas() {
-      this.canvas = this.$refs.particleCanvas;
-      if (!this.canvas) return;
-      this.ctx = this.canvas.getContext('2d');
-      this.resizeCanvas();
-      window.addEventListener('resize', this.resizeCanvas);
-      this.initParticles();
-      this.animate();
-    },
-
-    resizeCanvas() {
-      if (!this.canvas) return;
-      const container = this.canvas.parentElement;
-      const { width, height } = container.getBoundingClientRect();
-      this.canvas.width = width;
-      this.canvas.height = height;
-      this.canvasWidth = width;
-      this.canvasHeight = height;
-    },
-
-    initParticles() {
-      const count = 40;
-      this.particles = [];
-      for (let i = 0; i < count; i++) {
-        this.particles.push({
-          x: Math.random() * this.canvasWidth,
-          y: Math.random() * this.canvasHeight,
-          vx: (Math.random() - 0.5) * 0.3,
-          vy: (Math.random() - 0.5) * 0.3,
-          r: Math.random() * 2 + 1,
-          alpha: Math.random() * 0.4 + 0.1
-        });
-      }
-    },
-
-    animate() {
-      if (!this.ctx || !this.particles.length) return;
-      const ctx = this.ctx;
-      const particles = this.particles;
-      const width = this.canvasWidth;
-      const height = this.canvasHeight;
-
-      ctx.clearRect(0, 0, width, height);
-
-      particles.forEach(p => {
-        p.x += p.vx;
-        p.y += p.vy;
-        if (p.x < 0 || p.x > width) p.vx *= -1;
-        if (p.y < 0 || p.y > height) p.vy *= -1;
-
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(37, 99, 235, ${p.alpha * 0.3})`;
-        ctx.fill();
       });
-
-      this.animationId = requestAnimationFrame(this.animate);
     },
 
-    // 多地块对比图
+    // ✨精修：去线化的原生图表 + 稳定伪随机数据
     initCompareChart() {
-      if (!this.$refs.compareChart) return; // DOM不存在则跳过
+      if (!this.$refs.compareChart) return;
+      if (this.compareChart) this.compareChart.dispose();
       this.compareChart = echarts.init(this.$refs.compareChart);
-      const farms = this.farmList.filter(f => this.selectedFarms.includes(f.id)).map(f => f.name);
       
-      const option = {
-        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-        legend: { data: ['温度', '湿度'], bottom: 5 },
-        grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
-        xAxis: { type: 'category', data: farms },
-        yAxis: { type: 'value' },
+      const farms = this.farmList.filter(f => this.selectedFarms.includes(f.id));
+      if(farms.length === 0) return;
+
+      const farmNames = farms.map(f => f.name);
+      
+      // 生成稳定的伪随机数据(根据地块ID计算，确保每次渲染数据不乱跳)
+      const tempDatas = farms.map(f => (20 + (f.id % 5) * 2).toFixed(1));
+      const humiDatas = farms.map(f => (50 + (f.id % 4) * 5).toFixed(1));
+
+      this.compareChart.setOption({
+        tooltip: { trigger: 'axis', axisPointer: { type: 'none' }, backgroundColor: 'rgba(255,255,255,0.9)', borderColor: '#E5E5EA', textStyle: { color: '#1C1C1E' } },
+        legend: { data: ['平均温度 (℃)', '平均湿度 (%)'], bottom: 0, textStyle: { color: '#8E8E93', fontWeight: 500 }, icon: 'circle' },
+        grid: { left: '2%', right: '2%', bottom: '15%', top: '15%', containLabel: true },
+        xAxis: { 
+          type: 'category', 
+          data: farmNames, 
+          axisLine: { show: false }, // ✨ 精修：隐藏X轴底线
+          axisTick: { show: false }, // ✨ 精修：隐藏X轴刻度
+          axisLabel: { color: '#8E8E93', fontWeight: 600, margin: 12 } 
+        },
+        yAxis: { 
+          type: 'value', 
+          axisLine: { show: false }, // ✨ 精修：隐藏Y轴轴线
+          axisTick: { show: false },
+          splitLine: { lineStyle: { color: '#F2F2F7', type: 'solid' } }, // ✨ 精修：使用固态浅灰网格线
+          axisLabel: { color: '#8E8E93' } 
+        },
         series: [
           {
-            name: '温度',
-            type: 'bar',
-            data: farms.map(() => 20 + Math.random() * 10),
-            itemStyle: {
-              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                { offset: 0, color: '#ff9a56' },
-                { offset: 1, color: '#ff7b39' }
-              ])
-            }
+            name: '平均温度 (℃)', type: 'bar', barWidth: '15%', barGap: '20%',
+            itemStyle: { color: '#FF9500', borderRadius: [6, 6, 0, 0] }, // 圆角稍微增大
+            data: tempDatas
           },
           {
-            name: '湿度',
-            type: 'bar',
-            data: farms.map(() => 50 + Math.random() * 20),
-            itemStyle: {
-              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                { offset: 0, color: '#4facfe' },
-                { offset: 1, color: '#00f2fe' }
-              ])
-            }
+            name: '平均湿度 (%)', type: 'bar', barWidth: '15%',
+            itemStyle: { color: '#34C759', borderRadius: [6, 6, 0, 0] },
+            data: humiDatas
           }
         ]
-      };
-      this.compareChart.setOption(option);
+      });
     },
-
     handleResize() {
-      this.radarChart && this.radarChart.resize();
-      this.compareChart && this.compareChart.resize();
-    },
-
-    // 控制IoT设备
-    async controlDevice(type) {
-      if (type === 'led') {
-        try {
-          const res = await this.request.post('/aether/device/control/led', { 
-            led: this.sensorData.led ? 1 : 0 
-          });
-          if (res.code === '200') {
-            this.$message.success(`LED补光灯已${this.sensorData.led ? '开启' : '关闭'}`);
-          }
-        } catch (e) {
-          this.$message.error('控制失败');
-          this.sensorData.led = !this.sensorData.led; // 恢复状态
-        }
-      } else if (type === 'irrigation') {
-        this.$message.success(`智能灌溉已${this.autoControl.irrigation ? '开启' : '关闭'}`);
-        if (this.autoControl.irrigation) {
-          // 自动关闭（30分钟后）
-          setTimeout(() => {
-            this.autoControl.irrigation = false;
-            this.$message.info('灌溉已自动停止');
-          }, 30 * 60 * 1000);
-        }
-      } else if (type === 'ventilation') {
-        this.$message.success(`通风系统已${this.autoControl.ventilation ? '开启' : '关闭'}`);
-      }
-    },
-    
-    // 处理预警
-    handleAlert(index) {
-      this.alertData[index].handled = true;
-      this.$message.success('预警已处理');
-      
-      // 根据预警类型自动执行相应操作
-      const alert = this.alertData[index];
-      if (alert.type === '土壤缺水') {
-        this.autoControl.irrigation = true;
-        this.controlDevice('irrigation');
-      } else if (alert.type === '温度过高') {
-        this.autoControl.ventilation = true;
-        this.controlDevice('ventilation');
-      }
-    },
-
-    exportData() {
-      this.$message.success('正在生成环境监测报表(PDF)，请稍候...');
-      // TODO: 实现导出功能
-    },
-
-    getTypeColor(type) {
-      if(type.includes('高')) return 'text-danger';
-      if(type.includes('低')) return 'text-warning';
-      return 'text-info';
-    },
-    
-    getAlertIcon(type) {
-      if(type.includes('温度')) return 'el-icon-sunny';
-      if(type.includes('湿度')) return 'el-icon-heavy-rain';
-      if(type.includes('CO2')) return 'el-icon-wind-power';
-      if(type.includes('设备')) return 'el-icon-warning';
-      if(type.includes('土壤')) return 'el-icon-view';
-      return 'el-icon-info';
-    },
-    
-    getAlertIconClass(type) {
-      if(type.includes('高')) return 'danger';
-      if(type.includes('低')) return 'warning';
-      if(type.includes('超标')) return 'danger';
-      if(type.includes('离线')) return 'info';
-      return 'warning';
+      if(this.radarChart) this.radarChart.resize();
+      if(this.compareChart) this.compareChart.resize();
     }
   }
 }
 </script>
 
 <style scoped>
-.env-monitor-page {
-  position: relative;
-  padding: 16px;
-  padding-top: 8px;
-  padding-bottom: 40px;
-  background: #f4f6f9;
-  min-height: calc(100vh - 60px);
-  overflow-y: auto;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
-}
-
-.env-monitor-page::-webkit-scrollbar {
-  width: 8px;
-}
-
-.env-monitor-page::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 4px;
-}
-
-.env-monitor-page::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
-  border-radius: 4px;
-}
-
-.env-monitor-page::-webkit-scrollbar-thumb:hover {
-  background: #a1a1a1;
-}
-
-/* 简洁背景装饰 */
-.bg-gradient {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(to bottom, #fafbfc 0%, #f4f6f9 100%);
-  opacity: 1;
-  z-index: 0;
-}
-
-/* 粒子画布 */
-.particle-canvas {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 1;
-  pointer-events: none;
-  opacity: 0.2;
-}
-
-.env-monitor-page > *:not(.particle-canvas):not(.page-header) {
-  position: relative;
-  z-index: 2;
-}
-
-/* 玻璃态效果 */
-.glass-effect {
-  background: white;
-  backdrop-filter: blur(20px);
-  border: 1px solid #ffffff;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.03), 0 4px 6px -2px rgba(0, 0, 0, 0.01);
-}
-
-/* 头部样式 */
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-  padding: 12px 20px;
-  border-radius: 16px;
-  position: relative;
-  z-index: 100;
-}
-
-.left-title {
-  flex: 1;
-}
-
-.left-title h2 {
-  margin: 0 0 4px 0;
-  color: #1e293b;
-  font-size: 20px;
-  font-weight: 800;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.header-center {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.header-right {
-  flex: 0 0 auto;
-  display: flex;
-  gap: 10px;
-}
-
-.icon-pulse {
-  width: 32px;
-  height: 32px;
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  animation: pulse 2s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.7); }
-  50% { transform: scale(1.05); box-shadow: 0 0 20px 10px rgba(102, 126, 234, 0); }
-}
-
-.icon-pulse i {
-  color: #fff;
-  font-size: 18px;
-}
-
-.left-title .sub {
-  font-size: 11px;
-  color: #64748b;
-  display: block;
-  margin-bottom: 4px;
-  letter-spacing: 1px;
-}
-
-.status-bar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  color: #10b981;
-  margin-top: 2px;
-}
-
-.status-dot {
-  width: 6px;
-  height: 6px;
-  background: #10b981;
-  border-radius: 50%;
-  animation: blink 2s ease-in-out infinite;
-}
-
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
-}
-
-.divider {
-  color: #cbd5e1;
-}
-
-.time-update {
-  font-family: 'Courier New', monospace;
-  color: #2563eb;
-  font-weight: 600;
-}
-
-.right-actions {
-  display: flex;
-  gap: 10px;
-}
-
-/* AI 建议卡片样式在底部定义 */
-
-.ai-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.ai-avatar {
-  width: 40px;
-  height: 40px;
-  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 22px;
-  box-shadow: 0 4px 20px rgba(124, 58, 237, 0.3);
-}
-
-.ai-icon {
-  width: 28px;
-  height: 28px;
-  object-fit: contain;
-}
-
-.ai-title {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.title-text {
-  font-size: 16px;
-  font-weight: 700;
-  color: #1e293b;
-}
-
-.ai-content {
-  background: rgba(124, 58, 237, 0.05);
-  padding: 12px;
-  border-radius: 12px;
-  margin-bottom: 10px;
-  border-left: 3px solid #7c3aed;
-}
-
-.typing-text {
-  font-size: 14px;
-  line-height: 1.8;
-  color: #475569;
-  margin: 0;
-}
-
-.cursor {
-  animation: cursor-blink 1s step-start infinite;
-  color: #7c3aed;
-  font-weight: bold;
-}
-
-@keyframes cursor-blink {
-  50% { opacity: 0; }
-}
-
-.ai-footer {
-  display: flex;
-  gap: 20px;
-  font-size: 12px;
-  color: #94a3b8;
-}
-
-.ai-footer span {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-/* AI预测结果 */
-.ai-predictions {
-  margin-top: 15px;
-  padding: 15px;
-  background: rgba(124, 58, 237, 0.03);
-  border-radius: 10px;
-  border: 1px solid rgba(124, 58, 237, 0.1);
-}
-
-.prediction-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
-  font-size: 14px;
-  color: #475569;
-}
-
-.prediction-item:last-child {
-  margin-bottom: 0;
-}
-
-.prediction-item i {
-  color: #7c3aed;
-  font-size: 16px;
-}
-
-.prediction-item .el-progress {
-  flex: 1;
-  max-width: 200px;
-}
-
-/* KPI 卡片 */
-.kpi-row {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.kpi-card {
-  position: relative;
-  background: white;
-  backdrop-filter: blur(20px);
-  border: 1px solid #ffffff;
-  border-radius: 16px;
+/* ========================================================== */
+/* 苹果 iOS 极简扁平风格 - 仪表盘 (Final Polish) */
+/* ========================================================== */
+.ios-dashboard {
   padding: 20px;
+  background-color: #F2F2F7;
+  min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* 公共卡片样式 */
+.ios-card {
+  background: #FFFFFF;
+  border-radius: 18px; /* 更加圆润 */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03); /* 更柔和的弥散阴影 */
+  border: 1px solid rgba(229, 231, 235, 0.4);
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+
+.card-header {
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.card-header.border-bottom {
+  border-bottom: 1px solid #F2F2F7;
+}
+.header-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1C1C1E;
   display: flex;
   align-items: center;
-  gap: 16px;
-  overflow: hidden;
-  transition: all 0.3s;
-  cursor: pointer;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.03), 0 4px 6px -2px rgba(0, 0, 0, 0.01);
+  gap: 8px;
+}
+.header-title i { font-size: 18px; }
+
+/* 1. 顶部操作栏 */
+.ios-header-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+.header-left { display: flex; align-items: center; gap: 16px; }
+.title-box { display: flex; align-items: center; gap: 10px; }
+.title-box h1 { font-size: 22px; font-weight: 800; color: #1C1C1E; margin: 0; letter-spacing: 0.5px;}
+.icon-blue { font-size: 24px; color: #007AFF; }
+.status-pill {
+  display: flex; align-items: center; gap: 6px;
+  background: #E8F8F0; color: #34C759; padding: 6px 12px;
+  border-radius: 999px; font-size: 13px; font-weight: 600;
+}
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: #34C759; animation: blink 2s infinite; }
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+.header-right { display: flex; align-items: center; gap: 12px; }
+::v-deep .ios-select .el-input__inner {
+  background: #FFFFFF; border: 1px solid #E5E5EA; border-radius: 10px;
+  height: 38px; line-height: 38px; color: #1C1C1E; font-weight: 500;
+}
+::v-deep .ios-select .el-input__inner:focus { border-color: #007AFF; box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.1); }
+.farm-select { width: 220px; }
+.ios-btn-secondary {
+  background: #FFFFFF !important; border: 1px solid #E5E5EA !important; color: #007AFF !important;
+  border-radius: 10px !important; font-weight: 600 !important; height: 38px;
 }
 
-.kpi-card.excellent {
-  border-color: #22c55e;
-  background: linear-gradient(135deg, #f0fdf4, #fff);
+/* ✨ 2. KPI 卡片 (精修呼吸感间距) */
+.kpi-row { margin-bottom: 4px; }
+.kpi-card { padding: 22px 20px; display: flex; align-items: center; gap: 16px; transition: transform 0.2s; cursor: default;}
+.kpi-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.05); }
+.kpi-icon-box {
+  width: 52px; height: 52px; border-radius: 14px;
+  display: flex; align-items: center; justify-content: center; font-size: 26px;
 }
+.bg-blue { background: #E5F1FF; color: #007AFF; }
+.bg-green { background: #E8F8F0; color: #34C759; }
+.bg-orange { background: #FFF4E5; color: #FF9500; }
+.bg-purple { background: #F4E8FF; color: #AF52DE; }
+.kpi-info { display: flex; flex-direction: column; }
+.kpi-label { font-size: 13px; color: #8E8E93; font-weight: 600; margin-bottom: 8px;} /* ✨ 增加底部留白 */
+.kpi-value { font-size: 28px; font-weight: 800; color: #1C1C1E; line-height: 1;} /* 略微放大数值 */
+.unit { font-size: 14px; font-weight: 600; color: #8E8E93; margin-left: 4px;}
 
-.kpi-card.warning {
-  border-color: #e6a23c;
-  background: linear-gradient(135deg, #fffbf5, #fff);
+/* ✨ 3. AI 卡片 (精修 iMessage 气泡) */
+.middle-row { display: flex; align-items: stretch; }
+.ai-card, .radar-card { height: 340px; display: flex; flex-direction: column; }
+.ios-tag-loading { background: #F2F2F7; color: #8E8E93; border: none; font-weight: 600; border-radius: 6px;}
+.ios-tag-success { background: #E8F8F0; color: #34C759; border: none; font-weight: 600; border-radius: 6px;}
+
+.ai-body { padding: 20px; flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
+.ai-chat-container { display: flex; gap: 14px; align-items: flex-end; margin-bottom: 10px;}
+.ai-avatar { 
+  width: 42px; height: 42px; border-radius: 50%; background: white; 
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08); padding: 5px; flex-shrink: 0;
+  margin-bottom: 4px; /* 对齐气泡底部 */
 }
+.ai-avatar img { width: 100%; height: 100%; object-fit: contain; }
 
-.kpi-card.danger {
-  border-color: #f56c6c;
-  background: linear-gradient(135deg, #fff5f5, #fff);
-}
-
-.kpi-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05);
-}
-
-.update-time {
-  font-size: 11px;
-  color: #94a3b8;
-  margin-top: 4px;
-}
-
-.kpi-bg-wave {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  height: 4px;
-  background: linear-gradient(90deg, transparent, rgba(37, 99, 235, 0.2), transparent);
-  animation: wave 3s linear infinite;
-}
-
-@keyframes wave {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
-}
-
-.icon-box {
+/* iMessage 风格气泡 */
+.ai-chat-bubble { 
+  flex: 1;
+  background: #F2F2F7; 
+  padding: 14px 18px; 
+  border-radius: 20px;
+  border-bottom-left-radius: 4px; /* ✨ 形成气泡小尾巴 */
   position: relative;
-  width: 60px;
-  height: 60px;
-  border-radius: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 28px;
-  color: #fff;
 }
+.typing-text { font-size: 14px; color: #1C1C1E; line-height: 1.6; margin: 0; font-weight: 500;}
+.cursor { display: inline-block; width: 2px; height: 14px; background: #007AFF; margin-left: 2px; animation: blink 1s infinite; vertical-align: middle;}
 
-.icon-ring {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  border: 2px solid rgba(255, 255, 255, 0.5);
-  border-radius: 16px;
-  animation: ring 2s ease-in-out infinite;
+.ai-metrics { display: flex; gap: 16px; margin-top: 10px; }
+.metric-item { flex: 1; background: #FFFFFF; border: 1px solid #E5E5EA; padding: 14px; border-radius: 14px; display: flex; flex-direction: column; justify-content: center;}
+.metric-label { font-size: 12px; color: #8E8E93; font-weight: 600; margin-bottom: 8px;}
+.metric-val { font-size: 16px; font-weight: 700; color: #1C1C1E;}
+.text-blue { color: #007AFF; }
+
+/* 4. 雷达卡片 */
+.score-text { font-size: 15px; font-weight: 800; font-family: -apple-system; }
+.chart-container { flex: 1; width: 100%; min-height: 240px; }
+.chart-container.large { height: 320px; padding: 10px 20px;}
+
+/* 5. 底部对比卡片 */
+.compare-card { margin-top: 4px; }
+.checkbox-group-ios { background: #F2F2F7; padding: 4px; border-radius: 8px; }
+::v-deep .checkbox-group-ios .el-checkbox.is-bordered { 
+  border: none; background: transparent; padding: 6px 16px; height: auto; margin: 0; border-radius: 6px; transition: 0.2s;
 }
-
-@keyframes ring {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.1); opacity: 0.5; }
+::v-deep .checkbox-group-ios .el-checkbox.is-bordered.is-checked {
+  background: #FFFFFF; box-shadow: 0 1px 3px rgba(0,0,0,0.1); 
 }
-
-.icon-box.temp { background: linear-gradient(135deg, #ff7eb3, #ff758c); }
-.icon-box.humi { background: linear-gradient(135deg, #4facfe, #00f2fe); }
-.icon-box.soil { background: linear-gradient(135deg, #fbbf24, #f59e0b); }
-.icon-box.device { background: linear-gradient(135deg, #a78bfa, #8b5cf6); }
-.icon-box.yield { background: linear-gradient(135deg, #4ade80, #22c55e); }
-.icon-box.income { background: linear-gradient(135deg, #fbbf24, #f59e0b); }
-.icon-box.area { background: linear-gradient(135deg, #60a5fa, #3b82f6); }
-.icon-box.growth { background: linear-gradient(135deg, #f472b6, #ec4899); }
-
-.kpi-content {
-  flex: 1;
-}
-
-.kpi-content .label {
-  color: #64748b;
-  font-size: 12px;
-  margin-bottom: 8px;
-}
-
-.kpi-content .value {
-  color: #1e293b;
-  font-size: 28px;
-  font-weight: 800;
-  font-family: 'Arial', sans-serif;
-}
-
-.unit {
-  font-size: 14px;
-  font-weight: normal;
-  color: #64748b;
-  margin-left: 4px;
-}
-
-.trend {
-  font-size: 12px;
-  margin-top: 6px;
-  color: #94a3b8;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.trend.up { color: #10b981; }
-.trend.down { color: #ef4444; }
-
-/* 玻璃面板 */
-.glass-panel {
-  background: white;
-  backdrop-filter: blur(20px);
-  border: 1px solid #ffffff;
-  border-radius: 16px;
-  padding: 15px;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.03), 0 4px 6px -2px rgba(0, 0, 0, 0.01);
-}
-
-/* AI卡片样式 */
-.ai-advice-card {
-  background: linear-gradient(135deg, white 0%, #fafbfc 100%);
-  backdrop-filter: blur(20px);
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  padding: 16px;
-  margin-bottom: 16px;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.03), 0 4px 6px -2px rgba(0, 0, 0, 0.01);
-  transition: all 0.3s;
-}
-
-.chart-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
-
-.chart-header .title {
-  font-weight: 700;
-  color: #1e293b;
-  font-size: 16px;
-}
-
-
-
-
-/* 表格样式 */
-.text-danger {
-  color: #ef4444;
-  font-weight: 700;
-}
-
-.text-warning {
-  color: #f59e0b;
-}
-
-.text-info {
-  color: #6b7280;
-}
-
-/* Agent 区域 */
-.agent-card {
-  margin-bottom: 16px;
-  padding: 16px;
-}
-
-.agent-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
-
-.agent-sub {
-  margin: 4px 0 0 0;
-  color: #94a3b8;
-  font-size: 12px;
-}
-
-.agent-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.agent-plan {
-  margin-top: 12px;
-  border: 1px dashed #e2e8f0;
-  border-radius: 10px;
-  padding: 10px;
-}
-
-.agent-advice {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #475569;
-  margin-bottom: 10px;
-}
-
-.agent-action-item {
-  padding: 8px 0;
-  border-bottom: 1px solid #f1f5f9;
-}
-
-.agent-action-item:last-child {
-  border-bottom: none;
-}
-
-.action-title {
-  font-weight: 700;
-  margin-right: 10px;
-}
-
-.action-desc {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 4px;
-  font-size: 13px;
-  color: #64748b;
-}
-
-.action-route {
-  color: #2563eb;
-  font-weight: 600;
-}
-
-.agent-results {
-  margin-top: 12px;
-  background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 0;
-  overflow: hidden;
-}
-
-.results-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 16px;
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-  color: white;
-  font-weight: 700;
-  font-size: 14px;
-}
-
-.results-title i {
-  font-size: 16px;
-}
-
-.agent-result-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  border-bottom: 1px solid #f1f5f9;
-  transition: all 0.3s;
-}
-
-.agent-result-item:last-child {
-  border-bottom: none;
-}
-
-.agent-result-item:hover {
-  background: rgba(37, 99, 235, 0.05);
-}
-
-.result-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  flex-shrink: 0;
-}
-
-.agent-result-item.success .result-icon {
-  background: rgba(22, 163, 74, 0.1);
-  color: #16a34a;
-}
-
-.agent-result-item.pending-client .result-icon {
-  background: rgba(37, 99, 235, 0.1);
-  color: #2563eb;
-}
-
-.agent-result-item.failed .result-icon {
-  background: rgba(220, 38, 38, 0.1);
-  color: #dc2626;
-}
-
-.result-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.result-message {
-  color: #1e293b;
-  font-weight: 600;
-  font-size: 14px;
-}
-
-.result-route {
-  color: #64748b;
-  font-size: 12px;
-  font-family: 'Courier New', monospace;
-}
+::v-deep .checkbox-group-ios .el-checkbox__input { display: none; }
+::v-deep .checkbox-group-ios .el-checkbox__label { padding: 0; color: #8E8E93; font-weight: 600; font-size: 13px;}
+::v-deep .checkbox-group-ios .el-checkbox.is-checked .el-checkbox__label { color: #1C1C1E; }
 </style>
-

@@ -1,46 +1,124 @@
+# IDE and editor settings
 .idea/
 .vscode/
 .claude/
 .codex/
 .DS_Store
 Thumbs.db
+*.swp
+*.swo
 
+# Environment specific files
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+.env.*
+
+# Logs
 logs/
 *.log
+*.log.*
 model_call_log.txt
 springboot/model_call_log.txt
 
+# Build and dependency directories
+## Spring Boot
 springboot/target/
 springboot/.idea/
 springboot/.mvn/
+springboot/bin/
+springboot/logs/
 
+## Vue
 vue/node_modules/
 vue/dist/
 vue/.env.local
 vue/.env.development.local
 vue/.env.test.local
 vue/.env.production.local
+vue/.vuepress/dist/
 
+## Python/Anaconda
+TomatoDetection/.venv/
+TomatoDetection/venv/
+TomatoDetection/ENV/
+TomatoDetection/env.bak/
+TomatoDetection/__pycache__/
+TomatoDetection/*.pyc
+TomatoDetection/*.pyo
+TomatoDetection/.DS_Store
+TomatoDetection/.pytest_cache/
+TomatoDetection/api_uploads/
+TomatoDetection/api_results/
+TomatoDetection/*.log
+TomatoDetection/.idea/
+
+## HarmonyOS/OpenHarmony
 HongMeng/.hvigor/
 HongMeng/.appanalyzer/
 HongMeng/local.properties
 HongMeng/entry/.preview/
 HongMeng/entry/build/
+HongMeng/.idea/
 
-.env
-.env.local
-.env.development
-.env.production
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+iTunes Music Library.xml
+Thumbs.db
 
-uploads/
-temp/
-tmp/
+# Temporary files
 *.tmp
+*.temp
+tmp/
+temp/
+uploads/
+.tmp/
+.cache/
 
-TomatoDetection/.git/
-TomatoDetection/.git_local_backup/
-TomatoDetection/.idea/
-TomatoDetection/.venv/
-TomatoDetection/api_uploads/
-TomatoDetection/api_results/
-TomatoDetection/*.log
+# Local startup scripts
+TomatoDetection/start_*.bat
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Package manager
+node_modules/
+jspm_packages/
+
+# Compiled files
+*.class
+*.o
+*.so
+*.dll
+*.dylib
+*.exe
+
+# Distribution / packaging
+*.tar.*
+*.zip
+*.rar
+*.gz
+*.7z
+
+# Testing
+coverage/
+.nyc_output/
+.jest/
+jest/
+
+# CI/CD
+.github/
+.circleci/
+
+# Local configuration
+.vscode/settings.json
+!.gitignore

@@ -98,11 +98,31 @@ python:
 # OneNET物联网平台配置（STM32硬件）
 onenet:
   api-url: https://iot-api.heclouds.com
-  author-key: ${ONENET_AUTHOR_KEY:}
-  user-id: ${ONENET_USER_ID:}
-  version: ${ONENET_VERSION:2022-05-01}
-  product-id: ${ONENET_PRODUCT_ID:}
-  device-name: ${ONENET_DEVICE_NAME:}
+  author-key: o8FzlxdX8UO7UfvRKduJdztLTalf0Yvn25vH2afpA/k=
+  user-id: 502959
+  version: 2022-05-01
+  product-id: yN8ZASFo9d
+  device-name: d1
   new-product-id: ${ONENET_NEW_PRODUCT_ID:}
   new-device-name: ${ONENET_NEW_DEVICE_NAME:}
-  enabled: ${ONENET_ENABLED:true}
+  enabled: true
+
+# 自动灌溉配置
+auto-irrigation:
+  # === 开启灌溉条件（满足任一即可）===
+  # 土壤湿度阈值（低于此值自动开启灌溉，单位：%）
+  soil-humidity-threshold: 30
+  # 空气湿度阈值（低于此值自动开启灌溉，单位：%）
+  air-humidity-threshold: 40
+  # 温度阈值（高于此值自动开启灌溉降温，单位：℃）
+  temperature-threshold: 35
+
+  # === 关闭灌溉条件（满足所有恢复阈值，或超时）===
+  # 土壤湿度恢复阈值（高于此值可关闭灌溉，默认比开启阈值高5%）
+  soil-humidity-recover: 35
+  # 空气湿度恢复阈值（高于此值可关闭灌溉，默认比开启阈值高5%）
+  air-humidity-recover: 45
+  # 温度恢复阈值（低于此值可关闭灌溉，默认比开启阈值低5℃）
+  temperature-recover: 30
+  # 最大运行时长（分钟），超时强制关闭水泵
+  max-duration-minutes: 30

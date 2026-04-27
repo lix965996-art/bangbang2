@@ -7,10 +7,12 @@ const mapConfig = {
   // 高德地图API配置
   amap: {
     // JavaScript API Key（前端地图使用）
-    jsKey: process.env.VUE_APP_AMAP_JS_KEY || '',
+    // 临时写死Key，等环境变量清理后恢复
+    jsKey: 'd806efe96e9b2c062cf900915936508f',
 
     // 高德地图安全码（前端地图使用）
-    securityCode: process.env.VUE_APP_AMAP_SECURITY_CODE || '',
+    // 如果Key没有开启安全密钥，留空即可
+    securityCode: '',
     
     // API版本
     version: '2.0',
