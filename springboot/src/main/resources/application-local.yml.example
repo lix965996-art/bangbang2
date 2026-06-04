@@ -1,0 +1,38 @@
+spring:
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:smart-agriculture}?characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&rewriteBatchedStatements=true&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+
+jwt:
+  secret: ${JWT_SECRET:please-change-to-a-random-secret-at-least-32-chars}
+  expire-hours: ${JWT_EXPIRE_HOURS:12}
+
+amap:
+  js-key: ${AMAP_JS_KEY:}
+  web-key: ${AMAP_WEB_KEY:}
+  js-security-key: ${AMAP_JS_SECURITY_KEY:}
+  city: ${AMAP_CITY:430800}
+
+python:
+  api-url: ${PYTHON_API_URL:http://localhost:5000}
+
+onenet:
+  api-url: https://iot-api.heclouds.com
+  author-key: ${ONENET_AUTHOR_KEY:}
+  user-id: ${ONENET_USER_ID:}
+  product-id: ${ONENET_PRODUCT_ID:}
+  device-name: ${ONENET_DEVICE_NAME:}
+  new-product-id: ${ONENET_NEW_PRODUCT_ID:}
+  new-device-name: ${ONENET_NEW_DEVICE_NAME:}
+  enabled: ${ONENET_ENABLED:false}
+
+iot:
+  callback-secret: ${IOT_CALLBACK_SECRET:}
+
+agent:
+  autonomous:
+    enabled: ${AGENT_AUTONOMOUS_ENABLED:false}
+
+patrol:
+  enabled: ${PATROL_ENABLED:true}

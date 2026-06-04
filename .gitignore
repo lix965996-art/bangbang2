@@ -1,0 +1,67 @@
+# Dependencies
+node_modules/
+.venv/
+venv/
+
+# Build outputs
+dist/
+dist_electron/
+frontend-dist.tar.gz
+target/
+bin/
+*.class
+*.jar
+*.war
+*.asar
+*.exe
+
+# Logs and runtime files
+logs/
+*.log
+*.err
+model_call_log.txt
+dev-server-current.*
+
+# Runtime uploads and generated AI detection outputs
+api_uploads/
+api_results/
+
+# Large local demo assets. Keep them locally and document where to place them.
+TomatoDetection/models/
+TomatoDetection/disease_weights/
+TomatoDetection/Font/
+vue/public/models/
+vue/public/textures/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+application-local.yml
+
+# IDE and OS files
+.idea/
+.vscode/
+.claude/
+.codex-ppt-work/
+.metals/
+.bsp/
+.publish*/
+.DS_Store
+Thumbs.db
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Local documents, competition materials and generated reports
+doc_screenshots/
+CODE_AUDIT_REPORT.md
+README_CLEAN.md
+*.ppt
+*.pptx
+*.doc
+*.docx
+*.pdf
+*.zip
+*.tar.gz
